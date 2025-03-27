@@ -1,0 +1,115 @@
+<%- pageCSS = `
+<link href="/plugins/custom/datatables/datatables.bundle.css" rel="stylesheet" type="text/css"/>
+` %>
+
+<style>
+    .img-fluid{
+        width: 50px;
+        height: 60px;
+    }
+
+    .dbimg
+    {
+        width: 30px;
+        height: 30px;
+        filter: drop-shadow(1px 1px 1px black);
+
+    }
+</style>
+<div id="kt_app_toolbar" class="app-toolbar py-3 py-lg-6">
+    <div id="kt_app_toolbar_container" class="app-container container-fluid d-flex flex-stack">
+        <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
+            <h1 class="page-heading d-flex text-gray-900 fw-bold fs-3 flex-column justify-content-center my-0">
+                Categories</h1>
+            <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 my-0 pt-1">
+                <li class="breadcrumb-item text-muted">
+                    <a href="/admin/dashboard" class="text-muted text-hover-primary">Home</a>
+                </li>
+                <li class="breadcrumb-item">
+                    <span class="bullet bg-gray-500 w-5px h-2px"></span>
+                </li>
+                <li class="breadcrumb-item text-muted">Categories</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div id="kt_app_content" class="app-content flex-column-fluid">
+    <div id="kt_app_content_container" class="app-container container-fluid">
+
+        <% if (access_routes.Masters.Categories[0].permission == "1") { %>
+        <div class="card card-flush mb-4">
+            <div class="card-body py-4">
+                <div class="filter">
+                    <form id="addEditForm" action="" enctype="multipart/form-data" method="POST" class="row">
+                        <input type="hidden" name="_token" value="wAYoUGG1mXG10G1Qqe5wstXxjOvm9r71WdsTEAYR"
+                            autocomplete="off"> <input type="hidden" id="cat_id" name="cat_id">
+
+                        <div class="col-3">
+                            <label class="fs-6 fw-semibold form-label mb-2"><span class="required">Icon</span></label>
+                            <input type="file" class="form-control " name="icon" id="icon" accept="image/svg"/>
+
+                        </div>
+
+                        <div class="col-1 text-center">
+                            <img src="https://placehold.co/24x24" alt="image_preview" class="img-fluid mt-4 rounded" id="mediaPreview">
+                            <p class="error text-danger icon-error"></span>
+                        </div>
+
+                        <div class="col-3">
+                            <label class="fs-6 fw-semibold form-label mb-2"><span class="required">Green Icon</span></label>
+                            <input type="file" class="form-control " name="green_icon" id="green_icon" accept="image/svg"/>
+                        </div>
+
+                        <div class="col-1 text-center">
+                            <img src="https://placehold.co/24x24" alt="image_preview" class="img-fluid mt-4 rounded" id="mediaPreviewgreenicon">
+                            <p class="error text-danger icon-error"></span>
+                        </div>
+
+                        <div class="col-lg-2">
+                            <label class="form-label"><span class="required">Category Name</span></label>
+                            <input type="text" id="cat_name" name="cat_name" class="form-control mb-2"
+                                placeholder="Category Name" onkeypress="return allowAlphabetsSpaceNumbers(event);"
+                                maxlength="100">
+                            <span class="text-danger error-text cat_name-error"></span>
+                        </div>
+                        <div class="col-lg-2">
+                            <div class="pt-9">
+                                <button type="submit" class="btn btn-sm btn-primary" id="form_save_button">Save</button>
+                                <button type="button" class="btn btn-sm btn-light"
+                                    onclick="return resetForm();">Reset</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <% } %>
+        <div class="card card-flush">
+            <div class="card-body">
+                <table class="table table-rounded border align-middle w-100" id="category_table">
+                    <thead class="bg-light-secondary text-uppercase">
+                        <tr class="fw-semibold fs-7 text-gray-700 border-bottom border-gray-200">
+                            <th hidden class="">Id</th>
+                            <th class="">Rank</th>
+                            <th class="">Icon</th>
+                            <th class="">Green Icon</th>
+                            <th class="">Name</th>
+                            <th class="">Created/Updated By</th>
+                            <th class="text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+    const isActionVisible = <%- access_routes.Masters.Categories[0].permission  === "1" ? 'true' : 'false'; %>;
+</script>
+<%- pageJs = `
+<script src="/plugins/custom/datatables/datatables.bundle.js"></script>
+<script src="/js/pages/category.js"></script>
+` %>

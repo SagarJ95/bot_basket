@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title><%- project_name %></title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="/media/logos/favicon.png" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Inter:300,400,500,600,700" />
+    <link href="/plugins/global/plugins.bundle.css" rel="stylesheet" type="text/css" />
+    <link href="/css/style.bundle.css" rel="stylesheet" type="text/css" />
+
+    <base href="<%- baseUrl %>">
+
+    <!-- Page-specific CSS will be injected here -->
+    <%- typeof pageCss !=='undefined' ? pageCss : '' %>
+
+    <style>
+        body {
+            background: #0F2027 !important;
+            /* fallback for old browsers */
+            background: -webkit-linear-gradient(to right, #2c2e64, #203A43, #0F2027) !important;
+            /* Chrome 10-25, Safari 5.1-6 */
+            background: linear-gradient(to right, #2c2e64, #203A43, #0F2027) !important;
+            /* W3C, IE 10+/ Edge, Firefox 16+, Chrome 26+, Opera 12+, Safari 7+ */
+        }
+    </style>
+</head>
+
+<body id="kt_body" class="auth-bg bgi-size-cover bgi-attachment-fixed bgi-position-center bgi-no-repeat">
+    <div class="d-flex flex-column flex-root">
+        <div class="d-flex flex-column flex-column-fluid flex-lg-row">
+            <div class="d-flex flex-center w-lg-50 pt-15 pt-lg-0 px-10">
+                <div class="d-flex flex-center flex-lg-start flex-column">
+                    <a href="/admin" class="mb-7">
+                        <img alt="Logo" src="/media/logos/logo.svg" class="h-200px" />
+                    </a>
+                    <h2 class="text-white fw-normal m-0"></h2>
+                </div>
+            </div>
+            <%- body %>
+        </div>
+    </div>
+    <script src="/plugins/global/plugins.bundle.js"></script>
+    <script src="/js/scripts.bundle.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validate/1.19.2/jquery.validate.min.js"></script>
+
+    <!-- Page-specific JS will be injected here -->
+    <%- typeof pageJs !=='undefined' ? pageJs : '' %>
+</body>
+
+</html>

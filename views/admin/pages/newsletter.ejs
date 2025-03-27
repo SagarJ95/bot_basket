@@ -1,0 +1,46 @@
+<%- pageCSS = `
+<link href="/plugins/custom/datatables/datatables.bundle.css" rel="stylesheet" type="text/css"/>
+` %>
+<div id="kt_app_toolbar" class="app-toolbar py-3 py-lg-6">
+    <div id="kt_app_toolbar_container" class="app-container container-fluid d-flex flex-stack">
+        <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
+            <h1 class="page-heading d-flex text-gray-900 fw-bold fs-3 flex-column justify-content-center my-0">
+                News Letters</h1>
+            <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 my-0 pt-1">
+                <li class="breadcrumb-item text-muted">
+                    <a href="/admin/dashboard" class="text-muted text-hover-primary">Home</a>
+                </li>
+                <li class="breadcrumb-item">
+                    <span class="bullet bg-gray-500 w-5px h-2px"></span>
+                </li>
+                <li class="breadcrumb-item text-muted">News Letters</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div id="kt_app_content" class="app-content flex-column-fluid">
+    <div id="kt_app_content_container" class="app-container container-fluid">
+        <div class="card card-flush">
+            <div class="card-body">
+                <table class="table table-rounded border align-middle w-100" id="newsletter_table">
+                    <thead class="bg-light-secondary text-uppercase">
+                        <tr class="fw-semibold fs-7 text-gray-700 border-bottom border-gray-200">
+                            <th class="min-w-125px">Email</th>
+                            <th class="min-w-125px">Receive Email Updates</th>
+                            <th class="min-w-125px">Subscribe/Customer</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- pageJs = `
+<script src="/plugins/custom/datatables/datatables.bundle.js"></script>
+<script src="/js/pages/newsletter.js"></script>
+` %>
+<%- pageJs %>

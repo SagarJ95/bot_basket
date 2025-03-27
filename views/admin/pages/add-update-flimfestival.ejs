@@ -1,0 +1,81 @@
+<%- pageCss = `
+<style>
+    .ck-editor__editable {
+        min-height: 470px; /* Set your desired height */
+    }
+</style>
+
+` %>
+
+<div id="kt_app_toolbar" class="app-toolbar py-3 py-lg-6">
+    <div id="kt_app_toolbar_container" class="app-container container-fluid d-flex flex-stack">
+        <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
+            <h1 class="page-heading d-flex text-gray-900 fw-bold fs-3 flex-column justify-content-center my-0">Add Flim Festival</h1>
+            <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 my-0 pt-1">
+                <li class="breadcrumb-item text-muted">
+                    <a href="/admin/dashboard" class="text-muted text-hover-primary">Home</a>
+                </li>
+                <li class="breadcrumb-item">
+                    <span class="bullet bg-gray-500 w-5px h-2px"></span>
+                </li>
+                <li class="breadcrumb-item text-muted">Add Flim Festival</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div id="kt_app_content" class="app-content flex-column-fluid">
+    <div id="kt_app_content_container" class="app-container container-fluid">
+        <div class="card card-xl-stretch">
+            <div class="card-body align-items-center justify-content-between flex-wrap">
+                <div class="me-2">
+                    <form class="form fv-plugins-bootstrap5 fv-plugins-framework" method="post"
+                        id="addEditForm">
+                        <input type="hidden" name="flim_festival_id" id="flim_festival_id" value="<%- (flimfestival) ? flimfestival.id : '' %>">
+                        <div class="row">
+                            <div class="col-md-6 mb-3 fv-row fv-plugins-icon-container">
+                                <label class="fw-semibold mb-2 required">Title</label>
+                                <input type="text" class="form-control"
+                                    placeholder="Title" id="title" name="title"
+                                    value="<%= (flimfestival) ? flimfestival.title : '' %>">
+                                    <span class="error text-danger error-text title-error"></span>
+                            </div>
+                            <div class="col-md-6 mb-3 fv-row fv-plugins-icon-container">
+                                <label class="fw-semibold mb-2 required">Date</label>
+                                <input type="text" class="form-control" name="flim_festival_date" id="flim_festival_date" value="<%= (flimfestival) ? flimfestival.flim_festival_date : '' %>" readonly>
+                                <span class="error text-danger error-text flim_festival_date-error"></span>
+                            </div>
+                            <div class="col-md-12 mb-3 fv-row fv-plugins-icon-container" >
+                                <label class="fw-semibold mb-2 required">Short Desc</label>
+                                <textarea name="short_desc" id="short_desc"
+                                    class="form-control" style="min-height: 100px;"><%= (flimfestival) ? flimfestival.short_desc : '' %></textarea>
+                                    <span class="error error-text text-danger short_desc-error"></span>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-12 mb-3 fv-row fv-plugins-icon-container">
+                                <label class="fw-semibold mb-2 required">Long Desc</label>
+                                <textarea name="long_desc" id="long_desc"
+                                    class="form-control ckeditor"><%= (flimfestival) ? flimfestival.long_desc : '' %></textarea>
+                                    <span class="error error-text text-danger long_desc-error"></span>
+                            </div>
+                    </div>
+                        <div class="col-md-12 text-end">
+                            <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                            <a href="/admin/film-festival" class="btn btn-sm btn-secondary">Back</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- pageJs = `
+<script src="/plugins/custom/ckeditor/ckeditor-classic.bundle.js"></script>
+<script src="/js/pages/flim_festival.js"></script>
+<script>
+
+</script>
+
+` %>

@@ -1,0 +1,118 @@
+<div class="d-flex flex-column-fluid flex-lg-row-auto justify-content-center justify-content-lg-end p-12 p-lg-20">
+    <div class="bg-body d-flex flex-column align-items-stretch flex-center rounded-4 w-md-600px p-15">
+        <div class="d-flex flex-center flex-column flex-column-fluid px-lg-10">
+            <form class="form w-100" novalidate="novalidate" id="signInForm">
+                <div class="text-center mb-11">
+                    <h1 class="text-gray-900 fw-bolder mb-3">Welcome</h1>
+                    <div class="text-gray-500 fw-semibold fs-6">Please sign in to your account below</div>
+                </div>
+                <div class="fv-row mb-8">
+                    <label for="email" class="required form-label">Email</label>
+                    <input type="text" placeholder="Email" name="email" autocomplete="off"
+                        class="form-control bg-transparent" />
+                        <span class="errors text-danger email-error"></span>
+                </div>
+                <div class="fv-row mb-8" data-kt-password-meter="true">
+                    <div class="mb-1">
+                        <label class="form-label fw-semibold fs-6 mb-2 required">Password</label>
+                        <div class="position-relative mb-3">
+                            <input class="form-control form-control-lg form-control-solid" type="password" placeholder="Password" name="password" autocomplete="off" />
+                            <span class="btn btn-sm btn-icon position-absolute translate-middle top-50 end-0 me-n2" data-kt-password-meter-control="visibility">
+                                <i class="ki-duotone ki-eye-slash fs-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span><span class="path4"></span></i>
+                                <i class="ki-duotone ki-eye d-none fs-1"><span class="path1"></span><span class="path2"></span><span class="path3"></span></i>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-grid mb-10">
+                    <button type="submit" class="btn btn-dark">
+                        <span class="indicator-label">Sign In</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<% pageJs = `
+<script>
+    $("form#signInForm").validate({
+        errorClass: 'is-invalid text-danger',
+        errorElement: 'span',
+        highlight: function (element, errorClass, validClass) {
+            $(element).addClass(errorClass);
+        },
+        unhighlight: function (element, errorClass, validClass) {
+            $(element).removeClass(errorClass);
+        },
+        rules: {
+            email: {
+                required: true,
+                email: true,
+            },
+            password: {
+                required: true,
+            },
+        },
+        messages: {
+            email: {
+                required: "Please enter email address",
+                email: "Please enter a valid email address",
+            },
+            password: {
+                required: "Please enter password",
+            },
+        },
+        submitHandler: function (form) {
+            var form = $(form);
+            var formArray = form.serializeArray(); // Get form data as array
+            var formData = {}; // Empty object to hold JSON data
+        
+            // Convert form data array to JSON object
+            $.each(formArray, function(i, field) {
+                formData[field.name] = field.value;
+            });
+
+            var actionUrl = "/api/sign-in";
+            var method = "POST";
+
+            $.ajax({
+                url: actionUrl,
+                method: method,
+                data: JSON.stringify(formData),  // Send form data as JSON
+                contentType: "application/json",  // Set the content type to JSON
+                dataType: "json",
+                headers: {
+                    'Accept': 'application/json' // Indicates the client expects JSON response
+                },
+                beforeSend: function() {
+                    form.find('span.error').text('');
+                    form.find('button[type="submit"]').prop('disabled',true);
+                },
+                success: function(response) {
+                    toastr.remove();
+                    if (response.status) {
+                        form[0].reset();
+                        toastr.success(response.message);
+                        setTimeout(() => {
+                            location.href = "/admin/dashboard";
+                        }, 500);
+                    } else {
+                        toastr.error(response.message);
+                    }
+                    form.find('button[type="submit"]').prop('disabled',false);
+                },
+                error: function(response) {
+                    form.find('button[type="submit"]').prop('disabled',false);
+                    toastr.remove();
+                    //console.log(response.responseJSON.errors);
+                    toastr.error(response.responseJSON.message);
+                    
+                    
+                }
+            });
+        }
+    });
+</script>
+` %>

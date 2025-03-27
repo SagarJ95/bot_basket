@@ -1,0 +1,163 @@
+<%- pageCss = `
+<style>
+    .ck-editor__editable {
+        min-height: 470px; /* Set your desired height */
+    }
+</style>
+` %>
+
+<div id="kt_app_toolbar" class="app-toolbar py-3 py-lg-6">
+    <div id="kt_app_toolbar_container" class="app-container container-fluid d-flex flex-stack">
+        <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
+            <h1 class="page-heading d-flex text-gray-900 fw-bold fs-3 flex-column justify-content-center my-0"><%- (banner == '') ? 'Add' : 'Edit' %> Banner</h1>
+            <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 my-0 pt-1">
+                <li class="breadcrumb-item text-muted">
+                    <a href="/admin/dashboard" class="text-muted text-hover-primary">Home</a>
+                </li>
+                <li class="breadcrumb-item">
+                    <span class="bullet bg-gray-500 w-5px h-2px"></span>
+                </li>
+                <li class="breadcrumb-item text-muted"><%- (banner == '') ? 'Add' : 'Edit' %> Banner</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div id="kt_app_content" class="app-content flex-column-fluid">
+    <div id="kt_app_content_container" class="app-container container-fluid">
+        <div class="card card-xl-stretch">
+            <div class="card-body align-items-center justify-content-between flex-wrap">
+                <div class="me-2">
+                    <form class="form fv-plugins-bootstrap5 fv-plugins-framework" method="post"
+                        id="addEditForm" enctype="multipart/form-data">
+
+                        <input type="hidden" name="banner_id" value="<%- (banner) ? banner.id : '' %>">
+                        <div class="row">
+                            <div class="col-md-9 mb-3 fv-row fv-plugins-icon-container">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <label class="fw-semibold mb-2 mt-2 required">Title</label>
+                                        <input type="text" class="form-control"
+                                        placeholder="Title" name="title" id="title" value="<%= (banner) ? banner.title : '' %>">
+                                        <span class="error text-danger title-error"></span>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="fw-semibold mb-2 mt-2 required">Sub Title</label>
+                                        <textarea class="form-control"
+                                        placeholder="Sub Title" name="sub_title" id="sub_title" rows="4" maxlength="200"><%= (banner) ? banner.sub_title : '' %></textarea>
+                                        <!-- <input type="text" class="form-control"
+                                        placeholder="Sub Title" name="sub_title" id="sub_title" value="<%= (banner) ? banner.sub_title : '' %>"> -->
+                                        <span class="error text-danger sub_title-error"></span>
+                                    </div>
+                                </div>
+                                <div class="row mt-3">
+                                    <div class="col-md-6">
+                                        <label class="fw-semibold mb-2 mt-2 required">Master (Teacher)</label>
+                                        <select name="master" id="master" class="form-select"
+                                        data-control="select2" data-placeholder="Select Masters"
+                                        data-hide-search="true">
+                                            <option value=""></option>
+                                            <% if(masters.length> 0) {
+                                                masters.forEach((value, index) => {
+                                                %>
+                                                <option value="<%- value.id %>" <%- (banner && banner.master_id == value.id) ? 'selected' : '' %>><%- value.name %></option>
+                                                <%
+                                                });
+                                            } %>
+                                        </select>
+                                        <span class="error text-danger master-error"></span>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="fw-semibold mb-2 mt-2 required">Tag</label>
+                                    <select name="tag" id="tag" class="form-select"
+                                        data-control="select2" data-placeholder="Select Tag"
+                                        data-hide-search="true">
+                                        <option></option>
+                                        <% if(tags.length> 0) {
+                                            tags.forEach((value, index) => {
+                                            %>
+                                            <option value="<%- value.id %>" <%- (banner && banner.tag == value.id) ? 'selected' : '' %>><%- value.name %></option>
+                                            <%
+                                            });
+                                        } %>
+                                    </select>
+                                    <span class="error text-danger tag-error"></span>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <label class="fw-semibold mb-2 mt-2 required" id="courseLabel">Course</label>
+                                        <select name="course" id="course" class="form-select"
+                                            data-control="select2" data-placeholder="Select Course"
+                                            data-hide-search="true">
+                                            <option></option>
+                                            <% if(courses.length> 0) {
+                                                courses.forEach((value, index) => {
+                                                %>
+                                                <option value="<%- value.id %>" <%- (banner && banner.course_id == value.id) ? 'selected' : '' %>><%- value.name %></option>
+                                                <%
+                                                });
+                                            } %>
+                                        </select>
+                                        <span class="error text-danger course-error"></span>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="fw-semibold mb-2 mt-2 required">Type</label>
+                                        <select name="banner_type" id="banner_type" class="form-select"
+                                            data-control="select2" data-placeholder="Select Banner Type"
+                                            data-hide-search="true">
+                                            <option></option>
+                                                <option value="1" <%- (banner && banner.banner_type == 1) ? 'selected' : '' %>>Banner 1</option>
+                                                <option value="2" <%- (banner && banner.banner_type == 2) ? 'selected' : '' %>>Banner 2</option>
+                                                <option value="3" <%- (banner && banner.banner_type == 3) ? 'selected' : '' %>>Banner 3</option>
+                                        </select>
+                                        <span class="error text-danger banner_type-error"></span>
+                                    </div>
+                                </div>
+
+                                <div class="row mt-4">
+                                    <div class="col-md-6">
+                                        <label class="fw-semibold mb-2 mt-2">Trailer Video</label>
+                                        <input type="file" class="form-control " placeholder="Enter Trailer Video" id="banner_trailer_video" name="banner_trailer_video" accept="video/mp4, video/mov, video/avi, video/mkv" />
+
+                                        <span class="error text-danger trailer_video-error"></span>
+                                    </div>
+                                    <% if(banner && banner.trailer_video != null) { %>
+                                    <div class="col-md-6 mt-5">
+                                        <a href="<%= (banner && banner.trailer_video != null) ?  banner.trailer_video : '' %>" target="_blank"><i class="ki-duotone text-dark ki-eye fs-2 mt-5">
+                                            <span class="path1"></span>
+                                            <span class="path2"></span>
+                                            <span class="path3"></span>
+                                            </i></a>
+                                    </div>
+                                    <% } %>
+                                </div>
+
+                                <br>
+                                <label class="fw-semibold mb-2 required">Banner Media</label>
+                                <img src="<%= (banner && banner.banner_image != null) ?  banner.banner_image : 'https://placehold.co/1920x982' %>" alt="image_preview" class="img-fluid mb-3 rounded" id="mediaPreview">
+                                <input type="file" accept=".jpg,.png,.jpeg" name="banner_image" id="banner_image" class="form-control">
+                                <span class="error text-danger banner_image-error"></span>
+                            </div>
+                            <div class="col-md-3 mb-3 fv-row fv-plugins-icon-container">
+                                <label class="fw-semibold mb-2 required">Mobile Banner Media</label>
+                                <img src="<%= (banner && banner.mobile_banner_image != null) ?  banner.mobile_banner_image : 'https://placehold.co/720x1280' %>" alt="image_preview" class="img-fluid mb-3 rounded" id="MobilemediaPreview">
+                                <input type="file" accept=".jpg,.png,.jpeg" name="mobile_banner_image" id="mobile_banner_image" class="form-control">
+                                <span class="error text-danger mobile_banner_image-error"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-12 text-end">
+                            <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                            <a href="/admin/banners" class="btn btn-sm btn-secondary">Back</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- pageJs = `
+<script src="/plugins/custom/ckeditor/ckeditor-classic.bundle.js"></script>
+<script src="/js/pages/banner.js"></script>
+` %>

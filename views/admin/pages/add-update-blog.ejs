@@ -1,0 +1,112 @@
+<%- pageCss = `
+<style>
+    .ck-editor__editable {
+        min-height: 470px; /* Set your desired height */
+    }
+
+    
+</style>
+` %>
+
+<div id="kt_app_toolbar" class="app-toolbar py-3 py-lg-6">
+    <div id="kt_app_toolbar_container" class="app-container container-fluid d-flex flex-stack">
+        <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
+            <h1 class="page-heading d-flex text-gray-900 fw-bold fs-3 flex-column justify-content-center my-0"><%- (blog == '') ? 'Add' : 'Edit' %> Blog</h1>
+            <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 my-0 pt-1">
+                <li class="breadcrumb-item text-muted">
+                    <a href="/admin/dashboard" class="text-muted text-hover-primary">Home</a>
+                </li>
+                <li class="breadcrumb-item">
+                    <span class="bullet bg-gray-500 w-5px h-2px"></span>
+                </li>
+                <li class="breadcrumb-item text-muted"><%- (blog == '') ? 'Add' : 'Edit' %> Blog</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div id="kt_app_content" class="app-content flex-column-fluid">
+    <div id="kt_app_content_container" class="app-container container-fluid">
+        <div class="card card-xl-stretch">
+            <div class="card-body align-items-center justify-content-between flex-wrap">
+                <div class="me-2">
+                    <form class="form fv-plugins-bootstrap5 fv-plugins-framework" method="post"
+                        id="addEditForm" enctype="multipart/form-data">
+                        <input type="hidden" name="blog_id" value="<%- (blog) ? blog.id : '' %>">
+                        <div class="row">
+                            <div class="col-md-8 mb-3 fv-row fv-plugins-icon-container">
+                                <label class="fw-semibold mb-2 required">Blog Title</label>
+                                <input type="text" class="form-control"
+                                    placeholder="Blog Title" id="title" name="title"
+                                    value="<%= (blog) ? blog.title : '' %>">
+                                    <span class="error text-danger error-text title-error"></span>
+                            </div>
+                            <div class="col-md-4 mb-3 fv-row fv-plugins-icon-container">
+                                <label class="fw-semibold mb-2 required">Category</label>
+                                <select name="category" id="category" class="form-select"
+                                    data-control="select2" data-placeholder="Select Category"
+                                    data-hide-search="true">
+                                    <option></option>
+                                    <% if(categories.length> 0) {
+                                        categories.forEach((value, index) => {
+                                        %>
+                                        <option value="<%- value.id %>" <%- (blog && blog.category == value.id) ? 'selected' : '' %>><%- value.cat_name %></option>
+                                        <%
+                                        });
+                                    } %>
+                                </select>
+                                <span class="error text-danger error-text category-error"></span>
+                            </div>
+                            <div class="col-md-8 mb-3 fv-row fv-plugins-icon-container">
+                                <label class="fw-semibold mb-2 required">Blog Desc</label>
+                                <textarea name="desc" id="blog_desc"
+                                    class="form-control ckeditor"><%= (blog) ? blog.desc : '' %></textarea>
+                                    <span class="error error-text text-danger desc-error"></span>
+                            </div>
+                            <div class="col-md-4 mb-3 fv-row fv-plugins-icon-container">
+                                <div class="mb-3">
+                                    <label class="fw-semibold mb-2 required">Master</label>
+                                    <select name="master" id="master" class="form-select"
+                                        data-control="select2" data-placeholder="Select Master"
+                                        data-hide-search="true">
+                                        <option></option>
+                                        <% if(masters.length> 0) {
+                                            masters.forEach((value, index) => {
+                                            %>
+                                            <option value="<%- value.id %>" <%- (blog && blog.master == value.id) ? 'selected' : '' %>><%- value.name %></option>
+                                            <%
+                                            });
+                                        } %>
+                                    </select>
+                                    <span class="error error-text text-danger master-error"></span>
+                                </div>
+
+
+                                <label class="fw-semibold mb-2">Featured Media</label>
+                                <img src="<%= (blog && blog.featured_media != null) ?  blog.featured_media : 'https://placehold.co/600x400' %>" alt="image_preview" class="img-fluid mb-3 rounded" id="mediaPreview">
+                                <input type="file" accept=".jpg,.png,.jpeg" name="featured_media" id="featured_media" class="form-control">
+                                <span class="error text-danger featured_media-error"></span>
+                                <br>
+                                <label class="fw-semibold mb-2">Blog Tags</label>
+                                <input type="text" class="form-control"
+                                    placeholder="Blog Tags" id="blog_tags" name="tags"
+                                    value="<%= (blog) ? blog.tags : '' %>">
+                                <span class="error  error-text text-danger blog_tags-error"></span>
+                            </div>
+
+                        </div>
+                        <div class="col-md-12 text-end">
+                            <button type="submit" class="btn btn-sm btn-primary">Save</button>
+                            <a href="/admin/blogs" class="btn btn-sm btn-secondary">Back</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<%- pageJs = `
+<script src="/plugins/custom/ckeditor/ckeditor-classic.bundle.js"></script>
+<script src="/js/pages/blog.js"></script>
+` %>

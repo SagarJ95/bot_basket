@@ -1,0 +1,133 @@
+<%- pageCSS = `
+<link href="/plugins/custom/datatables/datatables.bundle.css" rel="stylesheet" type="text/css"/>
+<link href="/css/permission.css" rel="stylesheet" type="text/css"/>
+
+` %>
+<div id="kt_app_toolbar" class="app-toolbar py-3 py-lg-6">
+    <div id="kt_app_toolbar_container" class="app-container container-fluid d-flex flex-stack">
+        <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
+            <h1 class="page-heading d-flex text-gray-900 fw-bold fs-3 flex-column justify-content-center my-0">
+                Permission</h1>
+            <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 my-0 pt-1">
+                <li class="breadcrumb-item text-muted">
+                    <a href="/admin/dashboard" class="text-muted text-hover-primary">Home</a>
+                </li>
+                <li class="breadcrumb-item">
+                    <span class="bullet bg-gray-500 w-5px h-2px"></span>
+                </li>
+                <li class="breadcrumb-item text-muted">Permission</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div id="kt_app_content" class="app-content flex-column-fluid">
+    <form id="roleForm" type="post">
+        <div id="kt_app_content_container" class="app-container container-fluid">
+            <div class="card card-flush mb-4">
+                <div class="card-body py-4">
+                    <div class="filter">
+                        <div class="row">
+                            <div class="col-lg-3">
+                                <label class="form-label">Role<span class="mandat">*</span></label>
+                                <select class="form-control" id="role" name="role">
+                                    <option value="">---- Select Role ----</option>
+                                    <% if(data.length > 0) { %>
+                                    <% for(var i=0; i < data.length; i++) { %>
+                                    <option value="<%= data[i].id %>">
+                                        <%= data[i].role_name %>
+                                    </option>
+                                    <% } %>
+                                    <% } %>
+                                </select>
+                                <span class="text-danger error-text cat_name_error"></span>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label for="role" class="form-label">User<span class="mandat">*</span></label>
+                                <select class="form-control" id="user" name="user">
+                                    <option value="">---- Select User ----</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <% if(Object.keys(permission).length > 0) { %>
+            <div class="card card-flush">
+                <div class="card-body">
+                    <div class="accordion" id="kt_accordion_1">
+                        <% Object.keys(permission).forEach((mainKey, mainIndex) => { %>
+                        <div class="accordion-item">
+                            <input type="hidden" class="check" value="<%= mainIndex %>">
+                            <input type="hidden" class="submodulecount"
+                                value="<%= Object.keys(permission[mainKey]).length %>">
+
+                            <div class="accordion-header" id="kt_accordion_1_header_<%= mainIndex + 1 %>">
+                                <button class="accordion-button fs-4 fw-semibold" type="button"
+                                    data-bs-toggle="collapse" data-bs-target="#faq<%= mainIndex + 1 %>"
+                                    aria-expanded="false" aria-controls="faq<%= mainIndex + 1 %>">
+                                    <%= mainKey %>
+
+                                    <span id="count<%= mainIndex %>" style="position: absolute;
+                                right: 45px;
+                                top: 19px;
+                                font-size: 1.25rem;
+                                color: #222;">0 / <%= Object.keys(permission[mainKey]).length %></span>
+                                </button>
+                            </div>
+                            <div id="faq<%= mainIndex + 1 %>" class="accordion-collapse collapse"
+                                aria-labelledby="faqhead<%= mainIndex + 1 %>" data-bs-parent="#faq">
+
+                                <div class="accordion-body">
+                                    <% Object.keys(permission[mainKey]).forEach((subKey, subIndex) => { %>
+                                    <div class="row row-sep br-btm mt-3">
+                                        <div class="col-lg-3">
+                                            <div class="mr-4">
+                                                <h6 class="sub-role"><%= subKey %></h6>
+                                            </div>
+                                        </div>
+                                        <div class="col-lg-9">
+                                            <div class="d-flex justify-content-end">
+                                                <% permission[mainKey][subKey].forEach((item, itemIndex) => { %>
+                                                <div class="custom-control custom-checkbox mb-0 mr-3">
+                                                    <input type="checkbox"
+                                                        class="form-check-input result-checkbox result-<%= item.id %>"
+                                                        id="customCheck<%= mainIndex + 1 %><%= mainIndex + 1 %><%= item.id %>"
+                                                        value="<%= item.id %>"
+                                                        data-index="<%- subKey.replace(/[\s()]/g, '') %>" />
+                                                    &nbsp;&nbsp;<label class="custom-control-label"
+                                                        for="customCheck<%= mainIndex + 1 %><%= mainIndex + 1 %><%= item.id %>"><%= item.access_name %></label>
+                                                </div>
+                                                <% }) %>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <% }); %>
+                                </div>
+                            </div>
+                        </div>
+                        <% }); %>
+                    </div>
+                </div>
+            </div>
+            <% } %>
+
+            <% if (access_routes.UserManagements.Permissions[0].permission === "1") { %>
+            <div class="row">
+                <div class="col-lg-12  mt-3 mb-3">
+                    <a class="btn btn-green mr-3" id="submitForm" style="background-color:green;color:white">Submit</a>
+                </div>
+            </div>
+            <% } %>
+
+        </div>
+    </form>
+</div>
+
+<%- pageJs = `
+<script src="/plugins/custom/datatables/datatables.bundle.js"></script>
+<script src="/js/pages/permission.js"></script>
+` %>

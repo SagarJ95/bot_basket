@@ -1,0 +1,324 @@
+<%- pageCss = `
+<style>
+    .ck-editor__editable {
+        min-height: 470px; /* Set your desired height */
+    }
+</style>
+` %>
+
+<div id="kt_app_toolbar" class="app-toolbar py-3 py-lg-6">
+  <div id="kt_app_toolbar_container" class="app-container container-fluid d-flex flex-stack">
+    <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
+      <h1 class="page-heading d-flex text-gray-900 fw-bold fs-3 flex-column justify-content-center my-0"><%= (courseid === '') ? 'Add' : 'Edit' %> Course
+      </h1>
+      <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 my-0 pt-1">
+        <li class="breadcrumb-item text-muted">
+          <a href="/admin/dashboard" class="text-muted text-hover-primary">Home</a>
+        </li>
+        <li class="breadcrumb-item">
+          <span class="bullet bg-gray-500 w-5px h-2px"></span>
+        </li>
+        <li class="breadcrumb-item text-muted"><%= (courseid == '') ? 'Add' : 'Edit' %> Course
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div id="kt_app_content" class="app-content flex-column-fluid">
+  <div id="kt_app_content_container" class="app-container container-fluid">
+    <div class="card card-xl-stretch">
+      <div class="card-body align-items-center justify-content-between flex-wrap">
+        <div class="me-2">
+          <form id="data_form" class="form" action="#" enctype="multipart/form-data" method="POST">
+            <!-- Existing fields -->
+
+            <!-- Name -->
+            <input type="hidden" id="course_id" name="course_id" value="<%= courseid %>">
+
+            <div class="row">
+              <div class="col-6 mt-5">
+                <label class="d-flex align-items-center fs-6 fw-semibold form-label mb-2">
+                  <span class="required">Course Name</span>
+                </label>
+                <input type="text" class="form-control " placeholder="Enter name" name="name" value="<%= course_data ? course_data.name : '' %>" />
+              </div>
+
+              <div class="col-6 mt-5">
+                <label class="fs-6 fw-semibold form-label mb-2"><span class="required">Category</span></label>
+                <select class="form-control " name="category" id="category" class="form-select" data-control="select2" data-placeholder="Select Category" data-hide-search="true">
+                  <option value="">Select</option>
+                  <% if (category_data && category_data.length > 0) { %>
+                  <% category_data.forEach(category => { %>
+                  <option value="<%= category.id %>" <%= course_data && course_data.category === category.id ? 'selected' : '' %>><%= category.cat_name %></option>
+                  <% }); %>
+                  <% } %>
+                </select>
+              </div>
+
+
+              <div class="col-6 mt-5">
+                <label class="d-flex align-items-center fs-6 fw-semibold form-label mb-2">
+                  <span class="required">Short Description</span>
+                </label>
+                <textarea class="form-control " placeholder="Enter short description" name="short_description"><%= course_data ? course_data.short_description : '' %></textarea>
+              </div>
+
+              <!-- Tags -->
+              <div class="col-6 mt-5">
+                <label class="fs-6 fw-semibold form-label mb-2">Context of Course</label>
+                <textarea class="form-control " placeholder="Enter context of courses" name="context_of_course"><%= course_data ? course_data.context_of_course : '' %></textarea>
+              </div>
+
+              <div class="col-12">
+                <label class="d-flex align-items-center fs-6 fw-semibold form-label mb-2">
+                  <span class="required">What you will get to learn?</span>
+                </label>
+                <textarea class="form-control " placeholder="Enter what you will get to learn?" id="what_you_will_get" name="what_you_will_get"> <%= course_data ? course_data.learnings : '' %>
+                            </textarea>
+              </div>
+
+              <div class="col-6 mt-5">
+                <label class="fs-6 fw-semibold form-label mb-2"><span class="required">Master</span></label>
+                <select class="form-control " name="master_id" id="master_id" class="form-select" data-control="select2" data-placeholder="Select Masters" data-hide-search="true">
+                  <option value="">Select</option>
+                  <% if (master_data && master_data.length > 0) { %>
+                  <% master_data.forEach(master => { %>
+                  <option value="<%= master.id %>" <%= course_data && course_data.master_id == master.id ? 'selected' : '' %>><%= master.name %></option>
+                  <% }); %>
+                  <% } %>
+                </select>
+              </div>
+
+              <!-- Instructor -->
+              <div class="col-6 mt-5">
+                <label class="fs-6 fw-semibold form-label mb-2">Instructor</label>
+                <input type="text" class="form-control " placeholder="Enter instructor name" name="instructor" value="<%= course_data ? course_data.instructor : '' %>" />
+              </div>
+
+
+
+
+            <!-- Course Cost -->
+            <div class="col-3 mt-3">
+              <label class="fw-semibold mb-2 mt-2">Tag</label>
+                <select name="tag" id="tag" class="form-select"
+                    data-control="select2" data-placeholder="Select Tag"
+                    data-hide-search="true">
+                    <option></option>
+                    <% if(tags.length> 0) {
+                        tags.forEach((value, index) => {
+                        %>
+                        <option value="<%- value.id %>" <%- (course_data && course_data.tag == value.id) ? 'selected' : '' %>><%- value.name %></option>
+                        <%
+                        });
+                    } %>
+                </select>
+                <span class="error text-danger tag-error"></span>
+            </div>
+
+            <div class="col-3 mt-5">
+                <label class="fs-6 fw-semibold form-label mb-2">Course Start Date</label>
+                <input type="date" class="form-control " placeholder="Enter Course Start date" name="course_start_date" value="<%= course_data ? course_data.course_start_date : '' %>" />
+            </div>
+
+              <div class="col-6 mt-5">
+                <label class="fs-6 fw-semibold form-label mb-2"><span class="required">Course Type</span></label>
+                <select class="form-select " name="type" class="form-select" data-control="select2" data-placeholder="Select Type" data-hide-search="true">
+                  <option value="">Select type</option>
+                  <option value="online" <%= course_data && course_data.type === 'online' ? 'selected' : '' %>>Online</option>
+                  <option value="offline" <%= course_data && course_data.type === 'offline' ? 'selected' : '' %>>Offline</option>
+                </select>
+              </div>
+
+
+
+
+            <!-- Type -->
+
+              <div class="col-6 mt-5">
+                <label class="fs-6 fw-semibold form-label mb-2"><span class="required">Course Cost</span></label>
+                <input type="number" class="form-control " placeholder="Enter course cost" name="course_cost" value="<%= course_data ? course_data.course_cost : '' %>" />
+              </div>
+
+              <div class="col-6 mt-5">
+                <label class="fs-6 fw-semibold form-label mb-2"><span class="required">Discount Percentage</span></label>
+                <input type="number" class="form-control " placeholder="Enter Discount Percentage" name="discount_percentage" value="<%= course_data ? course_data.discount_percentage : '' %>" />
+              </div>
+
+
+
+
+              <!-- Trailer Video -->
+              <div class="col-6 mt-5">
+                <label class="fs-6 fw-semibold form-label mb-2"><span class="required">Trailor Video</span></label>
+                <input type="file" class="form-control " name="trailor_video" accept="video/mp4, video/mov, video/avi, video/mkv" />
+
+                <% if(course_data && course_data.trailor_video){%>
+                <%
+                                var trail = course_data.trailor_video;
+                                if (trail) {
+                                  trail = trail.replace(/public\\/, ""); // Escape backslash with double \\ for regex
+                                }
+                              %>
+
+                <div class="fv-row mb-8 mt-8">
+                  <!--begin::Dropzone-->
+                  <div class="dropzone" id="kt_modal_create_project_settings_logo">
+                    <!--begin::Message-->
+                    <div class="dz-message needsclick">
+                      <!--begin::Icon-->
+                      <i class="ki-duotone ki-file-up fs-3hx text-primary">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                      </i>
+                      <!--end::Icon-->
+                      <!--begin::Info-->
+                      <div class="ms-4">
+                        <h3 class="dfs-3 fw-bold text-gray-900 mb-1">Trailor Video:</h3>
+                        <span class="fw-semibold fs-4 text-muted"><a target="_blank" href="<%= trail  %>">View</a></span>
+                      </div>
+                      <!--end::Info-->
+                    </div>
+                  </div>
+                  <!--end::Dropzone-->
+                </div>
+                <% } %>
+              </div>
+
+              <div class="col-6 mt-5">
+                <label class="fs-6 fw-semibold form-label mb-2"><span class="required">BTS</span></label>
+                <input type="file" class="form-control " placeholder="Enter course BTS" name="bts"  accept="video/mp4, video/mov, video/avi, video/mkv"/>
+
+                <% if(course_data && course_data.bts){%>
+
+                <%
+                    var bts = course_data.bts;
+                    if (bts) {
+                    bts = bts.replace(/public\\/, ""); // Escape backslash with double \\ for regex
+                    }
+                %>
+
+                <div class="fv-row mb-8 mt-8">
+                  <div class="dropzone" id="kt_modal_create_project_settings_logo">
+                    <div class="dz-message needsclick">
+                      <i class="ki-duotone ki-file-up fs-3hx text-primary">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                      </i>
+                      <div class="ms-4">
+                        <h3 class="dfs-3 fw-bold text-gray-900 mb-1">BTS video: </h3>
+                        <span class="fw-semibold fs-4 text-muted"><a target="_blank" href="<%= bts  %>">View</a></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <% } %>
+
+              </div>
+
+              <div class="col-6 mt-5">
+                <label class="fs-6 fw-semibold form-label mb-2"><span class="required">Course Banner Image(Desktop)</span></label>
+                <input type="file" class="form-control " name="course_banner_desktop" id="course_banner_desktop" accept="image/*"/>
+
+                <p class="error course_banner_desktop_error"></p>
+                <% if(course_data && course_data.course_banner_desktop){%>
+
+                <% if(course_data && course_data.course_banner_desktop){%>
+                <%
+                    var bann = course_data.course_banner_desktop;
+                    if (bann) {
+                        bann = bann.replace(/public\\/, ""); // Escape backslash with double \\ for regex
+                    }
+                    %>
+                <% } %>
+
+                <div class="fv-row mb-8 mt-8">
+                  <!--begin::Dropzone-->
+                  <div class="dropzone" id="kt_modal_create_project_settings_logo">
+                    <!--begin::Message-->
+                    <div class="dz-message needsclick">
+                      <!--begin::Icon-->
+                      <i class="ki-duotone ki-file-up fs-3hx text-primary">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                      </i>
+                      <!--end::Icon-->
+                      <!--begin::Info-->
+                      <div class="ms-4">
+                        <h3 class="dfs-3 fw-bold text-gray-900 mb-1">Course Banner:</h3>
+                        <span class="fw-semibold fs-4 text-muted"><a target="_blank" href="<%= bann  %>">View</a></span>
+                      </div>
+                      <!--end::Info-->
+                    </div>
+                  </div>
+                  <!--end::Dropzone-->
+                </div>
+                <% } %>
+
+
+              </div>
+
+              <div class="col-6 mt-5">
+                <label class="fs-6 fw-semibold form-label mb-2"><span class="required">Course Banner Image(Mobile)</span></label>
+                <input type="file" class="form-control " name="course_banner_mobile" id="course_banner_mobile" accept="image/*"/>
+                <p class="error course_banner_mobile_error"></p>
+                <% if(course_data && course_data.course_banner_mobile){%>
+
+                <% if(course_data && course_data.course_banner_mobile){%>
+                <%
+                    var bann = course_data.course_banner_mobile;
+                    if (bann) {
+                        bann = bann.replace(/public\\/, ""); // Escape backslash with double \\ for regex
+                    }
+                    %>
+                <% } %>
+
+                <div class="fv-row mb-8 mt-8">
+                  <!--begin::Dropzone-->
+                  <div class="dropzone" id="kt_modal_create_project_settings_logo">
+                    <!--begin::Message-->
+                    <div class="dz-message needsclick">
+                      <!--begin::Icon-->
+                      <i class="ki-duotone ki-file-up fs-3hx text-primary">
+                        <span class="path1"></span>
+                        <span class="path2"></span>
+                      </i>
+                      <!--end::Icon-->
+                      <!--begin::Info-->
+                      <div class="ms-4">
+                        <h3 class="dfs-3 fw-bold text-gray-900 mb-1">Course Banner(Mobile):</h3>
+                        <span class="fw-semibold fs-4 text-muted"><a target="_blank" href="<%= bann  %>">View</a></span>
+                      </div>
+                      <!--end::Info-->
+                    </div>
+                  </div>
+                  <!--end::Dropzone-->
+                </div>
+                <% } %>
+              </div>
+
+
+            </div>
+
+            <!-- Submit Button -->
+            <div class="text-center pt-15">
+              <button type="submit" class="btn btn-sm btn-primary" id="form_save_button">Save</button>
+              <a href="/admin/course-list" class="btn btn-sm btn-secondary">Back</a>
+
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  const isActionVisible = <%- access_routes.Masters.Courselist[0].permission  === "1" ? 'true' : 'false'; %>;
+</script>
+<%- pageJs = `
+<script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify"></script>
+
+<script src="/plugins/custom/datatables/datatables.bundle.js"></script>
+<script src="/js/pages/course.js"></script>
+` %>

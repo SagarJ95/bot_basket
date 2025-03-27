@@ -1,0 +1,87 @@
+<%- pageCSS = `
+<link href="/plugins/custom/datatables/datatables.bundle.css" rel="stylesheet" type="text/css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/taras-d/images-grid/src/images-grid.min.css">
+` %>
+
+<div id="kt_app_toolbar" class="app-toolbar py-3 py-lg-6">
+    <div id="kt_app_toolbar_container" class="app-container container-fluid d-flex flex-stack">
+        <div class="page-title d-flex flex-column justify-content-center flex-wrap me-3">
+            <h1 class="page-heading d-flex text-gray-900 fw-bold fs-3 flex-column justify-content-center my-0">Community Posts
+            </h1>
+            <ul class="breadcrumb breadcrumb-separatorless fw-semibold fs-7 my-0 pt-1">
+                <li class="breadcrumb-item text-muted">
+                    <a href="/admin/dashboard" class="text-muted text-hover-primary">Home</a>
+                </li>
+                <li class="breadcrumb-item">
+                    <span class="bullet bg-gray-500 w-5px h-2px"></span>
+                </li>
+                <li class="breadcrumb-item text-muted">Community Posts</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<div id="kt_app_content" class="app-content flex-column-fluid">
+    <div id="kt_app_content_container" class="app-container container-fluid">
+        <div class="card card-flush">
+            <div class="card-body">
+                <table class="table border align-middle w-100" id="data_table">
+                    <thead class="bg-light-secondary text-uppercase">
+                        <tr class="fw-semibold fs-7 text-gray-700 border-bottom border-gray-200">
+                            <th class="text-center">Post</th>
+                            <th class="">Customer Name</th>
+                            <th class="">Likes</th>
+                            <th class="">Comments</th>
+                            <th class="">Reports</th>
+                            <th class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" tabindex="-1" id="viewModal">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header border-0 pb-2">
+                <div class="d-flex align-items-center">
+                    <div class="symbol symbol-50px me-5">
+                        <img src="/media/avatars/blank.png" class="" alt="">
+                    </div>
+                    <div class="flex-grow-1">
+                        <span id="customerName" class="text-gray-800 fs-4 fw-bold"></span>
+                        <span id="createdAt" class="text-gray-500 fw-semibold d-block"></span>
+                    </div>
+                </div>
+                <div class="btn btn-icon btn-sm btn-active-light-secondary ms-2" data-bs-dismiss="modal" aria-label="Close">
+                    <i class="ki-duotone ki-cross fs-1"><span class="path1"></span><span class="path2"></span></i>
+                </div>
+            </div>
+            <div class="modal-body">
+                <div class="fs-6 fw-normal text-gray-700 mb-2" id="postContent">
+
+                </div>
+                <div id="postImages">
+
+                </div>
+            </div>
+            <div class="modal-footer border-0 p-2">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const isActionVisible = <%- access_routes.Community.Community[0].permission  === "1" ? 'true' : 'false'; %>;
+</script>
+<%- pageJs = `
+
+<script src="/plugins/custom/datatables/datatables.bundle.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/taras-d/images-grid/src/images-grid.min.js"></script>
+<script src="/js/pages/community_posts.js"></script>
+` %>

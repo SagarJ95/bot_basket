@@ -1,0 +1,32 @@
+#faq .card .card-body .custom-control {
+    padding-bottom: 0px;
+}
+
+.custom-control {
+    padding-left: 35px;
+    cursor: pointer;
+    padding-bottom: 5px;
+}
+
+.br-btm {
+    border-bottom: 1px solid #EBEBEB;
+}
+
+.row-sep {
+    padding: 7px 3px;
+}
+
+.authError {
+    color: #ff0000;
+    /* Red color for error text */
+    font-size: 13px;
+    font-weight: bold;
+}
+
+/* Style for highlighting invalid fields */
+.authError-highlight {
+    border-color: #ff0000 !important;
+    /* Red border for invalid fields */
+    box-shadow: 0 0 5px #ff0000;
+    /* Optional red glow effect */
+}
