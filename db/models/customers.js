@@ -2,8 +2,8 @@
 import { DataTypes } from "sequelize";
 import sequelize from "../../config/database.js";
 
-const customer_otp_logs = sequelize.define(
-  "customer_otp_logs",
+const customers = sequelize.define(
+  "customers",
   {
     id: {
       allowNull: false,
@@ -11,17 +11,36 @@ const customer_otp_logs = sequelize.define(
       primaryKey: true,
       type: DataTypes.INTEGER
     },
-    customer_id: {
-      type: DataTypes.INTEGER
-    },
-    customer_email: {
+    first_name: {
       type: DataTypes.STRING
     },
-    otp: {
-      type: DataTypes.INTEGER
+    last_name: {
+      type: DataTypes.STRING
+    },
+    email: {
+      type: DataTypes.STRING
+    },
+    phone_no: {
+      type: DataTypes.STRING
+    },
+    profile_pic:{
+        type:DataTypes.STRING,
+        allowNull:true,
+    },
+    password: {
+      type: DataTypes.STRING
     },
     status: {
       type: DataTypes.ENUM('0', '1')
+    },
+    created_by:{
+      type:DataTypes.INTEGER,
+    },
+    updated_by:{
+      type:DataTypes.INTEGER,
+    },
+    deleted_by:{
+      type:DataTypes.INTEGER,
     },
     created_at: {
       allowNull: false,
@@ -40,8 +59,8 @@ const customer_otp_logs = sequelize.define(
     createdAt: 'created_at',
     updatedAt: 'updated_at',
     deletedAt: 'deleted_at',
-    modelName: "customer_otp_logs",
+    modelName: "customers",
   }
 );
 
-export default customer_otp_logs;
+export default customers;

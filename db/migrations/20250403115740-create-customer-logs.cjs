@@ -10,30 +10,20 @@ module.exports = {
         type: Sequelize.INTEGER
       },
       customer_id: {
-        type: Sequelize.STRING
+        type: Sequelize.INTEGER
       },
       login_time:{
-          allowNull: false,
-          type: Sequelize.DATE,
-          defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
-      },
-      logout_time:{
-        allowNull: true,
-        type: Sequelize.DATE
-      },
-      device:{
-        type: Sequelize.STRING
-      },
-      browers:{
-        type: Sequelize.STRING
-      },
-      ip_address:{
-        type: Sequelize.STRING
-      },
-      token:{
-        type: Sequelize.STRING
-      },
-
+        allowNull: false,
+        type: Sequelize.DATE,
+        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP')
+    },
+    logout_time:{
+      allowNull: true,
+      type: Sequelize.DATE
+    },
+    token:{
+      type: Sequelize.STRING
+    },
     });
   },
   async down(queryInterface, Sequelize) {

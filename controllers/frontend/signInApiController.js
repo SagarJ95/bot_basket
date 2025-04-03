@@ -6,25 +6,18 @@ import db from "../../config/db.js";
 import sequelize from "../../config/database.js";
 import { generateToken } from "../../helpers/jwt_helper.js";
 // Models
-import Customer from "../../db/models/customer.js";
-import customer_log from "../../db/models/customer_logs.js"
+// import Customer from "../../db/models/customer.js";
+// import customer_log from "../../db/models/customer_logs.js"
 import { body, validationResult } from "express-validator";
 import { Op, QueryTypes,Sequelize } from "sequelize";
 import { compare } from "bcrypt";
 import bcrypt from "bcrypt";
-// Node Modules
-import moment from "moment-timezone";
-//import { Op, Sequelize } from "sequelize";
-import Hashids from "hashids";
-import encryptionData from "../../helpers/encrypt_decrypt_helper.js";
 import nodemailer from "nodemailer";
-import useragent from "express-useragent";
 import os from "os";
 import customerOtpLog from '../../db/models/customer_otp_log.js'
 import pkg from 'jsonwebtoken';
-const { verify } = pkg;
-import passport from "passport";
-// import "./passportConfig.js";
+
+
 const project_name = process.env.APP_NAME;
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3847';
 
@@ -81,9 +74,7 @@ const SignUp = catchAsync(async (req, res) => {
           phone_no: phone_no,
           email: email.toLowerCase(),
           status: "1",
-          password: hashPassword,
-          country:'India',
-          category_id:(category_id) ? category_id : null
+          password: hashPassword
         });
 
 
@@ -94,54 +85,6 @@ const SignUp = catchAsync(async (req, res) => {
           // Store JWT token in session
           req.session.token = token;
           req.session.user_id = creation.id;
-
-          // Get customer's IP address
-          // const ipAddress =
-          //   req.headers["x-forwarded-for"] || req.connection.remoteAddress;
-
-          const ipAddress = getServerIP();
-
-          // Get browser information
-          const browserName = (browser_Name) ? browser_Name : '';
-          const deviceType = (device_Type) ? device_Type : '';
-
-          //Log the user's login info
-          await sequelize.query(
-            `INSERT INTO customer_logs (customer_id, login_time, browers,device, ip_address, token,created_at,updated_at) VALUES (:customerId, :loginIn, :browser,:device, :ipAddress, :token,:created_at,:updated_at)`,
-            {
-              type: QueryTypes.INSERT,
-              replacements: {
-                customerId: creation.id,
-                loginIn: new Date(),
-                browser: browserName,
-                device:deviceType,
-                ipAddress: ipAddress,
-                token:token,
-                created_at:new Date(),
-                updated_at:new Date()
-              },
-            }
-          );
-
-          //Insert email id into news_letter table
-          const result = await db.query(`
-            SELECT *
-            FROM news_letters
-            WHERE email = $1`, [email.toLowerCase()]);
-
-            if (result.rowCount == 0) {
-              const createNewsLetter = await News_letter.create({
-                email: email.toLowerCase(),
-                receive_update_status: 0,
-              });
-            }
-
-          //get plan info
-          const planInfo = {
-            plan_Name: 'Basic',
-            plan_expire_date:'',
-            status : 1 // 0 - default , 1 - sign in , 2 - subscriber
-          }
 
           return res.status(200).json({
             status: true,
@@ -167,7 +110,7 @@ const SignUp = catchAsync(async (req, res) => {
         // Handle errors
         throw new AppError(err.message, 200, errors);
       }
-  });
+});
 
 // POST Customer login
 const Login = catchAsync(async (req, res) => {
@@ -266,57 +209,7 @@ const Login = catchAsync(async (req, res) => {
   });
 
   // GET Customer logout
-const Logout = catchAsync(async (req, res, next) => {
 
-  await Promise.all([
-    body("token")
-      .notEmpty()
-      .withMessage("Token is required")
-      .custom(async (value) => {
-        // Check if the email is not  exists in the database
-        const existingToken = await customer_log.findOne({
-          where: {
-            token: value,
-          },
-        });
-
-        if (!existingToken) {
-          //throw new AppError("Token doesn't exists",200);
-            return res.status(200).json({
-                  status: false,
-                  message: "Token doesn't exists",
-		  });
-        }
-      })
-      .run(req)
-  ]);
-
-  // Handle validation result
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    const error_message = errors.array()[0].msg;
-    throw new AppError(error_message, 200, errors);
-  }
-
-    try {
-      const {token,status} = req.body;
-      const logStatus = status || 0;
-      if(logStatus == 0){
-        //update logout timestamp in db
-          const result = await db.query('UPDATE customer_logs SET logout_time = NOW() WHERE token = $1 and logout_time IS NULL', [req.body.token]);
-      }else{
-        //update logout timestamp  for all device
-          const result = await db.query('UPDATE customer_logs SET logout_time = NOW() WHERE token NOT IN ($1) and logout_time IS NULL', [req.body.token]);
-      }
-
-
-        return res
-          .status(200)
-          .json({ status: true, message: "Logout successfully" });
-    } catch (error) {
-      throw new AppError(error.message, 200);
-    }
-  });
 
   /*********************Forget Password *******************************/
 
@@ -363,13 +256,6 @@ const Logout = catchAsync(async (req, res, next) => {
 
         //generate random otp
         const otpCode = Math.floor(Math.random() * 900000) + 100000;
-       //encrypted customer id
-        // const encryptCustomerId = encryptionData("node_encryption", customerInfo.id.toString());
-
-        // const data = {
-        //   customer:{iv:encryptCustomerId.iv,encryptedData:encryptCustomerId.encryptedData},
-        //   email:email.toLowerCase()
-        // }
 
         //Send Email
         const currentYear = new Date().getFullYear();
@@ -864,137 +750,11 @@ const Logout = catchAsync(async (req, res, next) => {
   });
   /******************* End Forget password************************ */
 
-  /******************************Google login*****************************************/
-
-const GoogleLogin = catchAsync(async (req, res) => {
-
-    //console.log("Received Request: ", req.body);
-
-    // Validate request body
-    await Promise.all([
-     body("id_token")
-      .notEmpty()
-      .withMessage("Google ID Token is required")
-      .run(req)
-    ]);
-
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      //console.log("Validation Errors: ", errors.array());
-      throw new AppError(errors.array()[0].msg, 200);
-    }
-
-    try {
-      const { id_token, category_id, browser_Name, device_Type } = req.body;
-
-      // Check if token is expired
-      const decoded = jwt.decode(id_token, { complete: true });
-      if (decoded && decoded.payload.exp * 1000 < Date.now()) {
-        return res.status(200).json({ error: "Google Token Expired" });
-      }
-
-      // Verify Google ID Token
-      let ticket;
-      try {
-        ticket = await client.verifyIdToken({
-          idToken: id_token,
-          // audience: process.env.GOOGLE_CLIENT_ID,
-        });
-      // console.log("Google Token Verified Successfully");
-      } catch (error) {
-        //console.error("Google Token Verification Failed:", error);
-        return res
-          .status(200)
-          .json({ error: "Invalid Google Token", details: error.message });
-      }
-
-      const payload = ticket.getPayload();
-      //console.log("Google Payload: ", payload);
-
-      const { sub, email, given_name, family_name } = payload;
-
-      // Check if user exists in database
-      let user = await Customer.findOne({ where: { email } });
-
-      // Generate JWT for session management
-      const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET_KEY, {
-        expiresIn: process.env.JWT_EXPIRES_IN,
-      });
-
-      if (!user) {
-
-        user = await Customer.create({
-          first_name: given_name,
-          last_name: family_name,
-          email: email.toLowerCase(),
-          google_id: sub,
-          status: "1",
-          google_token: id_token,
-          category_id: category_id || null,
-        });
-      } else {
-        user.google_token = id_token;
-        await user.save();
-      }
-
-      //Log the user's login info
-      await sequelize.query(
-        `INSERT INTO customer_logs (customer_id, login_time, browers,device, ip_address, token,created_at,updated_at) VALUES (:customerId, :loginIn, :browser,:device, :ipAddress, :token,:created_at,:updated_at)`,
-        {
-          type: QueryTypes.INSERT,
-          replacements: {
-            customerId: user.id,
-            loginIn: new Date(),
-            browser: browser_Name,
-            device:device_Type,
-            ipAddress: ipAddress,
-            token:token,
-            created_at:new Date(),
-            updated_at:new Date()
-          },
-        }
-      );
-
-      return res.status(200).json({
-        status: true,
-        message: "Logged in successfully with Google",
-        data: [
-          {
-            token: token,
-            name: `${user.first_name} ${user.last_name}`,
-            customer_id: (user) ? user.id : '',
-          }
-        ],
-        planInfo:[]
-      });
-  } catch (error) {
-    return res.status(200).json({ error: error.message });
-  }
-});
-
-// router.get(
-//   "/auth/google",
-//   passport.authenticate("google", { scope: ["profile", "email"] })
-// );
-
-// // Google OAuth Callback
-// router.get(
-//   "/auth/google/callback",
-//   passport.authenticate("google", {
-//     failureRedirect: "/login",
-//     successRedirect: "/dashboard",
-//   })
-// );
-
-/****************************** End Google login*****************************************/
-
 export {
     SignUp,
     Login,
-    Logout,
     forgetPassword,
     updatePassword,
-    GoogleLogin
 }
 
 

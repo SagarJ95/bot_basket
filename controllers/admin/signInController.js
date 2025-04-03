@@ -6,17 +6,7 @@ import catchAsync from "../../utils/catchAsync.js";
 import AppError from "../../utils/appError.js";
 import db from "../../config/db.js";
 
-// Sequelize
-//import sequelize from "../config/database.js";
-
-// Helpers
-import {
-  encryptPassword,
-  decryptPassword,
-} from "../../helpers/password_helper.js";
 import { generateToken } from "../../helpers/jwt_helper.js";
-import { generateSlug, media_url } from "../../helpers/slug_helper.js";
-
 // Models
 import sequelize from "../../config/database.js";
 import User from "../../db/models/user.js";
@@ -24,22 +14,9 @@ import User from "../../db/models/user.js";
 import { body, validationResult } from "express-validator";
 import { Op, QueryTypes,Sequelize } from "sequelize";
 import { compare } from "bcrypt";
-import bcrypt from "bcrypt";
 import os from "os";
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3847';
 
-const getServerIP = () => {
-  const interfaces = os.networkInterfaces();
-  for (const interfaceName in interfaces) {
-      for (const iface of interfaces[interfaceName]) {
-          if (!iface.internal && iface.family === 'IPv4') {
-              return iface.address;
-          }
-      }
-  }
-  return req.headers["x-forwarded-for"] || req.connection.remoteAddress;
-};
-/* Auth API Start ------------------------------------- */
 
 // POST user login
 const userLogin = catchAsync(async (req, res) => {

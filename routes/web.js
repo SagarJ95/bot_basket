@@ -62,17 +62,12 @@ router.post('/sign_up', cutomerController.SignUp);
 //customer Login API
 router.post('/login', cutomerController.Login);
 
-//customer Logout API
-router.post('/logout',cutomerController.Logout);
-
 //forget password
 router.post('/forgetPassword',cutomerController.forgetPassword)
 
 //update password
 router.post('/updatePassword',cutomerController.updatePassword)
 
-//google login
-router.post("/google_login", cutomerController.GoogleLogin);
 /********************************** End Customer Section *********************************/
 
 

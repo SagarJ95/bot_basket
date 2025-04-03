@@ -15,38 +15,29 @@ module.exports = {
       last_name: {
         type: Sequelize.STRING
       },
-      email: {
-        type: Sequelize.STRING
-      },
       phone_no: {
+        type: Sequelize.INTEGER
+      },
+      email: {
         type: Sequelize.STRING
       },
       password: {
         type: Sequelize.STRING
-      },
-      country:{
-        type: Sequelize.STRING,
-      },
-      google_token: {
-        type: Sequelize.STRING
-      },
-      google_refresh_token: {
-        type: Sequelize.STRING
-      },
-      apple_id:{
-        type:Sequelize.STRING
-      },
-      apple_token:{
-        type:Sequelize.STRING
-      },
-      apple_refresh_token:{
-        type:Sequelize.STRING
       },
       status: {
         type: Sequelize.ENUM('0', '1')
       },
       category_id:{
         type:Sequelize.STRING
+      },
+      created_by:{
+        type:Sequelize.INTEGER
+      },
+      updated_by:{
+        type:Sequelize.INTEGER
+      },
+      deleted_by:{
+        type:Sequelize.INTEGER
       },
       created_at: {
         allowNull: false,

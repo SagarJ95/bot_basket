@@ -4,24 +4,8 @@ dotenv.config({ path: `${process.cwd()}/.env` });
 // Defaults
 import catchAsync from "../../utils/catchAsync.js";
 import AppError from "../../utils/appError.js";
-import db from "../../config/db.js";
-
-// Sequelize
-//import sequelize from "../config/database.js";
-
-// Helpers
-import {
-  encryptPassword,
-  decryptPassword,
-} from "../../helpers/password_helper.js";
-import { generateToken } from "../../helpers/jwt_helper.js";
 import { generateSlug, media_url } from "../../helpers/slug_helper.js";
-
-
-
-// Models
 import Category from "../../db/models/category.js";
-// Node Modules
 import { body, validationResult } from "express-validator";
 import { Op, QueryTypes,Sequelize } from "sequelize";
 import { compare } from "bcrypt";
@@ -236,55 +220,6 @@ const getCategories = catchAsync(async (req, res) => {
 
   });
 
-  // GET all categories
-const getAllCategories = catchAsync(async (req, res) => {
-    try {
-
-        const start = parseInt(req.body.start) != NaN ? parseInt(req.body.start) : 0;
-        const length = parseInt(req.body.length) != NaN ? parseInt(req.body.length) : 0;
-
-        let column_name = 'id'; // Default column for sorting
-        let column_sort_order = 'DESC'; // Default sorting order
-
-        // Search value handling
-        const search_value = req.body.search && req.body.search.value ? req.body.search.value.toLowerCase() : '';
-        let search_query = ` WHERE categories.deleted_at ISNULL`;
-
-        if (req.user && req.user.role != 1) {
-            search_query += ` AND categories.created_by = ${req.user.id}`;
-        }
-
-        const query_params = [];
-
-        if (search_value) {
-            search_query += ` AND (LOWER(cat_name) LIKE $1)`;
-            query_params.push(`%${search_value}%`);
-        }
-
-        let order_query = ` ORDER BY ${column_name} ${column_sort_order}`;
-        let limit_query = ``;
-
-        if (length > 0) {
-            limit_query = ` OFFSET $${query_params.length + 1} LIMIT $${query_params.length + 2}`;
-            query_params.push(start, length);
-        }
-
-        // Fetch data from the database
-        const query = `SELECT * from categories ${search_query} ${order_query} ${limit_query}`;
-
-        const result = await db.query(query, query_params);
-
-        if (result.rows.length <= 0) {
-            throw new AppError('Data Not Found');
-        }
-
-        return res.status(200).json({ status: true, message: 'Data Found', data: result.rows });
-
-    } catch (error) {
-        throw new AppError(error.message, 400);
-    }
-});
-
   // POST create category
 const createCategory = catchAsync(async (req, res) => {
 
@@ -369,7 +304,7 @@ const createCategory = catchAsync(async (req, res) => {
   });
 
   // GET category by ID
-  const getCategoryById = catchAsync(async (req, res) => {
+const getCategoryById = catchAsync(async (req, res) => {
     try {
         const categoryId = parseInt(req.params.id);
 
@@ -393,7 +328,7 @@ const createCategory = catchAsync(async (req, res) => {
   });
 
   // PATCH update category by ID
-  const updateCategoryById = catchAsync(async (req, res) => {
+const updateCategoryById = catchAsync(async (req, res) => {
 
     const categoryId = parseInt(req.params.id);
 
@@ -480,7 +415,7 @@ const createCategory = catchAsync(async (req, res) => {
   });
 
   // DELETE category by ID
-  const deleteCategoryById = catchAsync(async (req, res) => {
+const deleteCategoryById = catchAsync(async (req, res) => {
     try {
         const categoryId = parseInt(req.params.id);
 
@@ -515,7 +450,7 @@ const createCategory = catchAsync(async (req, res) => {
   });
 
   // PATCH update category status by ID
-  const updateCategoryStatusById = catchAsync(async (req, res) => {
+const updateCategoryStatusById = catchAsync(async (req, res) => {
     try {
         const categoryId = parseInt(req.params.id);
         const status = parseInt(req.params.status);
@@ -557,7 +492,6 @@ const createCategory = catchAsync(async (req, res) => {
 export {
     /* Category API */
     getCategories,
-    getAllCategories,
     createCategory,
     getCategoryById,
     updateCategoryById,

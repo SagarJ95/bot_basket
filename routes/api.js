@@ -16,18 +16,8 @@ const file_storage = diskStorage({
   destination: function (req, file, cb) {
       let uploadPath;
 
-      if (file.fieldname === 'featured_media') {
-          uploadPath = './public/uploads/blogs';
-      } else if (file.fieldname === 'photo') {
+      if (file.fieldname === 'photo') {
           uploadPath = './public/uploads/masters';
-      } else if(file.fieldname === 'banner_image') {
-          uploadPath = './public/uploads/banners/desktop';
-      } else if(file.fieldname === 'mobile_banner_image') {
-          uploadPath = './public/uploads/banners/mobile';
-      } else if(file.fieldname === 'landing_carousel[]' || file.fieldname === 'carousel_photo'){
-          uploadPath = './public/uploads/landingCarousel';
-      }else if(file.fieldname === 'banner_trailer_video') {
-        uploadPath = './public/uploads/banners/trailer_videos';
       }else {
         return cb(new Error('Invalid fieldname'), null);
       }
