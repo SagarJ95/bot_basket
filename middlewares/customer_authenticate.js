@@ -1,6 +1,6 @@
 import pkg from 'jsonwebtoken';
 const { verify } = pkg;
-import Customer from '../db/models/customer.js';
+import Customer from '../db/models/customers.js';
 import catchAsync from '../utils/catchAsync.js';
 import AppError from '../utils/appError.js';
 

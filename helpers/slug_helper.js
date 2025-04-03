@@ -1,5 +1,5 @@
 
-import Customer from "../db/models/customer.js";
+import Customer from "../db/models/customers.js";
 import pkg from 'jsonwebtoken';
 const { verify } = pkg;
 

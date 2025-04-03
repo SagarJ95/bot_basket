@@ -6,15 +6,15 @@ import db from "../../config/db.js";
 import sequelize from "../../config/database.js";
 import { generateToken } from "../../helpers/jwt_helper.js";
 // Models
-// import Customer from "../../db/models/customer.js";
-// import customer_log from "../../db/models/customer_logs.js"
+import Customer from "../../db/models/customers.js";
+import customer_log from "../../db/models/customer_otp_logs.js"
 import { body, validationResult } from "express-validator";
 import { Op, QueryTypes,Sequelize } from "sequelize";
 import { compare } from "bcrypt";
 import bcrypt from "bcrypt";
 import nodemailer from "nodemailer";
 import os from "os";
-import customerOtpLog from '../../db/models/customer_otp_log.js'
+import customerOtpLog from '../../db/models/customer_otp_logs.js'
 import pkg from 'jsonwebtoken';
 
 

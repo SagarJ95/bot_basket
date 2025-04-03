@@ -7,7 +7,7 @@ import sharp from "sharp"; // For image compression
 import authenticate from "../middlewares/authenticate.js";
 import * as userManagementController from "../controllers/admin/userManagementController.js";
 import * as signInController from "../controllers/admin/signInController.js";
-import * as adminController from "../controllers/admin/adminController.js";
+// import * as adminController from "../controllers/admin/adminController.js";
 import * as masterController from "../controllers/admin/masterController.js";
 
 const router = Router();

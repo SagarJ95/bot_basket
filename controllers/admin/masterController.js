@@ -303,6 +303,55 @@ const createCategory = catchAsync(async (req, res) => {
     }
   });
 
+    // GET all categories
+const getAllCategories = catchAsync(async (req, res) => {
+    try {
+
+        const start = parseInt(req.body.start) != NaN ? parseInt(req.body.start) : 0;
+        const length = parseInt(req.body.length) != NaN ? parseInt(req.body.length) : 0;
+
+        let column_name = 'id'; // Default column for sorting
+        let column_sort_order = 'DESC'; // Default sorting order
+
+        // Search value handling
+        const search_value = req.body.search && req.body.search.value ? req.body.search.value.toLowerCase() : '';
+        let search_query = ` WHERE categories.deleted_at ISNULL`;
+
+        if (req.user && req.user.role != 1) {
+            search_query += ` AND categories.created_by = ${req.user.id}`;
+        }
+
+        const query_params = [];
+
+        if (search_value) {
+            search_query += ` AND (LOWER(cat_name) LIKE $1)`;
+            query_params.push(`%${search_value}%`);
+        }
+
+        let order_query = ` ORDER BY ${column_name} ${column_sort_order}`;
+        let limit_query = ``;
+
+        if (length > 0) {
+            limit_query = ` OFFSET $${query_params.length + 1} LIMIT $${query_params.length + 2}`;
+            query_params.push(start, length);
+        }
+
+        // Fetch data from the database
+        const query = `SELECT * from categories ${search_query} ${order_query} ${limit_query}`;
+
+        const result = await db.query(query, query_params);
+
+        if (result.rows.length <= 0) {
+            throw new AppError('Data Not Found');
+        }
+
+        return res.status(200).json({ status: true, message: 'Data Found', data: result.rows });
+
+    } catch (error) {
+        throw new AppError(error.message, 400);
+    }
+});
+
   // GET category by ID
 const getCategoryById = catchAsync(async (req, res) => {
     try {
@@ -496,6 +545,7 @@ export {
     getCategoryById,
     updateCategoryById,
     deleteCategoryById,
-    updateCategoryStatusById
+    updateCategoryStatusById,
+    getAllCategories
 
 }
