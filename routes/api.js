@@ -9,6 +9,8 @@ import * as userManagementController from "../controllers/admin/userManagementCo
 import * as signInController from "../controllers/admin/signInController.js";
 // import * as adminController from "../controllers/admin/adminController.js";
 import * as masterController from "../controllers/admin/masterController.js";
+import * as cutomerController from "../controllers/frontend/signInApiController.js"
+import customer_authenticate from '../middlewares/customer_authenticate.js';
 
 const router = Router();
 
@@ -178,6 +180,9 @@ router
   .delete(authenticate, userManagementController.deleteRoleById);
 
 /* Roles API End ------------------------------------ */
+
+//update customer info
+router.post('/update_customer_info',customer_authenticate,cutomerController.update_customer_profile)
 
 
 export default router;

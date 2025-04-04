@@ -182,6 +182,7 @@ const Login = catchAsync(async (req, res) => {
   });
   /*********************Forget Password *******************************/
 
+  // used for sign_up and forget password api
 const resend_otp = catchAsync(async (req, res, next) => {
     await Promise.all([
       body("email")
@@ -256,18 +257,6 @@ const updatePassword = catchAsync(async (req, res, next) => {
         .notEmpty()
         .withMessage("email is required")
         .run(req),
-      // body("otp")
-      //   .notEmpty()
-      //   .withMessage("otp is required")
-      //   .run(req),
-      //   body("new_password")
-      //   .notEmpty()
-      //   .withMessage("New Password is required")
-      //   .run(req),
-      //   body("confirm_password")
-      //   .notEmpty()
-      //   .withMessage("Confirm Password is required")
-      //   .run(req),
     ]);
 
     // Handle validation result
@@ -306,11 +295,16 @@ const updatePassword = catchAsync(async (req, res, next) => {
             message: checkOtpResponse.message,
           });
         }
+      }else if(!otp || !new_password || !confirm_password){
+        return res.status(200).json({
+          status: false,
+          message: "Please Fill all fields"
+        });
       }
 
       //check otp expire and invalid, incorrect functionlity
-      const getOtpexpireStatus = await otpexpire(email,otp);
-      console.log("getOtpexpireStatus>>",getOtpexpireStatus)
+      const getOtpexpireStatus = await otpexpire(email.toLowerCase(),otp);
+
       if (!getOtpexpireStatus.status) {
         return res.status(200).json({
           status: false,
@@ -320,9 +314,8 @@ const updatePassword = catchAsync(async (req, res, next) => {
 
       //check otp from customer_otp_logs table
      const checkotpstatus = await db.query(`select * from customer_otp_logs where otp = ${otp} and status = $1 and deleted_at IS NULL`,["1"])
-     console.log("checkotpstatus>>",checkotpstatus)
+
      if(checkotpstatus.rowCount <= 0){
-      //throw new AppError("OTP doesn't match", 200);
       return res.status(200).json({
         status: false,
         message: "OTP doesn't match",
@@ -331,7 +324,6 @@ const updatePassword = catchAsync(async (req, res, next) => {
 
       //check the new password and confirm password is match or not
       if (new_password !== confirm_password) {
-        //throw new AppError("New Password and Confirm Password is not match", 200);
         return res.status(200).json({
           status: false,
           message: "New Password and Confirm Password is not match",
@@ -346,7 +338,7 @@ const updatePassword = catchAsync(async (req, res, next) => {
       //update customer password in Customer Table
       const updateCustomerPassword = await Customer.update(updateInfo, {
           where: {
-            id:checkotpstatus.rows[0].customer_id
+            email:checkotpstatus.rows[0].email
             },
           });
 
@@ -809,11 +801,106 @@ async function sendEmail(email,customer_name) {
 }
   /******************* End Forget password************************ */
 
+
+  /*******************  Profile Info ************************ */
+
+const fetch_profile = catchAsync(async (req, res) => {
+    try{
+      const customer_id = req.user.id;
+
+      const getCustomerInfo = await db.query(`
+        SELECT first_name, last_name, phone_no, whatsapp_no, email,
+         CASE
+          WHEN image IS NULL OR image = '' THEN ''
+              ELSE CONCAT('${BASE_URL}', image)
+      END AS profile
+        FROM customers
+        WHERE id = $1 AND status = $2 AND deleted_at IS NULL
+    `, [customer_id, "1"]);
+
+
+      if(getCustomerInfo.rowCount > 0){
+          return res.status(200).json({
+            status: true,
+            message: "fetch customer info sucessfully",
+            data: getCustomerInfo.rows
+          });
+      }else{
+        return res.status(200).json({
+          status: false,
+          message: "fetch customer info Unsucessfully",
+        });
+      }
+
+      }catch(e){
+        return res.status(200).json({
+            status: false,
+            message: "Failed to retrieve data",
+            errors: error.message
+        });
+      }
+  });
+
+const update_customer_profile = catchAsync(async (req, res) => {
+    try{
+      console.log("req.body>>",req.body)
+      const {first_name,last_name,contact_number,whatsapp_no,email,password,enable_email_notification} = req.body;
+
+      const customer_id = req.user.id;
+
+      const getCustomerInfo = await db.query(`
+              SELECT password
+              FROM customers
+              WHERE id = $1 AND status = $2 AND deleted_at IS NULL
+          `, [customer_id, "1"]);
+
+      const hashPassword = (password) ? await bcrypt.hash(password, 10) : getCustomerInfo.rows[0].password;
+
+
+      const updateCustomerPassword = await Customer.update({
+        first_name:first_name,
+        last_name:last_name,
+        phone_no:contact_number,
+        whatsapp_no:whatsapp_no,
+        email:email,
+        password:hashPassword,
+        enable_email_notification:enable_email_notification
+        },{
+          where:{
+            id:customer_id
+            }
+        });
+
+
+      if(updateCustomerPassword.length > 0){
+          return res.status(200).json({
+            status: true,
+            message: "update customer info sucessfully"
+          });
+      }else{
+        return res.status(200).json({
+          status: false,
+          message: "update customer info Unsucessfully",
+        });
+      }
+
+      }catch(e){
+        return res.status(200).json({
+            status: false,
+            message: "Failed to data",
+            errors: error.message
+        });
+      }
+  });
+  /******************* End  Profile Info ************************ */
+
 export {
     SignUp,
     Login,
     resend_otp,
     updatePassword,
+    fetch_profile,
+    update_customer_profile
 }
 
 

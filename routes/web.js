@@ -5,10 +5,8 @@ import { existsSync, mkdirSync } from "fs";
 import { extname } from "path";
 import path from "path";
 import * as cutomerController from "../controllers/frontend/signInApiController.js"
-import authenticate from '../middlewares/customer_authenticate.js';
-import staticApiKey from '../middlewares/static_api_key.js';
 const project_name = process.env.APP_NAME;
-import sharp from "sharp";
+import customer_authenticate from '../middlewares/customer_authenticate.js';
 
 const page_layout = {
     project_name: project_name,
@@ -67,6 +65,12 @@ router.post('/forget_password',cutomerController.updatePassword)
 
 //send Email wwith OTP
 router.post('/resend_otp',cutomerController.resend_otp)
+
+//get customer info
+router.post('/fetch_customer_profile',customer_authenticate,cutomerController.fetch_profile)
+
+//update customer info
+router.post('/update_customer_info',customer_authenticate,cutomerController.update_customer_profile)
 
 
 /********************************** End Customer Section *********************************/
