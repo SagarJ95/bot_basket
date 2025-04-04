@@ -16,7 +16,10 @@ module.exports = {
         type: Sequelize.STRING
       },
       phone_no: {
-        type: Sequelize.INTEGER
+        type: Sequelize.STRING
+      },
+      whatsapp_no:{
+        type: Sequelize.STRING
       },
       email: {
         type: Sequelize.STRING
@@ -24,11 +27,17 @@ module.exports = {
       password: {
         type: Sequelize.STRING
       },
-      status: {
+      image:{
+        type:Sequelize.STRING
+      },
+      enable_whatsapp_notification: {
         type: Sequelize.ENUM('0', '1')
       },
-      category_id:{
-        type:Sequelize.STRING
+      enable_email_notification: {
+        type: Sequelize.ENUM('0', '1')
+      },
+      status: {
+        type: Sequelize.ENUM('0', '1')
       },
       created_by:{
         type:Sequelize.INTEGER

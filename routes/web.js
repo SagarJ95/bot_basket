@@ -71,4 +71,6 @@ router.post('/updatePassword',cutomerController.updatePassword)
 /********************************** End Customer Section *********************************/
 
 
+
+
 export default router;

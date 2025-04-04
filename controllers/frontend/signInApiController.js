@@ -16,22 +16,9 @@ import nodemailer from "nodemailer";
 import os from "os";
 import customerOtpLog from '../../db/models/customer_otp_logs.js'
 import pkg from 'jsonwebtoken';
-
-
 const project_name = process.env.APP_NAME;
-const BASE_URL = process.env.BASE_URL || 'http://localhost:3847';
+const BASE_URL = process.env.BASE_URL || 'http://localhost:3848';
 
-const getServerIP = () => {
-  const interfaces = os.networkInterfaces();
-  for (const interfaceName in interfaces) {
-      for (const iface of interfaces[interfaceName]) {
-          if (!iface.internal && iface.family === 'IPv4') {
-              return iface.address;
-          }
-      }
-  }
-  return req.headers["x-forwarded-for"] || req.connection.remoteAddress;
-};
 
 // POST Customer login
 const SignUp = catchAsync(async (req, res) => {
