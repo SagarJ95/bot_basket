@@ -68,6 +68,11 @@ app.use(express.static(join(__dirname, "public")));
 app.use(_json());
 app.use(_urlencoded({ extended: false }));
 
+// Set the views folder (admin in this case)
+app.set("views", join(__dirname, "views"));
+
+// Set EJS as the view engine
+app.set("view engine", "ejs");
 
 // Use express-ejs-layouts
 app.use(expressLayouts);

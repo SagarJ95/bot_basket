@@ -23,7 +23,10 @@ const customers = sequelize.define(
     phone_no: {
       type: DataTypes.STRING
     },
-    profile_pic:{
+    whatsapp_no:{
+      type: DataTypes.STRING
+    },
+    image:{
         type:DataTypes.STRING,
         allowNull:true,
     },
@@ -31,6 +34,12 @@ const customers = sequelize.define(
       type: DataTypes.STRING
     },
     status: {
+      type: DataTypes.ENUM('0', '1')
+    },
+    enable_whatsapp_notification: {
+      type: DataTypes.ENUM('0', '1')
+    },
+    enable_email_notification: {
       type: DataTypes.ENUM('0', '1')
     },
     created_by:{

@@ -15,6 +15,9 @@ module.exports = {
       otp: {
         type: Sequelize.INTEGER
       },
+      expire_at: {
+        type: Sequelize.DATE
+      },
       status: {
         type: Sequelize.ENUM('0', '1')
       },

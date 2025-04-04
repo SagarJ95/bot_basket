@@ -17,6 +17,9 @@ const customer_otp_logs = sequelize.define(
     otp: {
       type: DataTypes.INTEGER
     },
+    expires_at:{
+      type: DataTypes.DATE
+    },
     status: {
       type: DataTypes.ENUM('0', '1')
     },

@@ -63,10 +63,11 @@ router.post('/sign_up', cutomerController.SignUp);
 router.post('/login', cutomerController.Login);
 
 //forget password
-router.post('/forgetPassword',cutomerController.forgetPassword)
+router.post('/forget_password',cutomerController.updatePassword)
 
-//update password
-router.post('/updatePassword',cutomerController.updatePassword)
+//send Email wwith OTP
+router.post('/resend_otp',cutomerController.resend_otp)
+
 
 /********************************** End Customer Section *********************************/
 
