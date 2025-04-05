@@ -9,7 +9,7 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:3848';
 
   /*******************  Profile Info ************************ */
 
-  const fetch_profile = catchAsync(async (req, res) => {
+const fetch_profile = catchAsync(async (req, res) => {
     try{
       const customer_id = req.user.id;
 
@@ -23,19 +23,11 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:3848';
         WHERE id = $1 AND status = $2 AND deleted_at IS NULL
     `, [customer_id, "1"]);
 
-
-      if(getCustomerInfo.rowCount > 0){
-          return res.status(200).json({
-            status: true,
-            message: "fetch customer info sucessfully",
-            data: getCustomerInfo.rows
-          });
-      }else{
-        return res.status(200).json({
-          status: false,
-          message: "fetch customer info Unsucessfully",
-        });
-      }
+      return res.status(200).json({
+        status: true,
+        message: "fetch customer info sucessfully",
+        data: (getCustomerInfo.rowCount > 0) ? getCustomerInfo.rows : []
+      });
 
       }catch(e){
         return res.status(200).json({
@@ -88,22 +80,10 @@ const update_customer_profile = catchAsync(async (req, res) => {
             }
         });
 
-
-
-
-
-
-      if(updateCustomerPassword.length > 0){
-          return res.status(200).json({
-            status: true,
-            message: "update customer info sucessfully"
-          });
-      }else{
         return res.status(200).json({
-          status: false,
-          message: "update customer info Unsucessfully",
+          status: true,
+          message: (updateCustomerPassword.length > 0) ? "update customer info sucessfully" : "update customer info Unsucessfully",
         });
-      }
 
       }catch(e){
         return res.status(200).json({

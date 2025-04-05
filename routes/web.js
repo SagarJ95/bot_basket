@@ -83,6 +83,12 @@ router.get('/category_list',staticApiKey,productController.category_list);
 //product list
 router.post('/product_list',customer_authenticate,productController.product_list);
 
+//Add cart
+router.post('/add_update_cart',customer_authenticate,productController.add_update_cart)
+
+//display cart list
+router.post('/cart_list',customer_authenticate,productController.cart_list)
+
 /********************************** End Customer Section *********************************/
 
 
