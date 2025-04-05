@@ -141,11 +141,40 @@ const cart_list =catchAsync(async (req, res) => {
     }
 });
 
+const delete_product_cart = catchAsync(async (req, res) => {
+  try{
+    const {id} = req.body;
+    const customer_id = req.user.id
+
+    let CartInfo = await addToCart.update({
+        status:0
+      },{
+        where:{
+          id:parseInt(id),
+          created_by:customer_id
+        }
+      })
+
+    return res.status(200).json({
+      status: true,
+      message: (CartInfo) ? `Delete From Cart sucessfully` : `Delete From Cart Unsucessfully`,
+    });
+
+    }catch(e){
+      return res.status(200).json({
+          status: false,
+          message: "Failed to retrieve data",
+          errors: error.message
+      });
+    }
+});
+
 /******************* End product  Info ************************ */
 
   export {
     category_list,
     product_list,
     add_update_cart,
-    cart_list
+    cart_list,
+    delete_product_cart
 }

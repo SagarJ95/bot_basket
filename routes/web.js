@@ -89,6 +89,9 @@ router.post('/add_update_cart',customer_authenticate,productController.add_updat
 //display cart list
 router.post('/cart_list',customer_authenticate,productController.cart_list)
 
+//delete product cart
+router.post('/delete_product_cart',customer_authenticate,productController.delete_product_cart)
+
 /********************************** End Customer Section *********************************/
 
 
