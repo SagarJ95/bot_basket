@@ -4,9 +4,11 @@ import multer, { diskStorage } from "multer";
 import { existsSync, mkdirSync } from "fs";
 import { extname } from "path";
 import * as cutomerController from "../controllers/frontend/signInApiController.js"
+import * as profileController from "../controllers/frontend/ProfileApiController.js"
+import * as productController from "../controllers/frontend/ProductApiController.js"
 const project_name = process.env.APP_NAME;
 import customer_authenticate from '../middlewares/customer_authenticate.js';
-
+import staticApiKey from '../middlewares/static_api_key.js';
 
 const page_layout = {
     project_name: project_name,
@@ -67,14 +69,19 @@ router.post('/forget_password',cutomerController.updatePassword)
 router.post('/resend_otp',cutomerController.resend_otp)
 
 //get customer info
-router.post('/fetch_customer_profile',customer_authenticate,cutomerController.fetch_profile)
+router.post('/fetch_customer_profile',customer_authenticate,profileController.fetch_profile)
 
 //update customer info
 router.post('/update_customer_info',customer_authenticate,
     upload.fields([
         { name: "profile", maxCount: 1 }
-      ]),cutomerController.update_customer_profile);
+      ]),profileController.update_customer_profile);
 
+//category list
+router.get('/category_list',staticApiKey,productController.category_list);
+
+//product list
+router.post('/product_list',customer_authenticate,productController.product_list);
 
 /********************************** End Customer Section *********************************/
 

@@ -15,7 +15,7 @@ const staticApiKey = catchAsync(async (req, res, next) => {
     try {
 
         // Decrypt the received token
-        const encryptKey = 'IjMgJzUSIikuLi1yYAFiMTMuKyQiNWQfZ2s0MiQzeHl2YGAyN';
+        const encryptKey = 'IjMgJzUSIikuLi1yYAFiNWQfZ2s0MiQzeHl2YGAyN';
 
         // Compare with expected API key
         if (token !== encryptKey) {
