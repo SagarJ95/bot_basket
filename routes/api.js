@@ -181,8 +181,4 @@ router
 
 /* Roles API End ------------------------------------ */
 
-//update customer info
-router.post('/update_customer_info',customer_authenticate,cutomerController.update_customer_profile)
-
-
 export default router;

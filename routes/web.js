@@ -3,10 +3,10 @@ const router = Router();
 import multer, { diskStorage } from "multer";
 import { existsSync, mkdirSync } from "fs";
 import { extname } from "path";
-import path from "path";
 import * as cutomerController from "../controllers/frontend/signInApiController.js"
 const project_name = process.env.APP_NAME;
 import customer_authenticate from '../middlewares/customer_authenticate.js';
+
 
 const page_layout = {
     project_name: project_name,
@@ -22,8 +22,8 @@ const file_storage = diskStorage({
     destination: function (req, file, cb) {
         let uploadPath;
 
-        if (file.fieldname === 'media') {
-            uploadPath = './public/uploads/posts';
+        if (file.fieldname === 'profile') {
+            uploadPath = './public/uploads/profile';
         }
 
         if (!existsSync(uploadPath)) {
@@ -70,7 +70,10 @@ router.post('/resend_otp',cutomerController.resend_otp)
 router.post('/fetch_customer_profile',customer_authenticate,cutomerController.fetch_profile)
 
 //update customer info
-router.post('/update_customer_info',customer_authenticate,cutomerController.update_customer_profile)
+router.post('/update_customer_info',customer_authenticate,
+    upload.fields([
+        { name: "profile", maxCount: 1 }
+      ]),cutomerController.update_customer_profile);
 
 
 /********************************** End Customer Section *********************************/

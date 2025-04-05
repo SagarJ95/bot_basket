@@ -811,9 +811,9 @@ const fetch_profile = catchAsync(async (req, res) => {
       const getCustomerInfo = await db.query(`
         SELECT first_name, last_name, phone_no, whatsapp_no, email,
          CASE
-          WHEN image IS NULL OR image = '' THEN ''
-              ELSE CONCAT('${BASE_URL}', image)
-      END AS profile
+          WHEN profile IS NULL OR profile = '' THEN ''
+              ELSE CONCAT('${BASE_URL}', profile)
+      END AS profile_pic
         FROM customers
         WHERE id = $1 AND status = $2 AND deleted_at IS NULL
     `, [customer_id, "1"]);
@@ -843,8 +843,9 @@ const fetch_profile = catchAsync(async (req, res) => {
 
 const update_customer_profile = catchAsync(async (req, res) => {
     try{
-      console.log("req.body>>",req.body)
+
       const {first_name,last_name,contact_number,whatsapp_no,email,password,enable_email_notification} = req.body;
+      const files = req.files || {};
 
       const customer_id = req.user.id;
 
@@ -854,10 +855,10 @@ const update_customer_profile = catchAsync(async (req, res) => {
               WHERE id = $1 AND status = $2 AND deleted_at IS NULL
           `, [customer_id, "1"]);
 
+
       const hashPassword = (password) ? await bcrypt.hash(password, 10) : getCustomerInfo.rows[0].password;
 
-
-      const updateCustomerPassword = await Customer.update({
+      const updateInfo = {
         first_name:first_name,
         last_name:last_name,
         phone_no:contact_number,
@@ -865,11 +866,26 @@ const update_customer_profile = catchAsync(async (req, res) => {
         email:email,
         password:hashPassword,
         enable_email_notification:enable_email_notification
-        },{
+        };
+
+        const formatPath = (filePath) => {
+          return filePath ? filePath.replace(/^public[\\/]/, '/').replace(/\\/g, '/') : null;
+      };
+
+      const profile_pic = files.profile && files.profile.length > 0
+          ? formatPath(files.profile[0].path)
+          : null;
+
+      if (profile_pic) updateInfo.profile = profile_pic;
+      const updateCustomerPassword = await Customer.update(updateInfo,{
           where:{
             id:customer_id
             }
         });
+
+
+
+
 
 
       if(updateCustomerPassword.length > 0){

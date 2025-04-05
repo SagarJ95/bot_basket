@@ -27,7 +27,7 @@ module.exports = {
       password: {
         type: Sequelize.STRING
       },
-      image:{
+      profile:{
         type:Sequelize.STRING
       },
       enable_whatsapp_notification: {

@@ -26,7 +26,7 @@ const customers = sequelize.define(
     whatsapp_no:{
       type: DataTypes.STRING
     },
-    image:{
+    profile:{
         type:DataTypes.STRING,
         allowNull:true,
     },

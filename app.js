@@ -17,12 +17,13 @@ import session, { Store } from "express-session";
 import connectSessionSequelize from "connect-session-sequelize";
 const SequelizeStore = connectSessionSequelize(Store);
 import sequelize from "./config/database.js"; // Sequelize instance
-
+import multer from "multer";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import path from "path";
 
 app.use("/uploads/export", express.static(path.join(process.cwd(), "public/uploads/export")));
+
 
 // Get the directory name
 const __filename = fileURLToPath(import.meta.url);
