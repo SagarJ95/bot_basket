@@ -60,6 +60,21 @@ const fetch_profile = catchAsync(async (req, res) => {
   });
 
 const update_customer_profile = catchAsync(async (req, res) => {
+  await Promise.all([
+        body('customer_id').notEmpty().withMessage('Customer Id is required').run(req),
+        body('first_name').notEmpty().withMessage('first name is required').run(req),
+        body('last_name').notEmpty().withMessage('Last Name is required').run(req),
+        body('contact_number').notEmpty().withMessage('Contact Number is required').run(req),
+        body('whatsapp_number').notEmpty().withMessage('Whatsapp Number is required').run(req),
+        body('email').notEmpty().withMessage('Email is required').run(req)
+    ]);
+
+    // Handle validation result
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const error_message = errors.array()[0].msg;
+        throw new AppError(error_message, 200, errors);
+    }
 
     try{
 
@@ -77,7 +92,6 @@ const update_customer_profile = catchAsync(async (req, res) => {
                 FROM customers
                 WHERE id = $1 AND status = $2 AND deleted_at IS NULL
             `, [customer_id, "1"]);
-
 
         const hashPassword = (password) ? await bcrypt.hash(password, 10) : getCustomerInfo.rows[0].password;
 

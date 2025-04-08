@@ -159,6 +159,9 @@ router.post("/changeProductStockStatus", authenticate, masterController.changePr
 /* Customers */
 router.post("/getCustomers", authenticate, customerController.getCustomers);
 router.post("/exportCustomers", authenticate, customerController.exportCustomers);
+router.post('/getParticularCustomerInfo',authenticate,customerController.getParticularCustomerInfo)
+router.post('/update_customer_info',authenticate,customerController.update_customer_info)
+router.post('/add_customer',authenticate,customerController.add_customer)
 
 /* Permission API Start ----------------------------------- */
 

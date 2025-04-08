@@ -115,6 +115,19 @@ const product_list = catchAsync(async (req, res) => {
 });
 
 const add_update_cart = catchAsync(async (req, res) => {
+  await Promise.all([
+    body('product_id').notEmpty().withMessage('first name is required').run(req),
+    body('qty').notEmpty().withMessage('quantity is required').run(req),
+    body('price').notEmpty().withMessage('Price is required').run(req)
+  ]);
+
+  // Handle validation result
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+      const error_message = errors.array()[0].msg;
+      throw new AppError(error_message, 200, errors);
+  }
+
     try{
       const {id,product_id,qty,price} = req.body;
 
@@ -122,7 +135,6 @@ const add_update_cart = catchAsync(async (req, res) => {
       let CartInfo;
       //if id is empty then product insert into cart otherwise update product qty in add_to_carts table
       if(!id && id == 0){
-        console.log("in")
          CartInfo = await addToCart.create({
           product_id,
           qty,
@@ -210,6 +222,17 @@ const cart_list =catchAsync(async (req, res) => {
 });
 
 const delete_product_cart = catchAsync(async (req, res) => {
+  await Promise.all([
+    body('id').notEmpty().withMessage('Id is required').run(req)
+  ]);
+
+  // Handle validation result
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+      const error_message = errors.array()[0].msg;
+      throw new AppError(error_message, 200, errors);
+  }
+
   try{
     const {id} = req.body;
     const customer_id = req.user.id
@@ -244,12 +267,30 @@ const delete_product_cart = catchAsync(async (req, res) => {
 /******************* Start Order creation Flow ************************ */
 
 const create_order = catchAsync(async (req, res) => {
+
+  await Promise.all([
+    body('name').notEmpty().withMessage('Name is required').run(req),
+    body('whatsapp_number').notEmpty().withMessage('Whatsapp Number is required').run(req),
+    body('email').notEmpty().withMessage('Email is required').run(req),
+    body('perferred_delivery_date').notEmpty().withMessage('Perferred delivery date is required').run(req),
+    body('address').notEmpty().withMessage('Address is required').run(req)
+  ]);
+
+  // Handle validation result
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+      const error_message = errors.array()[0].msg;
+      throw new AppError(error_message, 200, errors);
+  }
+
+
   try{
     const customer_id = req.user.id;
     const {name,whatsapp_number,email,perferred_delivery_date,address,instruction,order_item} = req.body;
 
     const order_id = await Orders.create({
       customer_id:customer_id,
+      order_ref_id:'00001',
       customer_name:name,
       whatsapp_number:whatsapp_number,
       email:email,
@@ -260,8 +301,8 @@ const create_order = catchAsync(async (req, res) => {
       created_by:customer_id
     });
 
-    if(order_id.id){
-      for(let item of req.body.order_item){
+    if(order_id.id && order_item){
+      for(let item of order_item){
         const order_item_id = await OrderItem.create({
           order_id:order_id.id,
           customer_id:customer_id,
@@ -292,7 +333,19 @@ const create_order = catchAsync(async (req, res) => {
   }
  })
 
- const order_history = catchAsync(async (req, res) => {
+const order_history = catchAsync(async (req, res) => {
+
+  await Promise.all([
+    body('status').notEmpty().withMessage('Status is required').run(req),
+  ]);
+
+  // Handle validation result
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+      const error_message = errors.array()[0].msg;
+      throw new AppError(error_message, 200, errors);
+  }
+
   try{
     const customer_id = req.user.id;
     const {status} = req.body;
@@ -331,7 +384,7 @@ const create_order = catchAsync(async (req, res) => {
   }
  })
 
- const repeat_order = catchAsync(async (req, res) => {
+const repeat_order = catchAsync(async (req, res) => {
   try{
     const customer_id = req.user.id;
     const {order_id} = req.body;
@@ -354,6 +407,17 @@ const create_order = catchAsync(async (req, res) => {
  })
 
  const view_order = catchAsync(async (req, res) => {
+  await Promise.all([
+    body('order_id').notEmpty().withMessage('Order Id is required').run(req),
+  ]);
+
+  // Handle validation result
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+      const error_message = errors.array()[0].msg;
+      throw new AppError(error_message, 200, errors);
+  }
+
   try{
     const customer_id = req.user.id;
     const {order_id} = req.body;

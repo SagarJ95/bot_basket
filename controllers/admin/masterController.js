@@ -30,54 +30,7 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:3848';
 // GET all categories (datatables)
 const getCategories = catchAsync(async (req, res) => {
     try {
-        if (!req.xhr) {
-            throw new AppError('Bad Request: Only AJAX requests are allowed', 400);
-        }
 
-        // Extract query parameters
-        const draw = req.body.draw;
-        const start = parseInt(req.body.start);
-        const length = parseInt(req.body.length);
-        const order_data = req.body.order;
-
-        let column_name = 'ordering'; // Default column for sorting
-        let column_sort_order = 'ASC'; // Default sorting order
-
-        // Check if order_data exists, then extract sorting info
-        if (order_data) {
-            const column_index = req.body.order[0].column;
-            column_name = req.body.columns[column_index].data;
-            column_sort_order = req.body.order[0].dir.toUpperCase();
-        }
-
-        var where = {};
-        where = {
-            deleted_at: null,
-        };
-        // Fetch total records
-        const totalRecords = await Category.count({
-            where: where,
-        });
-
-        // Search value handling
-        const search_value = req.body.search && req.body.search.value ? req.body.search.value.toLowerCase() : '';
-        let search_query = ` WHERE categories.deleted_at IS NULL`;
-
-        // if (req.user && req.user.role != 1) {
-        //     search_query += ` AND categories.created_by = ${req.user.id}`;
-        // }
-
-        const query_params = [];
-
-        if (search_value) {
-            search_query += ` AND (
-            LOWER(cat_name) LIKE $1 OR
-            LOWER(u1.name) LIKE $1 OR
-            LOWER(u2.name) LIKE $1
-            )
-            `;
-            query_params.push(`%${search_value}%`);
-        }
 
         // Filter data count from the database
         const filter_query = `SELECT categories.*,
@@ -168,8 +121,6 @@ const getCategories = catchAsync(async (req, res) => {
                         </div>`;
             }
 
-
-
             return {
                 id: category.id,
                 ordering: category.ordering,
@@ -243,8 +194,6 @@ const createCategory = catchAsync(async (req, res) => {
 
     try {
         const body = req.body;
-
-        // const errors = validationResult(req);
 
         const files = req.files;
         const icon = files && files.icon ? media_url(files.icon[0].path) : null;

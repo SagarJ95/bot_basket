@@ -9,6 +9,9 @@ module.exports = {
         primaryKey: true,
         type: Sequelize.INTEGER
       },
+      order_ref_id: {
+        type: Sequelize.STRING
+      },
       customer_id: {
             type: Sequelize.BIGINT
       },
