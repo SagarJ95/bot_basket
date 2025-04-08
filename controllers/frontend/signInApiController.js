@@ -208,6 +208,8 @@ const resend_otp = catchAsync(async (req, res, next) => {
       const {first_name,last_name,email,status} = req.body;
       let customer_name;
       // 1 means sign up and 2 means forget password( need to check email id exits or not)
+
+
       if(status == 2){
         const existingEmail = await Customer.findOne({
           where: {

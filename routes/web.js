@@ -92,6 +92,24 @@ router.post('/cart_list',customer_authenticate,productController.cart_list)
 //delete product cart
 router.post('/delete_product_cart',customer_authenticate,productController.delete_product_cart)
 
+
+//create_order
+router.post('/place_order',customer_authenticate,productController.create_order)
+
+//order_history
+router.post('/order_history',customer_authenticate,productController.order_history)
+
+//view_order
+router.post('/view_order',customer_authenticate,productController.view_order)
+
+//recommended_products
+router.post('/recommended_products',customer_authenticate,productController.recommended_products)
+
+//repeat_order
+router.post('/repeat_order',customer_authenticate,productController.repeat_order)
+
+
+
 /********************************** End Customer Section *********************************/
 
 

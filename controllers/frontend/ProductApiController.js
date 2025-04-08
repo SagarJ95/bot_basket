@@ -4,6 +4,8 @@ import catchAsync from "../../utils/catchAsync.js";
 import db from "../../config/db.js";
 import Customer from "../../db/models/customers.js";
 import addToCart from "../../db/models/add_to_carts.js";
+import Orders from "../../db/models/orders.js"
+import OrderItem from "../../db/models/order_items.js"
 import bcrypt from "bcrypt";
 const project_name = process.env.APP_NAME;
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3848';
@@ -35,14 +37,70 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:3848';
 
 /******************* product  Info ************************ */
 
+const recommended_products = catchAsync(async (req, res) => {
+  try{
+    const getproductlist = await db.query(`select
+      p.id,p.name as product_name,p.slug,p.description,p.price,c.cat_name as category_name,
+       JSON_AGG(
+          CONCAT('${BASE_URL}', pi.image_path)
+      ) FILTER (WHERE pi.image_path IS NOT NULL) AS product_images
+       from products as p
+      left join categories as c ON p.category = c.id
+      left join product_images as pi ON p.id = pi.product_id
+      where p.status = $1 and p.deleted_at IS NULL
+      GROUP BY p.id,c.cat_name`,[1]);
+
+      return res.status(200).json({
+        status: true,
+        message: "fetch Product list sucessfully",
+        data: (getproductlist.rowCount > 0) ? getproductlist.rows : []
+      });
+
+    }catch(e){
+      return res.status(200).json({
+          status: false,
+          message: "Failed to retrieve data",
+          errors: error.message
+      });
+    }
+});
+
 const product_list = catchAsync(async (req, res) => {
-    try{
-      const getproductlist = await db.query(`select
-        p.id,p.name as product_name,p.slug,p.description,p.price,c.cat_name as category_name from products as p
-        left join categories as c ON p.category = c.id where p.status = $1 and p.deleted_at IS NULL`,[1]);
+   try{
+      const {category_id,search} = req.body;
+      let query_params = [1];
+      let searchQuery = '';
+      let categories = '';
+      let wildcardSearch = '';
+
+      if(category_id){
+         categories = `and p.category = $${query_params.length + 1}`;
+         query_params.push(category_id)
+      }
+
+      if (search) {
+        wildcardSearch = `%${search.toLowerCase()}%`;
+        searchQuery = `AND lower(p.name) LIKE $${query_params.length + 1}`;
+        query_params.push(wildcardSearch);
+    }
+
+
+      const productquery = `select
+        p.id,p.name as product_name,p.slug,p.description,p.price,c.id as categoryId,c.cat_name as category_name,
+         JSON_AGG(
+            CONCAT('${BASE_URL}', pi.image_path)
+        ) FILTER (WHERE pi.image_path IS NOT NULL) AS product_images
+         from products as p
+        left join categories as c ON p.category = c.id
+        left join product_images as pi ON p.id = pi.product_id
+        where p.status = $1 and p.deleted_at IS NULL ${categories} ${searchQuery}
+        GROUP BY p.id,c.cat_name,c.id`;
+
+      const getproductlist = await db.query(productquery,query_params);
 
         return res.status(200).json({
           status: true,
+          total:(getproductlist.rowCount > 0) ? getproductlist.rowCount : 0,
           message: "fetch Product list sucessfully",
           data: (getproductlist.rowCount > 0) ? getproductlist.rows : []
         });
@@ -54,7 +112,7 @@ const product_list = catchAsync(async (req, res) => {
             errors: error.message
         });
       }
-  });
+});
 
 const add_update_cart = catchAsync(async (req, res) => {
     try{
@@ -103,7 +161,7 @@ const add_update_cart = catchAsync(async (req, res) => {
             errors: error.message
         });
       }
-  });
+});
 
 const cart_list =catchAsync(async (req, res) => {
   try{
@@ -126,10 +184,20 @@ const cart_list =catchAsync(async (req, res) => {
             AND atc.deleted_at IS NULL
         `, [1, customer_id]);
 
+        let cartSum;
+        if(cartlist.rowCount > 0){
+          //sum of cart qty and price
+           cartSum = cartlist.rows.reduce((acc, item) => {
+            acc.qty += parseInt(item.qty);
+            acc.price += parseInt(item.price) * parseInt(item.qty);
+            return acc;
+            }, { qty: 0, price: 0 });
+        }
+
         return res.status(200).json({
           status: true,
           message: `Fetch Cart list sucessfully`,
-          data:(cartlist.rowCount > 0) ? cartlist.rows : []
+          data:(cartlist.rowCount > 0) ? [{"list":cartlist.rows,"listofsum":cartSum}] : []
         });
 
     }catch(e){
@@ -169,12 +237,188 @@ const delete_product_cart = catchAsync(async (req, res) => {
     }
 });
 
+
+
 /******************* End product  Info ************************ */
+
+/******************* Start Order creation Flow ************************ */
+
+const create_order = catchAsync(async (req, res) => {
+  try{
+    const customer_id = req.user.id;
+    const {name,whatsapp_number,email,perferred_delivery_date,address,instruction,order_item} = req.body;
+
+    const order_id = await Orders.create({
+      customer_id:customer_id,
+      customer_name:name,
+      whatsapp_number:whatsapp_number,
+      email:email,
+      perferred_delivery_date:perferred_delivery_date,
+      address:address,
+      special_instruction:instruction,
+      status:1,
+      created_by:customer_id
+    });
+
+    if(order_id.id){
+      for(let item of req.body.order_item){
+        const order_item_id = await OrderItem.create({
+          order_id:order_id.id,
+          customer_id:customer_id,
+          cart_id:item.cart_id,
+          product_id:item.product_id,
+          product_name:item.product_name,
+          quantity:item.quantity,
+          price:item.price,
+          order_item_status:1,
+          item_delivery_status:1,
+          created_by:customer_id
+          });
+      }
+    }
+
+    return res.status(200).json({
+      status: true,
+      message: 'Order Place Successfully'
+    });
+
+
+  }catch(error){
+    return res.status(200).json({
+      status: false,
+      message: "Failed to retrieve data",
+      errors: error.message
+      });
+  }
+ })
+
+ const order_history = catchAsync(async (req, res) => {
+  try{
+    const customer_id = req.user.id;
+    const {status} = req.body;
+
+    const result = await db.query(`SELECT
+    o.id,
+    oi.product_id,
+    TO_CHAR(o.perferred_delivery_date, 'FMDDth Month YYYY') AS delivery_date,
+    p.name AS product_name,
+    p.description,
+    (
+      SELECT JSON_AGG(DISTINCT CONCAT('${BASE_URL}', pi.image_path))
+      FROM product_images pi
+      WHERE pi.product_id = p.id AND pi.image_path IS NOT NULL
+    ) AS product_images,
+    SUM(oi.quantity * oi.price::numeric) AS total_price
+    FROM orders AS o
+    LEFT JOIN order_items AS oi ON o.id = oi.order_id
+    LEFT JOIN products AS p ON oi.product_id = p.id
+    WHERE o.customer_id = $1 AND o.status = $2 and oi.order_item_status = $3
+    GROUP BY p.id,o.id, oi.product_id, o.perferred_delivery_date, p.name, p.description`,[customer_id,status,1]);
+
+    return res.status(200).json({
+      status: true,
+      message: 'Fetch Order History Successfully',
+      data:(result.rowCount > 0) ? result.rows : []
+    });
+
+
+  }catch(error){
+    return res.status(200).json({
+      status: false,
+      message: "Failed to retrieve data",
+      errors: error.message
+      });
+  }
+ })
+
+ const repeat_order = catchAsync(async (req, res) => {
+  try{
+    const customer_id = req.user.id;
+    const {order_id} = req.body;
+
+
+
+    return res.status(200).json({
+      status: true,
+      message: 'Order Place Successfully'
+    });
+
+
+  }catch(error){
+    return res.status(200).json({
+      status: false,
+      message: "Failed to retrieve data",
+      errors: error.message
+      });
+  }
+ })
+
+ const view_order = catchAsync(async (req, res) => {
+  try{
+    const customer_id = req.user.id;
+    const {order_id} = req.body;
+
+    const result = await db.query(`SELECT
+    o.id,
+    o.customer_id,
+    o.customer_name,
+    o.whatsapp_number,
+    o.email,
+    o.special_instruction,
+    TO_CHAR(o.perferred_delivery_date, 'FMDDth Month YYYY') AS delivery_date,
+    ca.address as address,
+    o.address as address_id
+    FROM orders AS o
+    LEFT JOIN customer_addresses as ca ON o.address = ca.id
+    WHERE o.customer_id = $1`,[customer_id]);
+
+    //fetch order_item table fetch order item list based on order_id
+    const order_item = await db.query(`SELECT
+      oi.id,
+      oi.order_id,
+      oi.product_id,
+      oi.product_name AS product_name,
+      p.description,
+      oi.price AS product_price,
+      oi.quantity AS product_quantity,
+      SUM(oi.quantity * oi.price::numeric) As total_price
+      FROM order_items AS oi
+      LEFT JOIN products AS p ON oi.product_id = p.id
+      WHERE oi.order_id = $1
+      GROUP BY oi.id,p.description`,[order_id]);
+
+    return res.status(200).json({
+      status: true,
+      message: 'Fetch Order Details Successfully',
+      data:(result.rowCount > 0) ? {
+        ...result.rows[0],
+      order_items: order_item.rows} : []
+    });
+
+
+  }catch(error){
+    return res.status(200).json({
+      status: false,
+      message: "Failed to retrieve data",
+      errors: error.message
+      });
+  }
+ })
+
+
+/******************* End Order creation Flow ************************ */
 
   export {
     category_list,
     product_list,
     add_update_cart,
     cart_list,
-    delete_product_cart
+    delete_product_cart,
+
+    /** order creation */
+    recommended_products,
+    create_order,
+    order_history,
+    view_order,
+    repeat_order
 }
