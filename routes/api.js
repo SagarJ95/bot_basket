@@ -9,8 +9,8 @@ import * as userManagementController from "../controllers/admin/userManagementCo
 import * as signInController from "../controllers/admin/signInController.js";
 // import * as adminController from "../controllers/admin/adminController.js";
 import * as masterController from "../controllers/admin/masterController.js";
-import * as cutomerController from "../controllers/frontend/signInApiController.js"
-import customer_authenticate from '../middlewares/customer_authenticate.js';
+import * as customerController from "../controllers/admin/customerController.js";
+
 
 const router = Router();
 
@@ -58,7 +58,11 @@ const categorytorage = multer.diskStorage({
         uploadPath = './public/uploads/category';
     } else if (file.fieldname === 'green_icon') {
         uploadPath = './public/uploads/category';
-    } else {
+    }
+    else if (file.fieldname === 'product_images') {
+        uploadPath = './public/uploads/product_images';
+    }
+    else {
       return cb(new Error('Invalid fieldname'), null);
     }
 
@@ -75,6 +79,7 @@ const categorytorage = multer.diskStorage({
 });
 
 const upload_category = multer({ storage: categorytorage });
+const upload_product = multer({ storage: categorytorage });
 
 
 const compressImage = async (req, res, next) => {
@@ -124,29 +129,36 @@ router.route("/users_change_status/:id").patch(authenticate, userManagementContr
 /* Users API End ------------------------------------ */
 
 /* Category API Start ----------------------------------- */
-
-// POST get categories (datatables)
+// POST add new category || GET get all categories
 router.post("/getCategories", authenticate, masterController.getCategories);
 
-// POST add new category || GET get all categories
-router
-  .route("/category")
-  .post(authenticate,upload_category.fields([
-    { name: 'icon', maxCount: 1 },{ name: 'green_icon', maxCount: 1 }]), masterController.createCategory)
-  .get(authenticate, masterController.getAllCategories);
-
-// GET category by id || PATCH update category by id || DELETE delete category by id
-router
-  .route("/category/:id")
-  .get(authenticate, masterController.getCategoryById)
-  .patch(authenticate,upload_category.fields([
-    { name: 'icon', maxCount: 1 },{ name: 'green_icon', maxCount: 1 }]), masterController.updateCategoryById)
-  .delete(authenticate, masterController.deleteCategoryById);
-
-  //router.patch('/updateCategoryOrder',authenticate,masterController.updateCategoryOrder)
+router.post("/createCategory",upload_category.fields([
+    { name: 'icon', maxCount: 1 }]) ,authenticate, masterController.createCategory);
+router.post("/getCategoryById", authenticate, masterController.getCategoryById);
+router.post("/updateCategoryById", authenticate,  upload_category.fields([
+    { name: 'icon', maxCount: 1 }]),masterController.updateCategoryById);
+router.post("/deleteCategoryById", authenticate, masterController.deleteCategoryById);
+router.post("/excelExportCategory", authenticate, masterController.excelExportCategory);
+//router.patch('/updateCategoryOrder',authenticate,masterController.updateCategoryOrder)
 
 /* Category API End ------------------------------------ */
+router.post("/createProduct",upload_product.fields([
+    { name: 'product_images', maxCount: 5 }]) ,authenticate, masterController.createProduct)
+router.post("/updateProduct",upload_product.fields([
+    { name: 'product_images', maxCount: 5 }]) ,authenticate, masterController.updateProduct)
+router.post("/getProductById", authenticate, masterController.getProductById);
+router.post("/deleteProductById", authenticate, masterController.deleteProductById);
+router.post("/updateProductStatusById", authenticate, masterController.updateProductStatusById);
+router.post("/excelExportProducts", authenticate, masterController.excelExportProducts);
+router.post("/changeProductPrice", authenticate, masterController.changeProductPrice);
+router.post("/getProductPriceLogs", authenticate, masterController.getProductPriceLogs);
+router.post("/exportProductPriceLogs", authenticate, masterController.exportProductPriceLogs);
+router.post("/changeProductStockStatus", authenticate, masterController.changeProductStockStatus);
 
+
+/* Customers */
+router.post("/getCustomers", authenticate, customerController.getCustomers);
+router.post("/exportCustomers", authenticate, customerController.exportCustomers);
 
 /* Permission API Start ----------------------------------- */
 

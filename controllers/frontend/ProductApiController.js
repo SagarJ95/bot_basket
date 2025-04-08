@@ -237,9 +237,9 @@ const delete_product_cart = catchAsync(async (req, res) => {
     }
 });
 
-
-
 /******************* End product  Info ************************ */
+
+
 
 /******************* Start Order creation Flow ************************ */
 
@@ -407,6 +407,8 @@ const create_order = catchAsync(async (req, res) => {
 
 
 /******************* End Order creation Flow ************************ */
+
+
 
   export {
     category_list,

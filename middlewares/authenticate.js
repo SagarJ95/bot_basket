@@ -8,43 +8,35 @@ const authenticate = catchAsync(async (req, res, next) => {
     // Get the token from headers
     let token = '';
 
-    if (req.headers['content-type'] === 'application/html' || req.accepts('html')) {
-        token = req.session.token;
-    } else {
-        // Check for bearer token
-        if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-            token = req.headers.authorization.split(' ')[1];
-        }else{
-            token = req.session.token;
-        }
-    }
-
-    //console.log("Token = ",token); return false;
-
-    // Check if token exists and matches the session token (either admin or customer)
-    if (!token || (token !== req.session.token)) {
-        if (req.headers['content-type'] === 'application/html' || req.accepts('html')) {
-            return res.redirect('/admin');
-        } else {
-            throw new AppError('Please Login to get access', 401);
-        }
+    // Check for bearer token
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        token = req.headers.authorization.split(' ')[1];
     }
 
     // Check if token is valid
-    const tokenDetail = verify(token, process.env.JWT_SECRET_KEY);
+    const tokenDetail = await new Promise((resolve, reject) => {
+        verify(token, process.env.JWT_SECRET_KEY, (err, decoded) => {
+            if (err) {
+                if (err.name === "TokenExpiredError") {
+                    return res.status(401).json({ status: 401, message: "Token expired",errors:{} });
+                } else if (err.name === "JsonWebTokenError") {
+                    return res.status(400).json({ status: 400, message: "Invalid token",errors:{} });
+                } else {
+                    return res.status(403).json({ status: 403, message: "Unauthorized access",errors:{} });
+                }
+            }
+            resolve(decoded);
+        });
+    });
 
-    const freshUser = await User.findByPk(tokenDetail.id); // Customer or carwasher login
+    const admin = await User.findByPk(tokenDetail.id); // Customer or carwasher login
 
-    if (!freshUser) {
-        return res.redirect('/admin');
-       // throw new AppError('User does not exist', 201);
+    if (!admin) {
+        throw new AppError('Customer does not exist', 201);
     }
 
-    // Attach user details to request
-    req.user = freshUser;
-    req.role = tokenDetail.role;
-
+    // Attach admmin details to request
+    req.user = admin;
     return next();
 });
-
 export default authenticate;

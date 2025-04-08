@@ -40,4 +40,16 @@ const verifycustomerToken = async (token = null) => {
         return null;
     }
 }
-export { generateSlug, media_url,verifycustomerToken };
+
+const formatValidationArray =async(errors) =>
+{
+    const result=errors.errors.reduce((acc, curr) => {
+        if (curr.path) {
+            acc[curr.path] = curr.msg;
+        }
+        return acc;
+    }, {});
+
+    return result;
+}
+export { generateSlug, media_url,verifycustomerToken,formatValidationArray };

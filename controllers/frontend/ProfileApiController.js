@@ -133,7 +133,6 @@ const update_customer_profile = catchAsync(async (req, res) => {
       }
   });
 
-
   /******************* End  Profile Info ************************ */
 
   export {
