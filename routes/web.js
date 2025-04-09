@@ -77,6 +77,9 @@ router.post('/update_customer_info',customer_authenticate,
         { name: "profile", maxCount: 1 }
       ]),profileController.update_customer_profile);
 
+//Address list
+router.post('/getAddressList',customer_authenticate,profileController.getAddressList)
+
 //category list
 router.get('/category_list',staticApiKey,productController.category_list);
 
@@ -107,7 +110,6 @@ router.post('/recommended_products',customer_authenticate,productController.reco
 
 //repeat_order
 router.post('/repeat_order',customer_authenticate,productController.repeat_order)
-
 
 
 /********************************** End Customer Section *********************************/

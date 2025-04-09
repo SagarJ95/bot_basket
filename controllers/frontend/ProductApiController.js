@@ -391,17 +391,71 @@ const order_history = catchAsync(async (req, res) => {
  })
 
 const repeat_order = catchAsync(async (req, res) => {
+  await Promise.all([
+    body('order_id').notEmpty().withMessage('Order Id is required').run(req),
+  ]);
+
+  // Handle validation result
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+      const error_message = errors.array()[0].msg;
+      throw new AppError(error_message, 200, errors);
+  }
+
   try{
     const customer_id = req.user.id;
     const {order_id} = req.body;
 
+    const result = await db.query(`SELECT
+      o.id,
+      o.customer_id,
+      o.customer_name,
+      o.whatsapp_number,
+      o.email,
+      o.special_instruction,
+      TO_CHAR(o.perferred_delivery_date, 'FMDDth Month YYYY') AS delivery_date,
+      ca.address as address,
+      o.address as address_id
+      FROM orders AS o
+      LEFT JOIN customer_addresses as ca ON o.address = ca.id
+      WHERE o.customer_id = $1`,[customer_id]);
 
+      //fetch order_item table fetch order item list based on order_id
+      const order_item = await db.query(`SELECT
+        oi.id,
+        oi.order_id,
+        oi.product_id,
+        oi.product_name AS product_name,
+        p.description,
+        p.price AS product_price,
+        oi.quantity AS product_quantity,
+        SUM(oi.quantity * p.price::numeric) As total_price,
+        (
+          SELECT JSON_AGG(DISTINCT CONCAT('${BASE_URL}', pi.image_path))
+          FROM product_images pi
+          WHERE pi.product_id = p.id AND pi.image_path IS NOT NULL
+        ) AS product_images
+        FROM order_items AS oi
+        LEFT JOIN products AS p ON oi.product_id = p.id
+        WHERE oi.order_id = $1 And oi.order_item_status = $2
+        GROUP BY oi.id,p.id,p.description`,[order_id,1]);
 
-    return res.status(200).json({
-      status: true,
-      message: 'Order Place Successfully'
-    });
+        let Sumoflist;
+        if(order_item.rowCount > 0){
+            Sumoflist = order_item.rows.reduce((acc, item) => {
+                acc.qty += parseInt(item.product_quantity);
+                acc.price += parseInt(item.total_price);
+                return acc;
+                }, { qty: 0, price: 0 });
+            }
 
+      return res.status(200).json({
+        status: true,
+        message: 'Fetch Order Details Successfully',
+        data:(result.rowCount > 0) ? {
+          ...result.rows[0],
+        order_items: order_item.rows,Sumoflist:Sumoflist} : []
+      });
 
   }catch(error){
     return res.status(200).json({
@@ -462,12 +516,22 @@ const repeat_order = catchAsync(async (req, res) => {
       WHERE oi.order_id = $1 And oi.order_item_status = $2
       GROUP BY oi.id,p.id,p.description`,[order_id,1]);
 
+      let Sumoflist;
+      if(order_item.rowCount > 0){
+        Sumoflist = order_item.rows.reduce((acc, item) => {
+            acc.qty += parseInt(item.product_quantity);
+            acc.price += parseInt(item.total_price);
+            return acc;
+            }, { qty: 0, price: 0 });
+        }
+
     return res.status(200).json({
       status: true,
       message: 'Fetch Order Details Successfully',
       data:(result.rowCount > 0) ? {
         ...result.rows[0],
-      order_items: order_item.rows} : []
+      order_items: order_item.rows,
+      Sumoflist:(Sumoflist) ? Sumoflist : ''} : []
     });
 
 
