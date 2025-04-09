@@ -42,6 +42,9 @@ module.exports = {
       special_instruction: {
         type: Sequelize.STRING
       },
+      invoice_path:{
+        type: Sequelize.STRING
+      },
       status: {
         type: Sequelize.INTEGER
       },

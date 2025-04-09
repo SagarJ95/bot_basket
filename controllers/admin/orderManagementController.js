@@ -96,8 +96,7 @@ const changeStatus = catchAsync(async (req, res) => {
 const orderViewDetails = catchAsync(async (req, res) => {
 
     await Promise.all([
-        body('order_id').notEmpty().withMessage('Order Id is required').run(req),
-        body('status').notEmpty().withMessage('status is required').run(req)
+        body('order_id').notEmpty().withMessage('Order Id is required').run(req)
     ]);
 
     // Handle validation result
@@ -108,7 +107,7 @@ const orderViewDetails = catchAsync(async (req, res) => {
     }
 
     try {
-        const {status,order_id} = req.body
+        const {order_id} = req.body
         const result = await db.query(`SELECT
                             o.id,
                             o.customer_id,
@@ -116,12 +115,13 @@ const orderViewDetails = catchAsync(async (req, res) => {
                             o.whatsapp_number,
                             o.email,
                             o.special_instruction,
-                            TO_CHAR(o.perferred_delivery_date, 'FMDDth Month YYYY') AS delivery_date,
+                            TO_CHAR(o.perferred_delivery_date, 'FMDDth Month YYYY') AS perferred_delivery_date,
+                            TO_CHAR(o.created_at, 'FMDDth Month YYYY') AS order_date,
                             ca.address as address,
                             o.address as address_id
                             FROM orders AS o
                             LEFT JOIN customer_addresses as ca ON o.address = ca.id
-                            WHERE o.id = $1 and o.status = $2`,[order_id,status]);
+                            WHERE o.id = $1 `,[order_id]);
 
             //fetch order_item table fetch order item list based on order_id
             const order_item = await db.query(`SELECT
@@ -140,14 +140,14 @@ const orderViewDetails = catchAsync(async (req, res) => {
                             ) AS product_images
                             FROM order_items AS oi
                             LEFT JOIN products AS p ON oi.product_id = p.id
-                            WHERE oi.order_id = $1 And oi.status = $2
-                            GROUP BY oi.id,p.description`,[order_id,1]);
+                            WHERE oi.order_id = $1 And oi.order_item_status = $2
+                            GROUP BY oi.id,p.description,p.id`,[order_id,1]);
 
                             let Sumoflist;
                             if(order_item.rowCount > 0){
                                 Sumoflist = order_item.rows.reduce((acc, item) => {
-                                    acc.qty += parseInt(item.quantity);
-                                    acc.price += parseInt(item.price) * parseInt(item.quantity);
+                                    acc.qty += parseInt(item.product_quantity);
+                                    acc.price += parseInt(item.total_price);
                                     return acc;
                                     }, { qty: 0, price: 0 });
                                 }
@@ -157,8 +157,8 @@ const orderViewDetails = catchAsync(async (req, res) => {
             message: 'Fetch Order details Successfully',
             data:(result.rowCount > 0) ? {
                 ...result.rows[0],
-              order_items: order_item.rows} : [],
-              Sumoflist
+              order_items: order_item.rows,Sumoflist:Sumoflist} : [],
+
           });
     } catch (error) {
         throw new AppError(error.message, 400);
@@ -185,9 +185,11 @@ const orderEditDetails = catchAsync(async (req, res) => {
 
     try {
 
-        const {order_id,status,payment_status,payment_mode} = req.body
+        const {order_id,status,payment_status,payment_mode} = req.body;
+        const files = req.files || {};
         //status 4 means delivered. Need to Update delivery date in orders table
         let deliverDate = '';
+
         if(status == 4){
             deliverDate = new Date()
         }
@@ -196,7 +198,7 @@ const orderEditDetails = catchAsync(async (req, res) => {
             status:status,
             payment_status:payment_status,
             payment_mode:payment_mode,
-            delivery_date:deliverDate
+            delivery_date:(deliverDate) ? deliverDate :null
         };
 
         const formatPath = (filePath) => {

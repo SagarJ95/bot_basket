@@ -31,21 +31,22 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:3848';
 const getCategories = catchAsync(async (req, res) => {
     try {
         //get total number of categories
-        const totalCategories = await db.query(`select COUNT(id) FROM category where status =$1 and deleted_at IS NULL`,
+        const totalCategories = await db.query(`select COUNT(id) FROM categories where status =$1 and deleted_at IS NULL`,
             [1]
         );
 
         //get get catgories list
-        const query = `select c.cat_name as category_name,c.description,
-        SUM(p.id) as No_of_products from category as c
+        const query = `select c.id as cat_id,c.cat_name as category_name,c.slug,COALESCE(c.description,'') as description,
+        COALESCE(COUNT(p.id),0) as No_of_products from categories as c
         LEFT JOIN products as p ON c.id = p.category
-        where c.status = $1 and deleted_at IS NULL`
+        where c.status = $1 and c.deleted_at IS NULL
+        GROUP BY c.cat_name,c.id Order BY c.id desc`;
 
         const getCategorieslist = await db.query(query,[1])
 
         return res.status(200).json({
             status: true,
-            total:totalCategories,
+            total:(totalCategories.rowCount > 0) ? totalCategories.rowCount : 0,
             message: 'Fetch Categories Successfully',
             data:(getCategorieslist.rowCount > 0) ? getCategorieslist.rows : []
           });
@@ -60,7 +61,7 @@ const createCategory = catchAsync(async (req, res) => {
 
     // Apply validation rules
     await Promise.all([
-        body('cat_name')
+        body('category_name')
             .notEmpty().withMessage('Category Name is required')
             .bail() // stops further validation if empty
             .custom(async (value) => {
@@ -76,11 +77,12 @@ const createCategory = catchAsync(async (req, res) => {
     const errors = validationResult(req);
 
     try {
-        const body = req.body;
+        const {category_name,description} = req.body;
 
         const category = await Category.create({
-            cat_name: body.cat_name,
-            slug: generateSlug(body.cat_name),
+            cat_name: category_name,
+            slug: generateSlug(category_name),
+            description:description,
             created_by: req.user.id,
             updated_by: req.user.id,
             status: '1',
@@ -144,15 +146,15 @@ const getCategoryById = catchAsync(async (req, res) => {
 // PATCH update category by ID
 const updateCategoryById = catchAsync(async (req, res) => {
 
-    const categoryId = parseInt(req.body.id);
+    const categoryId = parseInt(req.body.category_id);
 
     // Apply validation rules
     await Promise.all([
-        body('cat_name')
+        body('category_name')
             .notEmpty().withMessage('Category Name is required')
             .bail()
             .custom(async (value, { req }) => {
-                const categoryId = req.body.id; // define it here from the request
+                const categoryId = req.body.category_id; // define it here from the request
                 const existingCategory = await Category.findOne({
                     where: {
                         cat_name: value,
@@ -180,7 +182,7 @@ const updateCategoryById = catchAsync(async (req, res) => {
             return res.status(200).json({ status: false, message: 'Invalid Category ID', error: '' });
         }
 
-        const { cat_name, description } = req.body;
+        const { category_name, description } = req.body;
 
         const category_res = await Category.findOne({ where: { id: categoryId } });
         if (!category_res) {
@@ -188,8 +190,8 @@ const updateCategoryById = catchAsync(async (req, res) => {
         }
 
         const updateCategory = await Category.update({
-            cat_name: cat_name,
-            description,
+            cat_name: category_name,
+            description:description,
             updated_by: req.user.id,
         }, {
             where: { id: categoryId }
@@ -217,20 +219,21 @@ const updateCategoryById = catchAsync(async (req, res) => {
 
 // DELETE category by ID
 const deleteCategoryById = catchAsync(async (req, res) => {
+    await Promise.all([
+        body('category_id')
+            .notEmpty().withMessage('category id is required')
+            .run(req) // THIS is important
+    ]);
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const formattedErrors = await formatValidationArray(errors);
+        return res.status(200).json({ status: false, errors: formattedErrors });
+    }
+
     try {
-        await Promise.all([
-            body('id')
-                .notEmpty().withMessage('Id is required')
-                .run(req) // THIS is important
-        ]);
 
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            const formattedErrors = await formatValidationArray(errors);
-            return res.status(200).json({ status: false, errors: formattedErrors });
-        }
-
-        const categoryId = parseInt(req.body.id);
+        const categoryId = parseInt(req.body.category_id);
 
         if (isNaN(categoryId)) {
             return res.status(200).json({ status: false, message: 'Invalid Category ID', error: '' });
@@ -242,7 +245,10 @@ const deleteCategoryById = catchAsync(async (req, res) => {
             return res.status(200).json({ status: false, message: 'Category not found', error: '' });
         }
 
-        await result.destroy();
+        await db.query(
+            `UPDATE categories SET status = $1, deleted_at = $2 where id = $3`,
+            ["0", new Date(),categoryId]
+          );
 
         const data = {
             user_id: req.user.id,
@@ -253,7 +259,7 @@ const deleteCategoryById = catchAsync(async (req, res) => {
 
         adminLog(data);
 
-        return res.status(200).json({ status: true, message: 'Data Deleted' });
+        return res.status(200).json({ status: true, message: 'Data Deleted sucessfully' });
 
     } catch (error) {
         return res.status(200).json({ status: false, message: 'Category not found', error: error.message });
@@ -262,33 +268,59 @@ const deleteCategoryById = catchAsync(async (req, res) => {
 
 // PATCH update category status by ID
 const updateCategoryStatusById = catchAsync(async (req, res) => {
-    try {
-        const categoryId = parseInt(req.params.id);
-        const status = parseInt(req.params.status);
+    await Promise.all([
+        body('category_id')
+            .notEmpty().withMessage('category id is required')
+            .run(req),
+        body('status')
+            .notEmpty().withMessage('status is required')
+            .run(req)
+    ]);
 
-        if (isNaN(categoryId) || isNaN(status)) {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const formattedErrors = await formatValidationArray(errors);
+        return res.status(200).json({ status: false, errors: formattedErrors });
+    }
+
+    try {
+
+       let {category_id,status} = req.body;
+
+        if (isNaN(category_id) || isNaN(status)) {
             return res.status(200).json({ status: false, message: 'Invalid Category ID or Status', error: '' });
         }
 
-        const updateCategory = await Category.update({
-            status: status,
-            updated_by: req.user.id,
-        }, {
-            where: { id: categoryId }
-        });
+        //check no of product for particular category
+        const count = await db.query(`select c.id as cat_id,c.cat_name as category_name,c.slug,COALESCE(c.description,'') as description,
+        COALESCE(COUNT(p.id),0) as no_of_products from categories as c
+        LEFT JOIN products as p ON c.id = p.category
+        where c.id = $1 and c.status = $2 and c.deleted_at IS NULL
+        GROUP BY c.cat_name,c.id Order BY c.id desc`,[category_id,1]);
 
-        if (!updateCategory) {
-            return res.status(200).json({ status: false, message: 'Category Status Not Updated', error: '' });
+        if(count.rowCount > 0 && count.rows.no_of_products > 0){
+            return res.status(200).json({ status: false,
+                message: `Category has products cannot be deleted` });
+        }else{
+
+            const updateCategory = await db.query(
+                `UPDATE categories SET status = $1, updated_by = $2 where id = $3`,
+                [status, req.user.id,category_id]
+              );
+
+            if (!updateCategory) {
+                return res.status(200).json({ status: false, message: 'Category Status Not Updated', error: '' });
+            }
+
+            const data = {
+                user_id: req.user.id,
+                table_id: category_id,
+                table_name: 'categories',
+                action: 'status to ' + status,
+            };
+
+            adminLog(data);
         }
-
-        const data = {
-            user_id: req.user.id,
-            table_id: categoryId,
-            table_name: 'categories',
-            action: 'status to ' + status,
-        };
-
-        adminLog(data);
 
         return res.status(200).json({ status: true, message: 'Category status updated successfully' });
 
@@ -305,6 +337,7 @@ const excelExportCategory=catchAsync( async(req,res)=>{
         const query = `SELECT
                     c.id,
                     c.cat_name,
+                    c.description,
                     COUNT(p.id) AS product_count,
                     c.status
                 FROM categories c
@@ -326,6 +359,7 @@ const excelExportCategory=catchAsync( async(req,res)=>{
         worksheet.columns = [
             { header: "ID", key: "id", width: 10 },
             { header: "Category Name", key: "cat_name", width: 25 },
+            { header: "Description", key: "description", width: 25 },
             { header: "Product Count", key: "product_count", width: 25 },
             { header: "Status", key: "status", width: 10 },
         ];

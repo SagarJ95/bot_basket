@@ -143,7 +143,7 @@ router.post("/updateCategoryById", authenticate,  upload.fields([
     { name: 'icon', maxCount: 1 }]),masterController.updateCategoryById);
 router.post("/deleteCategoryById", authenticate, masterController.deleteCategoryById);
 router.post("/excelExportCategory", authenticate, masterController.excelExportCategory);
-//router.patch('/updateCategoryOrder',authenticate,masterController.updateCategoryOrder)
+router.post('/updateCategoryStatusById',authenticate,masterController.updateCategoryStatusById)
 
 /* Category API End ------------------------------------ */
 router.post("/createProduct",upload.fields([

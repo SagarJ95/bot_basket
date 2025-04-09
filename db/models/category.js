@@ -14,17 +14,17 @@ const category = sequelize.define(
     ordering : {
       type: DataTypes.INTEGER
     },
- 	icon: {
-        type: DataTypes.STRING
-    },
-    green_icon: {
-      type: DataTypes.STRING
-  },
+    icon: {
+          type: DataTypes.STRING
+      },
     cat_name: {
       type: DataTypes.STRING
     },
     slug: {
       type: DataTypes.STRING
+    },
+    description:{
+      type:DataTypes.TEXT
     },
     status: {
       type: DataTypes.ENUM('0', '1')
