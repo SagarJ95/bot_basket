@@ -30,141 +30,25 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:3848';
 // GET all categories (datatables)
 const getCategories = catchAsync(async (req, res) => {
     try {
+        //get total number of categories
+        const totalCategories = await db.query(`select COUNT(id) FROM category where status =$1 and deleted_at IS NULL`,
+            [1]
+        );
 
+        //get get catgories list
+        const query = `select c.cat_name as category_name,c.description,
+        SUM(p.id) as No_of_products from category as c
+        LEFT JOIN products as p ON c.id = p.category
+        where c.status = $1 and deleted_at IS NULL`
 
-        // Filter data count from the database
-        const filter_query = `SELECT categories.*,
-        u1.name AS created_by_name,
-        u2.name AS updated_by_name FROM categories
-        LEFT JOIN users u1 ON categories.created_by = u1.id
-        LEFT JOIN users u2 ON categories.updated_by = u2.id ${search_query}`;
-        const filter_result = await db.query(filter_query, query_params);
+        const getCategorieslist = await db.query(query,[1])
 
-        let order_query = ` ORDER BY ${column_name} ${column_sort_order}`;
-        let limit_query = ``;
-
-        if (length > 0) {
-            limit_query = ` OFFSET $${query_params.length + 1} LIMIT $${query_params.length + 2}`;
-            query_params.push(start, length);
-        }
-
-        // Fetch total records with filtering
-        const totalRecordsWithFilter = filter_result.rows.length;
-
-        // Filter data count from the database
-        const query = `SELECT categories.*,
-        u1.name AS created_by_name,
-        u2.name AS updated_by_name FROM categories
-        LEFT JOIN users u1 ON categories.created_by = u1.id
-        LEFT JOIN users u2 ON categories.updated_by = u2.id
-        ${search_query} ${order_query} ${limit_query}`;
-
-        const result = await db.query(query, query_params);
-
-        let categories = result.rows;
-
-        // Map data for response
-        const data_arr = categories.map((category, index) => {
-            const createdAtFormatted = new Date(category.created_at).toLocaleDateString('en-US', {
-                month: 'short',
-                day: '2-digit',
-                year: 'numeric',
-
-            });
-
-            const updatedAtFormatted = new Date(category.updated_at).toLocaleDateString('en-US', {
-                month: 'short',
-                day: '2-digit',
-                year: 'numeric',
-
-            });
-
-            const created_by = `<div class='created'>
-                    <small> `+ category.created_by_name + `</small>
-                    <br/>
-                    <small class='text-muted'>`+ createdAtFormatted + `</small>
-                    </div>`;
-
-            if (category.updated_by_name != '' && category.updated_by_name != null) {
-                var updated_by = `<div class='created'>
-                    <small > `+ category.updated_by_name + `</small>
-                    <br/>
-                    <small class='text-muted'>`+ updatedAtFormatted + `</small>
-                    </div>`;
-            }
-            else {
-                var updated_by = '';
-            }
-
-            let status = ``;
-
-            if (category.status == 1) {
-                status = `<div class="form-check form-switch form-check-custom form-check-solid">
-                                <input class="form-check-input h-20px w-30px" type="checkbox" onchange="return change_status(${category.id},0)" id="category_${category.id}" checked="checked" />
-                                <label class="form-check-label text-success" for="category_${category.id}">
-                                    <span class="badge badge-success">Active</span>
-                                </label>
-                            </div>`;
-            } else {
-                status = `<div class="form-check form-switch form-check-custom form-check-solid">
-                                <input class="form-check-input h-20px w-30px" type="checkbox" onchange="return change_status(${category.id},1)" id="category_${category.id}" />
-                                <label class="form-check-label text-dark" for="category_${category.id}">
-                                    <span class="badge badge-danger">In-active</span>
-                                </label>
-                            </div>`;
-            }
-            var icon_image = "";
-            if (category.icon != '' && category.icon != null) {
-                var icon_image = `<div class="text-center">
-                            <img src="${category.icon}" alt="image_preview" class="dbimg rounded">
-
-                        </div>`;
-            }
-
-            return {
-                id: category.id,
-                ordering: category.ordering,
-                icon: icon_image,
-                cat_name: category.cat_name,
-                created_by_name: created_by,
-                //createdAt: createdAtFormatted,
-                updated_by_name: updated_by,
-                //updatedAt: updatedAtFormatted,
-                status: status,
-                action: `<div class="text-center">
-                            <a href="javascript:void(0)" onclick="return edit_data(${category.id});"
-                                class="btn btn-icon btn-bg-light btn-active-color-dark btn-sm me-1 mb-2" data-bs-toggle="tooltip" data-bs-placement="top" title="Edit">
-                                <i class="ki-duotone text-dark
-                                    ki-pencil fs-1">
-                                    <span class="path1"></span>
-                                    <span class="path2"></span>
-                                </i>
-                            </a>
-                            <a href="javascript:void(0)" onclick="return delete_data(${category.id});"
-                                class="btn btn-icon btn-bg-light btn-active-color-danger btn-sm me-1 mb-2" data-bs-toggle="tooltip" data-bs-placement="top" title="Delete">
-                                <i class="ki-duotone text-dark
-                                    ki-trash fs-1">
-                                    <span class="path1"></span>
-                                    <span class="path2"></span>
-                                    <span class="path3"></span>
-                                    <span class="path4"></span>
-                                    <span class="path5"></span>
-                                </i>
-                            </a>
-                        </div>`
-            };
-        });
-
-        // Create output
-        const output = {
-            draw: draw,
-            recordsTotal: totalRecords,
-            recordsFiltered: totalRecordsWithFilter,
-            data: data_arr,
-        };
-
-        // Send the output
-        return res.json(output);
+        return res.status(200).json({
+            status: true,
+            total:totalCategories,
+            message: 'Fetch Categories Successfully',
+            data:(getCategorieslist.rowCount > 0) ? getCategorieslist.rows : []
+          });
     } catch (error) {
         throw new AppError(error.message, 400);
     }
@@ -191,40 +75,14 @@ const createCategory = catchAsync(async (req, res) => {
     // Handle validation result
     const errors = validationResult(req);
 
-
     try {
         const body = req.body;
-
-        const files = req.files;
-        const icon = files && files.icon ? media_url(files.icon[0].path) : null;
-
-        if (icon == '' || icon == null) {
-            errors.errors.push({ msg: "Please upload icon image", path: "icon" });
-        }
-
-        if (!errors.isEmpty()) {
-            const formattedErrors = await formatValidationArray(errors);
-            return res.status(200).json({ status: false, errors: formattedErrors });
-        }
-
-        let categoriesOrderingId = 0;
-        // Get the current highest ordering
-        const getCountOrdering = await db.query(
-            "SELECT * FROM categories where deleted_at IS NULL ORDER BY ordering DESC LIMIT 1"
-        );
-
-        if (getCountOrdering.rows.length > 0) {
-            categoriesOrderingId = getCountOrdering.rows[0].ordering;
-        }
-
 
         const category = await Category.create({
             cat_name: body.cat_name,
             slug: generateSlug(body.cat_name),
             created_by: req.user.id,
             updated_by: req.user.id,
-            ordering: (categoriesOrderingId) ? parseInt(categoriesOrderingId) + 1 : 1,
-            icon: icon,
             status: '1',
         });
 
@@ -248,8 +106,6 @@ const createCategory = catchAsync(async (req, res) => {
     }
 });
 
-
-
 // GET category by ID
 const getCategoryById = catchAsync(async (req, res) => {
     try {
@@ -271,10 +127,7 @@ const getCategoryById = catchAsync(async (req, res) => {
         }
 
         // Fetch data from the database
-        const query = `SELECT cat_name,CASE
-            WHEN icon IS NULL OR icon = '' THEN ''
-            ELSE CONCAT('${BASE_URL}', icon)
-        END AS icon FROM categories WHERE deleted_at IS NULL AND id = ${categoryId}`;
+        const query = `SELECT cat_name,description FROM categories WHERE deleted_at IS NULL AND id = ${categoryId}`;
 
         const result = await db.query(query);
 
@@ -327,22 +180,16 @@ const updateCategoryById = catchAsync(async (req, res) => {
             return res.status(200).json({ status: false, message: 'Invalid Category ID', error: '' });
         }
 
-
-        const { cat_name } = req.body;
+        const { cat_name, description } = req.body;
 
         const category_res = await Category.findOne({ where: { id: categoryId } });
         if (!category_res) {
             return res.json({ status: false, message: "Category not found", error: '' });
         }
-        const files = req.files;
-
-        const icon = files.icon
-            ? media_url(files.icon[0].path)
-            : category_res.icon;
 
         const updateCategory = await Category.update({
             cat_name: cat_name,
-            icon,
+            description,
             updated_by: req.user.id,
         }, {
             where: { id: categoryId }

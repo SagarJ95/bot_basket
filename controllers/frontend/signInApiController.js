@@ -131,7 +131,7 @@ const Login = catchAsync(async (req, res) => {
         message: "Please provide email and password",
       });
     } else {
-      const result = await Customer.findOne({ where: { email: email.toLowerCase() } })
+      const result = await Customer.findOne({ where: { email: email.toLowerCase(), status:"1" } })
 
       if (!result || !(await compare(password, result.password))) {
         return res.status(200).json({

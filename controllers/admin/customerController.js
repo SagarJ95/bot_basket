@@ -3,6 +3,7 @@ dotenv.config({ path: `${process.cwd()}/.env` });
 
 import catchAsync from "../../utils/catchAsync.js";
 import AppError from "../../utils/appError.js";
+import { body, validationResult } from "express-validator";
 import bcrypt from "bcrypt";
 import moment from 'moment';
 import db from "../../config/db.js";
@@ -360,10 +361,56 @@ const add_customer = catchAsync(async (req, res) => {
       }
   });
 
+  //activation and deactivation
+const activationStatus = catchAsync(async (req, res) => {
+
+    await Promise.all([
+        body('customer_id').notEmpty().withMessage('Customer Id is required').run(req),
+        body('status').notEmpty().withMessage('status is required').run(req)
+    ]);
+
+    // Handle validation result
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const error_message = errors.array()[0].msg;
+        throw new AppError(error_message, 200, errors);
+    }
+
+    try{
+
+        const {customer_id,status} = req.body;
+        const custId = req.user.id;
+
+            const updateStatus = await db.query(`update customers SET status = $1 and updated_by = $2 Where id = $3`,[status,custId,customer_id])
+
+            const data = {
+                user_id: req.user.id,
+                table_id: updateStatus.id,
+                table_name: 'customers',
+                action: 'update activation status',
+            };
+
+            adminLog(data);
+
+          return res.status(200).json({
+            status: true,
+            message: (updateStatus.id) ? "update status successfully" : "update status Unsuccessfully"
+          });
+
+      }catch(e){
+        return res.status(200).json({
+            status: false,
+            message: "Failed to data",
+            errors: error.message
+        });
+      }
+  });
+
 export {
     getCustomers,
     exportCustomers,
     getParticularCustomerInfo,
     update_customer_info,
-    add_customer
+    add_customer,
+    activationStatus
 }

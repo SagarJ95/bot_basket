@@ -11,6 +11,9 @@ const orders = sequelize.define(
       primaryKey: true,
       type: DataTypes.INTEGER
     },
+    order_ref_id: {
+      type: DataTypes.STRING
+    },
     customer_id: {
       type: DataTypes.BIGINT
     },
@@ -25,6 +28,15 @@ const orders = sequelize.define(
     },
     perferred_delivery_date: {
       type: DataTypes.DATE
+    },
+    delivery_date:{
+      type: DataTypes.DATE
+    },
+    payment_status:{
+      type: DataTypes.INTEGER
+    },
+    payment_mode:{
+      type: DataTypes.STRING
     },
     address: {
       type: DataTypes.INTEGER

@@ -27,6 +27,15 @@ module.exports = {
       perferred_delivery_date: {
         type: Sequelize.DATE
       },
+      delivery_date:{
+            type: Sequelize.DATE
+      },
+      payment_status:{
+        type: Sequelize.INTEGER
+      },
+      payment_mode:{
+        type: Sequelize.STRING
+      },
       address: {
         type: Sequelize.INTEGER
       },

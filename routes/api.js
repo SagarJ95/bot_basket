@@ -10,6 +10,7 @@ import * as signInController from "../controllers/admin/signInController.js";
 // import * as adminController from "../controllers/admin/adminController.js";
 import * as masterController from "../controllers/admin/masterController.js";
 import * as customerController from "../controllers/admin/customerController.js";
+import * as orderController from "../controllers/admin/orderManagementController.js";
 
 
 const router = Router();
@@ -36,17 +37,17 @@ const file_storage = diskStorage({
   }
 });
 
-const upload = multer({
-  storage: file_storage,
-  fileFilter: (req, file, cb) => {
-      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp','video/mp4','video/mov'];
-      if (allowedTypes.includes(file.mimetype)) {
-          cb(null, true);
-      } else {
-          cb(new Error('Only image files are allowed!'), false);
-      }
-  }
-});
+// const upload = multer({
+//   storage: file_storage,
+//   fileFilter: (req, file, cb) => {
+//       const allowedTypes = ['image/jpeg', 'image/png', 'image/webp','video/mp4','video/mov'];
+//       if (allowedTypes.includes(file.mimetype)) {
+//           cb(null, true);
+//       } else {
+//           cb(new Error('Only image files are allowed!'), false);
+//       }
+//   }
+// });
 
 //uploadCategory
 const categorytorage = multer.diskStorage({
@@ -61,6 +62,9 @@ const categorytorage = multer.diskStorage({
     }
     else if (file.fieldname === 'product_images') {
         uploadPath = './public/uploads/product_images';
+    } else if(file.fieldname === 'invoice'){
+      uploadPath = './public/uploads/invoice';
+
     }
     else {
       return cb(new Error('Invalid fieldname'), null);
@@ -78,8 +82,8 @@ const categorytorage = multer.diskStorage({
   },
 });
 
-const upload_category = multer({ storage: categorytorage });
-const upload_product = multer({ storage: categorytorage });
+const upload = multer({ storage: categorytorage });
+//const upload_product = multer({ storage: categorytorage });
 
 
 const compressImage = async (req, res, next) => {
@@ -132,19 +136,19 @@ router.route("/users_change_status/:id").patch(authenticate, userManagementContr
 // POST add new category || GET get all categories
 router.post("/getCategories", authenticate, masterController.getCategories);
 
-router.post("/createCategory",upload_category.fields([
-    { name: 'icon', maxCount: 1 }]) ,authenticate, masterController.createCategory);
+router.post("/createCategory",authenticate,upload.fields([
+    { name: 'icon', maxCount: 1 }]) , masterController.createCategory);
 router.post("/getCategoryById", authenticate, masterController.getCategoryById);
-router.post("/updateCategoryById", authenticate,  upload_category.fields([
+router.post("/updateCategoryById", authenticate,  upload.fields([
     { name: 'icon', maxCount: 1 }]),masterController.updateCategoryById);
 router.post("/deleteCategoryById", authenticate, masterController.deleteCategoryById);
 router.post("/excelExportCategory", authenticate, masterController.excelExportCategory);
 //router.patch('/updateCategoryOrder',authenticate,masterController.updateCategoryOrder)
 
 /* Category API End ------------------------------------ */
-router.post("/createProduct",upload_product.fields([
+router.post("/createProduct",upload.fields([
     { name: 'product_images', maxCount: 5 }]) ,authenticate, masterController.createProduct)
-router.post("/updateProduct",upload_product.fields([
+router.post("/updateProduct",upload.fields([
     { name: 'product_images', maxCount: 5 }]) ,authenticate, masterController.updateProduct)
 router.post("/getProductById", authenticate, masterController.getProductById);
 router.post("/deleteProductById", authenticate, masterController.deleteProductById);
@@ -162,6 +166,7 @@ router.post("/exportCustomers", authenticate, customerController.exportCustomers
 router.post('/getParticularCustomerInfo',authenticate,customerController.getParticularCustomerInfo)
 router.post('/update_customer_info',authenticate,customerController.update_customer_info)
 router.post('/add_customer',authenticate,customerController.add_customer)
+router.post('/activationStatus',authenticate,customerController.activationStatus)
 
 /* Permission API Start ----------------------------------- */
 
@@ -195,5 +200,12 @@ router
   .delete(authenticate, userManagementController.deleteRoleById);
 
 /* Roles API End ------------------------------------ */
+
+/* Order Management */
+router.post("/getOrderlist", authenticate, orderController.getOrderlist);
+router.post("/changeOrderStatus", authenticate, orderController.changeStatus);
+router.post("/orderViewDetails", authenticate, orderController.orderViewDetails);
+router.post('/orderEditDetails',authenticate,upload.fields([
+  { name: 'invoice', maxCount: 1 }]),orderController.orderEditDetails)
 
 export default router;

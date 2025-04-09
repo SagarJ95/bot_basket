@@ -1,10 +1,12 @@
 
 // Defaults
 import catchAsync from "../../utils/catchAsync.js";
+import AppError from "../../utils/appError.js";
 import db from "../../config/db.js";
 import Customer from "../../db/models/customers.js";
 import customer_address from "../../db/models/customer_address.js";
 import bcrypt from "bcrypt";
+import { body, validationResult } from "express-validator";
 const project_name = process.env.APP_NAME;
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3848';
 
@@ -16,6 +18,7 @@ const fetch_profile = catchAsync(async (req, res) => {
 
       const getCustomerInfo = await db.query(`
         SELECT
+            c.id,
             c.first_name,
             c.last_name,
             c.phone_no,

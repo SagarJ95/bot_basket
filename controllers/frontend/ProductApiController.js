@@ -7,6 +7,8 @@ import addToCart from "../../db/models/add_to_carts.js";
 import Orders from "../../db/models/orders.js"
 import OrderItem from "../../db/models/order_items.js"
 import bcrypt from "bcrypt";
+import { body, validationResult } from "express-validator";
+import AppError from "../../utils/appError.js";
 const project_name = process.env.APP_NAME;
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3848';
 
@@ -116,7 +118,7 @@ const product_list = catchAsync(async (req, res) => {
 
 const add_update_cart = catchAsync(async (req, res) => {
   await Promise.all([
-    body('product_id').notEmpty().withMessage('first name is required').run(req),
+    body('product_id').notEmpty().withMessage('Product id is required').run(req),
     body('qty').notEmpty().withMessage('quantity is required').run(req),
     body('price').notEmpty().withMessage('Price is required').run(req)
   ]);
@@ -181,7 +183,7 @@ const cart_list =catchAsync(async (req, res) => {
 
         const cartlist = await db.query(`
           SELECT DISTINCT ON (atc.id)
-            atc.id,
+            atc.id as cart_id,
             atc.product_id,
             p.name AS product_name,
             p.description,
@@ -223,7 +225,7 @@ const cart_list =catchAsync(async (req, res) => {
 
 const delete_product_cart = catchAsync(async (req, res) => {
   await Promise.all([
-    body('id').notEmpty().withMessage('Id is required').run(req)
+    body('cart_id').notEmpty().withMessage('Cart id is required').run(req)
   ]);
 
   // Handle validation result
@@ -234,14 +236,14 @@ const delete_product_cart = catchAsync(async (req, res) => {
   }
 
   try{
-    const {id} = req.body;
+    const {cart_id} = req.body;
     const customer_id = req.user.id
 
     let CartInfo = await addToCart.update({
         status:0
       },{
         where:{
-          id:parseInt(id),
+          id:parseInt(cart_id),
           created_by:customer_id
         }
       })
@@ -315,6 +317,10 @@ const create_order = catchAsync(async (req, res) => {
           item_delivery_status:1,
           created_by:customer_id
           });
+
+          //Deactive status in cart_list
+          const cart_id = item.cart_id;
+          const cart = await addToCart.update({status:0},{where:{id:cart_id}});
       }
     }
 
@@ -445,11 +451,16 @@ const repeat_order = catchAsync(async (req, res) => {
       p.description,
       oi.price AS product_price,
       oi.quantity AS product_quantity,
-      SUM(oi.quantity * oi.price::numeric) As total_price
+      SUM(oi.quantity * oi.price::numeric) As total_price,
+      (
+        SELECT JSON_AGG(DISTINCT CONCAT('${BASE_URL}', pi.image_path))
+        FROM product_images pi
+        WHERE pi.product_id = p.id AND pi.image_path IS NOT NULL
+      ) AS product_images
       FROM order_items AS oi
       LEFT JOIN products AS p ON oi.product_id = p.id
-      WHERE oi.order_id = $1
-      GROUP BY oi.id,p.description`,[order_id]);
+      WHERE oi.order_id = $1 And oi.order_item_status = $2
+      GROUP BY oi.id,p.id,p.description`,[order_id,1]);
 
     return res.status(200).json({
       status: true,
