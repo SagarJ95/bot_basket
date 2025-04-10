@@ -65,6 +65,13 @@ router.post('/login', cutomerController.Login);
 //forget password
 router.post('/forget_password',cutomerController.updatePassword)
 
+//reset password
+router.post(
+    "/set_new_password",
+    customer_authenticate,
+    cutomerController.resetpassword
+  );
+
 //send Email wwith OTP
 router.post('/resend_otp',cutomerController.resend_otp)
 

@@ -18,7 +18,13 @@ module.exports = {
       price: {
         type: Sequelize.STRING
       },
+      pervoius_price: {
+        type: Sequelize.STRING
+      },
       status: {
+        type: Sequelize.INTEGER
+      },
+      repeat_status: {
         type: Sequelize.INTEGER
       },
       created_by:{

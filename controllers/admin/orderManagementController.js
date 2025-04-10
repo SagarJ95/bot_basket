@@ -20,7 +20,7 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:3848';
 const getOrderlist = catchAsync(async (req, res) => {
 
     await Promise.all([
-        body('status').notEmpty().withMessage('status is required').run(req)
+        body('order_status').notEmpty().withMessage('status is required').run(req)
     ]);
 
     // Handle validation result
@@ -31,19 +31,27 @@ const getOrderlist = catchAsync(async (req, res) => {
     }
 
     try {
-        const {status} = req.body
-        const query_params = [status,1];
+        const {order_status} = req.body
+        const query_params = [order_status,1,1];
 
         //get total count
-        const totalCount = await db.query(`select COUNT(id) FROM orders WHERE status = $1`,[status])
+        const totalCount = await db.query(`select COUNT(id) FROM orders WHERE status = $1`,[order_status])
 
         const query = `select o.id as order_id,o.order_ref_id,o.customer_name,TO_CHAR(o.created_at,'FMDDth Month YYYY') as order_date,
         o.status,SUM(oi.quantity * oi.price::numeric) as total_price,
+        CASE
+            WHEN o.status = 1 THEN 'Pending'
+            WHEN o.status = 2 THEN 'Confirmed'
+            WHEN o.status = 3 THEN 'Shipped'
+            WHEN o.status = 4 THEN 'Delivered'
+            WHEN o.status = 5 THEN 'Cancelled'
+            ELSE ''
+        END AS status_name,
         TO_CHAR(o.delivery_date,'FMDDth Month YYYY') as delivery_date
-        from orders as o
-        LEFt JOIN order_items as oi ON o.id = oi.order_id AND o.status = $2
-        where o.status = $1
-        GROUP BY o.id,o.order_ref_id,o.customer_name,o.created_at`;
+        from orders AS o
+        LEFt JOIN order_items as oi ON o.id = oi.order_id AND oi.order_item_status = $2
+        where o.order_status = $1 and o.status = $3
+        GROUP BY o.id,o.order_ref_id,o.customer_name,o.created_at, o.status, o.delivery_date`;
 
         const result = await db.query(query,query_params)
 
@@ -155,9 +163,9 @@ const orderViewDetails = catchAsync(async (req, res) => {
         return res.status(200).json({
             status: true,
             message: 'Fetch Order details Successfully',
-            data:(result.rowCount > 0) ? {
+            data:(result.rowCount > 0) ? [{
                 ...result.rows[0],
-              order_items: order_item.rows,Sumoflist:Sumoflist} : [],
+              order_items: order_item.rows,Sumoflist:Sumoflist}] : [],
 
           });
     } catch (error) {
@@ -195,7 +203,7 @@ const orderEditDetails = catchAsync(async (req, res) => {
         }
 
         const updateInfo = {
-            status:status,
+            order_status:status,
             payment_status:payment_status,
             payment_mode:payment_mode,
             delivery_date:(deliverDate) ? deliverDate :null

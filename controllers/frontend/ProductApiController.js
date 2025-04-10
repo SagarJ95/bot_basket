@@ -68,9 +68,9 @@ const recommended_products = catchAsync(async (req, res) => {
 });
 
 const product_list = catchAsync(async (req, res) => {
-   try{
+  try{
       const {category_id,search} = req.body;
-      let query_params = [1];
+      let query_params = [1,1];
       let searchQuery = '';
       let categories = '';
       let wildcardSearch = '';
@@ -88,15 +88,25 @@ const product_list = catchAsync(async (req, res) => {
 
 
       const productquery = `select
-        p.id,p.name as product_name,p.slug,p.description,p.price,c.id as categoryId,c.cat_name as category_name,
+        p.id,p.name as product_name,p.slug,p.description,p.price,p.minimum_order_place,p.maximum_order_place,
+        COALESCE(q.total_ordered_quantity_today, 0) AS total_ordered_quantity_today,
+        (p.maximum_order_place - COALESCE(q.total_ordered_quantity_today, 0)) AS available_quantity,c.id as categoryId,c.cat_name as category_name,
          JSON_AGG(
             CONCAT('${BASE_URL}', pi.image_path)
         ) FILTER (WHERE pi.image_path IS NOT NULL) AS product_images
          from products as p
         left join categories as c ON p.category = c.id
         left join product_images as pi ON p.id = pi.product_id
+        LEFT JOIN (
+        SELECT
+          product_id,
+          SUM(quantity) AS total_ordered_quantity_today
+        FROM order_items
+        WHERE order_item_status = $2 AND DATE(created_at) = CURRENT_DATE
+        GROUP BY product_id
+      ) AS q ON p.id = q.product_id
         where p.status = $1 and p.deleted_at IS NULL ${categories} ${searchQuery}
-        GROUP BY p.id,c.cat_name,c.id`;
+        GROUP BY p.id,c.cat_name,c.id,q.total_ordered_quantity_today`;
 
       const getproductlist = await db.query(productquery,query_params);
 
@@ -137,13 +147,25 @@ const add_update_cart = catchAsync(async (req, res) => {
       let CartInfo;
       //if id is empty then product insert into cart otherwise update product qty in add_to_carts table
       if(!id && id == 0){
+
+        const pervPrice = await db.query(`
+          SELECT price
+          FROM products_price_logs
+          WHERE product_id = $1 AND created_at < (CURRENT_DATE - INTERVAL '1 day')
+          ORDER BY created_at DESC
+          LIMIT 1
+        `, [product_id]);
+
+        const previousPrice = pervPrice.rows[0]?.price || null;
+
          CartInfo = await addToCart.create({
           product_id,
           qty,
           price,
-          created_by:req.user.id,
-          status:1
-        })
+          prevprice: previousPrice,
+          created_by: req.user.id,
+          status: 1
+        });
 
         infoUpdate = 'Add';
       }else{
@@ -187,6 +209,7 @@ const cart_list =catchAsync(async (req, res) => {
             atc.product_id,
             p.name AS product_name,
             p.description,
+            COALESCE(atc.pervoius_price::numeric,0) AS pervoius_price,
             CONCAT('${BASE_URL}', pi.image_path) AS product_image,
             atc.qty,
             p.price
@@ -300,6 +323,7 @@ const create_order = catchAsync(async (req, res) => {
       address:address,
       special_instruction:instruction,
       status:1,
+      order_status:1,
       created_by:customer_id
     });
 
@@ -357,7 +381,7 @@ const order_history = catchAsync(async (req, res) => {
     const {status} = req.body;
 
     const result = await db.query(`SELECT
-    o.id,
+    o.id as order_id,
     oi.product_id,
     TO_CHAR(o.perferred_delivery_date, 'FMDDth Month YYYY') AS delivery_date,
     p.name AS product_name,
@@ -371,8 +395,8 @@ const order_history = catchAsync(async (req, res) => {
     FROM orders AS o
     LEFT JOIN order_items AS oi ON o.id = oi.order_id
     LEFT JOIN products AS p ON oi.product_id = p.id
-    WHERE o.customer_id = $1 AND o.status = $2 and oi.order_item_status = $3
-    GROUP BY p.id,o.id, oi.product_id, o.perferred_delivery_date, p.name, p.description`,[customer_id,status,1]);
+    WHERE o.customer_id = $1 AND o.order_status = $2 and oi.order_item_status = $3 and o.status = $4
+    GROUP BY p.id,o.id, oi.product_id, o.perferred_delivery_date, p.name, p.description`,[customer_id,status,1,1]);
 
     return res.status(200).json({
       status: true,
@@ -380,82 +404,6 @@ const order_history = catchAsync(async (req, res) => {
       data:(result.rowCount > 0) ? result.rows : []
     });
 
-
-  }catch(error){
-    return res.status(200).json({
-      status: false,
-      message: "Failed to retrieve data",
-      errors: error.message
-      });
-  }
- })
-
-const repeat_order = catchAsync(async (req, res) => {
-  await Promise.all([
-    body('order_id').notEmpty().withMessage('Order Id is required').run(req),
-  ]);
-
-  // Handle validation result
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-      const error_message = errors.array()[0].msg;
-      throw new AppError(error_message, 200, errors);
-  }
-
-  try{
-    const customer_id = req.user.id;
-    const {order_id} = req.body;
-
-    const result = await db.query(`SELECT
-      o.id,
-      o.customer_id,
-      o.customer_name,
-      o.whatsapp_number,
-      o.email,
-      o.special_instruction,
-      TO_CHAR(o.perferred_delivery_date, 'FMDDth Month YYYY') AS delivery_date,
-      ca.address as address,
-      o.address as address_id
-      FROM orders AS o
-      LEFT JOIN customer_addresses as ca ON o.address = ca.id
-      WHERE o.customer_id = $1`,[customer_id]);
-
-      //fetch order_item table fetch order item list based on order_id
-      const order_item = await db.query(`SELECT
-        oi.id,
-        oi.order_id,
-        oi.product_id,
-        oi.product_name AS product_name,
-        p.description,
-        p.price AS product_price,
-        oi.quantity AS product_quantity,
-        SUM(oi.quantity * p.price::numeric) As total_price,
-        (
-          SELECT JSON_AGG(DISTINCT CONCAT('${BASE_URL}', pi.image_path))
-          FROM product_images pi
-          WHERE pi.product_id = p.id AND pi.image_path IS NOT NULL
-        ) AS product_images
-        FROM order_items AS oi
-        LEFT JOIN products AS p ON oi.product_id = p.id
-        WHERE oi.order_id = $1 And oi.order_item_status = $2
-        GROUP BY oi.id,p.id,p.description`,[order_id,1]);
-
-        let Sumoflist;
-        if(order_item.rowCount > 0){
-            Sumoflist = order_item.rows.reduce((acc, item) => {
-                acc.qty += parseInt(item.product_quantity);
-                acc.price += parseInt(item.total_price);
-                return acc;
-                }, { qty: 0, price: 0 });
-            }
-
-      return res.status(200).json({
-        status: true,
-        message: 'Fetch Order Details Successfully',
-        data:(result.rowCount > 0) ? {
-          ...result.rows[0],
-        order_items: order_item.rows,Sumoflist:Sumoflist} : []
-      });
 
   }catch(error){
     return res.status(200).json({
@@ -528,10 +476,10 @@ const repeat_order = catchAsync(async (req, res) => {
     return res.status(200).json({
       status: true,
       message: 'Fetch Order Details Successfully',
-      data:(result.rowCount > 0) ? {
+      data:(result.rowCount > 0) ? [{
         ...result.rows[0],
       order_items: order_item.rows,
-      Sumoflist:(Sumoflist) ? Sumoflist : ''} : []
+      Sumoflist:(Sumoflist) ? Sumoflist : ''}] : []
     });
 
 
@@ -544,10 +492,61 @@ const repeat_order = catchAsync(async (req, res) => {
   }
  })
 
+ // repeat order
+const repeat_order = catchAsync(async (req, res) => {
+  try {
+    const customer_id = req.user.id;
+    const { order_id } = req.body;
+
+    const getoder = await db.query(
+      `select ot.order_id,ot.product_id,ot.quantity,ot.price as previous_price,p.price as current_price from order_items as ot
+        LEFT JOIN products as p ON ot.product_id = p.id
+       where ot.order_id=$1 AND ot.order_item_status=$2 AND p.product_stock_status=$3 AND p.status=$4 AND p.price != ${0}`,
+      [order_id, "1", "1", "1"]
+    );
+
+    if (getoder.rowCount == 0) {
+      return res.status(200).json({
+        status: false,
+        message: "Product not available",
+      });
+    }
+
+    const items = getoder.rows;
+
+    for (const item of items) {
+      await db.query(
+        `INSERT INTO add_to_carts (product_id,qty,price,pervoius_price,created_at,updated_at,created_by,status)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [
+          item.product_id,
+          item.quantity,
+          item.current_price,
+          item.previous_price,
+          new Date(),
+          new Date(),
+          customer_id,
+
+          "1",
+        ]
+      );
+    }
+    return res.status(200).json({
+      status: true,
+      message: "Order fetched and added to cart successfully!",
+      data: items,
+    });
+
+  } catch (error) {
+    res.status(400).json({
+      status: false,
+      message: error.message,
+    });
+  }
+});
+
 
 /******************* End Order creation Flow ************************ */
-
-
 
   export {
     category_list,

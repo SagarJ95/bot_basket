@@ -48,6 +48,9 @@ module.exports = {
       status: {
         type: Sequelize.INTEGER
       },
+      order_status: {
+        type: Sequelize.INTEGER
+      },
       created_by:{
         type:Sequelize.INTEGER,
       },

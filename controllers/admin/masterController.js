@@ -395,6 +395,69 @@ const excelExportCategory=catchAsync( async(req,res)=>{
 /* Category API End ------------------------------- */
 
 /* Product API Start ------------------------------- */
+const getProductlist = catchAsync(async (req, res) => {
+    try {
+        const {category_id} = req.body;
+        const query_params = [1];
+        let categories = '';
+
+        if(category_id){
+            categories = `and p.category = $${query_params.length + 1}`;
+            query_params.push(category_id)
+         }
+
+        //get total number of products
+        const totalProducts = await db.query(`select COUNT(p.id) as product_id
+         from products as p LEFT JOIN categories as c ON p.category = c.id
+         LEFT JOIN country_data as ca ON p.country_id = ca.id
+         WHERE p.status = $1 AND p.deleted_at IS NULL ${categories} GROUP BY p.id ORDER BY p.id desc`,
+         query_params
+        );
+
+        //get get product list
+        const query = `select p.id as product_id,p.name as product_name,c.cat_name as category_name
+        ,p.price as current_price,
+        CONCAT('${BASE_URL}/images/img-country-flag/',ca.flag) as country_flag,
+        p.category as category_id,
+        ca.country_name,
+        TO_CHAR(p.created_at,'FMDD FMMonth YYYY') as last_updated_date,
+        p.product_stock_status,p.status
+         from products as p LEFT JOIN categories as c ON p.category = c.id
+         LEFT JOIN country_data as ca ON p.country_id = ca.id
+         WHERE p.status = $1 AND p.deleted_at IS NULL ${categories} ORDER BY p.id desc`;
+
+        const getProductslist = await db.query(query,query_params)
+
+        return res.status(200).json({
+            status: true,
+            total:(totalProducts.rowCount > 0) ? totalProducts.rowCount : 0,
+            message: 'Fetch Product Successfully',
+            data:(getProductslist.rowCount > 0) ? getProductslist.rows : []
+          });
+    } catch (error) {
+        throw new AppError(error.message, 400);
+    }
+
+});
+
+const countries = catchAsync(async (req, res) => {
+    try {
+
+        const query = `select c.id,c.country_name,c.code1 as code,CONCAT('${BASE_URL}/images/img-country-flag/',c.flag) from country_data as c`;
+
+        const getCountrylist = await db.query(query,[])
+
+        return res.status(200).json({
+            status: true,
+            message: 'Fetch Countries Successfully',
+            data:(getCountrylist.rowCount > 0) ? getCountrylist.rows : []
+          });
+    } catch (error) {
+        throw new AppError(error.message, 400);
+    }
+
+});
+
 const createProduct = catchAsync(async (req, res) => {
 
     // Apply validation rules
@@ -403,9 +466,8 @@ const createProduct = catchAsync(async (req, res) => {
             .notEmpty().withMessage('Name is required'),
         body('description').notEmpty().withMessage('Description is required'),
         body('category').notEmpty().withMessage('Category is required'),
-        body('minimum_order_place').notEmpty().withMessage('Minimum order place is required'),
-        body('maximum_order_place').notEmpty().withMessage('Maximum order place is required'),
-        body('price').notEmpty().withMessage('Price is required')
+        body('countryId').notEmpty().withMessage('Country is required'),
+        body('country_flag').notEmpty().withMessage('country flag is required')
     ]);
 
 
@@ -414,7 +476,7 @@ const createProduct = catchAsync(async (req, res) => {
     try {
         const body = req.body;
         const files = req.files;
-        // const errors = validationResult(req);
+
         if (!files || !files.product_images || files.product_images.length === 0) {
             errors.errors.push({ msg: "Please upload product image", path: "product_images" });
         }
@@ -431,7 +493,6 @@ const createProduct = catchAsync(async (req, res) => {
         if (existing) {
             errors.errors.push({ msg: "A product with the same name and category already exists", path: "name" });
         }
-
 
         if (!errors.isEmpty()) {
             const formattedErrors = await formatValidationArray(errors);
@@ -452,18 +513,19 @@ const createProduct = catchAsync(async (req, res) => {
             name: body.name,
             slug: generateSlug(body.name),
             description: body.description,
-            minimum_order_place: body.minimum_order_place,
-            maximum_order_place: body.maximum_order_place,
-            price: body.price,
+            minimum_order_place:1,
+            maximum_order_place: 10,
+            price: 0,
+            country_id:body.country_id,
+            country_flag:body.country_flag,
             category: body.category,
             created_by: req.user.id,
-            updated_by: req.user.id,
             ordering: (OrderingId) ? parseInt(OrderingId) + 1 : 1,
-            status: req.body.status,
+            status: 1,
         });
 
         const product_id=product.id;
-        //return res.json(product.id);
+
         if (!product) {
             return res.status(200).json({ status: false, message: 'Product not created' });
         }
@@ -480,13 +542,12 @@ const createProduct = catchAsync(async (req, res) => {
         }
 
 
-        const price_log = await Products_price_logs.create({
-            product_id: product_id,
-            price: body.price,
-            created_by: req.user.id,
-            updated_by: req.user.id
-        });
-
+        // const price_log = await Products_price_logs.create({
+        //     product_id: product_id,
+        //     price: body.price,
+        //     created_by: req.user.id,
+        //     updated_by: req.user.id
+        // });
 
         const data = {
             user_id: req.user.id,
@@ -511,10 +572,7 @@ const updateProduct = catchAsync(async (req, res) => {
     await Promise.all([
         body('name').notEmpty().withMessage('Name is required').run(req),
         body('description').notEmpty().withMessage('Description is required').run(req),
-        body('category').notEmpty().withMessage('Category is required').run(req),
-        body('minimum_order_place').notEmpty().withMessage('Minimum order place is required').run(req),
-        body('maximum_order_place').notEmpty().withMessage('Maximum order place is required').run(req),
-        body('price').notEmpty().withMessage('Price is required').run(req)
+        body('category').notEmpty().withMessage('Category is required').run(req)
     ]);
 
     const errors = validationResult(req);
@@ -555,9 +613,7 @@ const updateProduct = catchAsync(async (req, res) => {
             name: body.name,
             slug: generateSlug(body.name),
             description: body.description,
-            minimum_order_place: body.minimum_order_place,
-            maximum_order_place: body.maximum_order_place,
-            price: body.price,
+            country_id:body.country_id,
             category: body.category,
             updated_by: req.user.id,
         },
@@ -608,7 +664,6 @@ const updateProduct = catchAsync(async (req, res) => {
         return res.status(500).json({ status: false, message: 'Product not updated', error: error.message });
     }
 });
-
 
 const getProductById = catchAsync(async (req, res) => {
     try {
@@ -674,7 +729,6 @@ const getProductById = catchAsync(async (req, res) => {
     }
 });
 
-
 const deleteProductById = catchAsync(async (req, res) => {
     try {
         await Promise.all([
@@ -718,7 +772,6 @@ const deleteProductById = catchAsync(async (req, res) => {
         return res.status(200).json({ status: false, message: 'Product not deleted', error: error.message });
     }
 });
-
 
 const updateProductStatusById = catchAsync(async (req, res) => {
     try {
@@ -769,7 +822,6 @@ const updateProductStatusById = catchAsync(async (req, res) => {
         return res.status(200).json({ status: false, message: 'Product status not updated', error: error.message });
     }
 });
-
 
 //excel export products
 const excelExportProducts = catchAsync(async(req,res)=>{
@@ -1093,10 +1145,7 @@ export {
     changeProductPrice,
     getProductPriceLogs,
     exportProductPriceLogs,
-    changeProductStockStatus
-
-
-
-
-
+    changeProductStockStatus,
+    countries,
+    getProductlist
 }

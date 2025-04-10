@@ -19,8 +19,8 @@ const file_storage = diskStorage({
   destination: function (req, file, cb) {
       let uploadPath;
 
-      if (file.fieldname === 'photo') {
-          uploadPath = './public/uploads/masters';
+      if (file.fieldname === 'profile') {
+          uploadPath = './public/uploads/profile';
       }else {
         return cb(new Error('Invalid fieldname'), null);
       }
@@ -36,18 +36,6 @@ const file_storage = diskStorage({
       cb(null, file.fieldname + '-' + uniqueSuffix + extname(file.originalname));
   }
 });
-
-// const upload = multer({
-//   storage: file_storage,
-//   fileFilter: (req, file, cb) => {
-//       const allowedTypes = ['image/jpeg', 'image/png', 'image/webp','video/mp4','video/mov'];
-//       if (allowedTypes.includes(file.mimetype)) {
-//           cb(null, true);
-//       } else {
-//           cb(new Error('Only image files are allowed!'), false);
-//       }
-//   }
-// });
 
 //uploadCategory
 const categorytorage = multer.diskStorage({
@@ -83,7 +71,7 @@ const categorytorage = multer.diskStorage({
 });
 
 const upload = multer({ storage: categorytorage });
-//const upload_product = multer({ storage: categorytorage });
+const upload_profile = multer({ storage: file_storage });
 
 
 const compressImage = async (req, res, next) => {
@@ -103,6 +91,9 @@ const compressImage = async (req, res, next) => {
 };
 
 /* Auth API Routes -------------------------------------- */
+
+//countries
+router.post('/countries',masterController.countries)
 
 // POST user login
 router.post("/sign-in", signInController.userLogin);
@@ -158,14 +149,18 @@ router.post("/changeProductPrice", authenticate, masterController.changeProductP
 router.post("/getProductPriceLogs", authenticate, masterController.getProductPriceLogs);
 router.post("/exportProductPriceLogs", authenticate, masterController.exportProductPriceLogs);
 router.post("/changeProductStockStatus", authenticate, masterController.changeProductStockStatus);
-
+router.post('/getProductlist',authenticate,masterController.getProductlist)
 
 /* Customers */
 router.post("/getCustomers", authenticate, customerController.getCustomers);
 router.post("/exportCustomers", authenticate, customerController.exportCustomers);
 router.post('/getParticularCustomerInfo',authenticate,customerController.getParticularCustomerInfo)
-router.post('/update_customer_info',authenticate,customerController.update_customer_info)
-router.post('/add_customer',authenticate,customerController.add_customer)
+router.post('/update_customer_info',authenticate,upload_profile.fields([
+  { name: "profile", maxCount: 1 }
+]),customerController.update_customer_info)
+router.post('/add_customer',authenticate,upload_profile.fields([
+  { name: "profile", maxCount: 1 }
+]),customerController.add_customer)
 router.post('/activationStatus',authenticate,customerController.activationStatus)
 
 /* Permission API Start ----------------------------------- */

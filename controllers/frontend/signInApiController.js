@@ -131,7 +131,7 @@ const Login = catchAsync(async (req, res) => {
         message: "Please provide email and password",
       });
     } else {
-      const result = await Customer.findOne({ where: { email: email.toLowerCase(), status:"1" } })
+      const result = await Customer.findOne({ where: { email: email.toLowerCase() } })
 
       if (!result || !(await compare(password, result.password))) {
         return res.status(200).json({
@@ -180,6 +180,98 @@ const Login = catchAsync(async (req, res) => {
       }
     }
   });
+
+//set new password
+//reset password
+
+const resetpassword = catchAsync(async (req, res) => {
+  await Promise.all([
+    body("old_password")
+      .notEmpty()
+      .withMessage("Old Password is required")
+      .run(req),
+    body("new_password")
+      .notEmpty()
+      .withMessage("New Password is required")
+      .run(req),
+    body("confirm_password")
+      .notEmpty()
+      .withMessage("Confirm Password is required")
+      .run(req),
+  ]);
+
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    const error_message = errors.array()[0].msg;
+    throw new AppError(error_message, 200, errors);
+  }
+
+  try {
+    const { old_password, new_password, confirm_password } = req.body;
+    const userEmail = req.user?.email;
+
+    // console.log(req.user.password);
+
+    if (!userEmail) {
+      return res.status(200).json({
+        status: false,
+        message: "Unauthorized access. Please login again.",
+      });
+    }
+
+    const customer = await Customer.findOne({
+      where: { email: userEmail.toLowerCase() },
+    });
+
+    if (!customer) {
+      throw new AppError("Customer not found", 200);
+    }
+    console.log(customer.password);
+    const isPasswordCorrect = await bcrypt.compare(
+      old_password,
+      customer.password
+    );
+
+    if (!isPasswordCorrect) {
+      return res.status(200).json({
+        status: false,
+        message: "Old password is incorrect",
+      });
+    }
+
+    const isPasswordmatch = await bcrypt.compare(
+      new_password,
+      customer.password
+    );
+    if (isPasswordmatch) {
+      return res.status(200).json({
+        status: false,
+        message: "New password must be different from the old password",
+      });
+    }
+
+    if (new_password !== confirm_password) {
+      return res.status(200).json({
+        status: false,
+        message: "New Password and Confirm Password do not match",
+      });
+    }
+
+    const confirmPassword = await bcrypt.hash(confirm_password, 10);
+
+    await Customer.update(
+      { password: confirmPassword },
+      { where: { email: customer.email } }
+    );
+
+    return res.status(200).json({
+      status: true,
+      message: "Password changed successfully",
+    });
+  } catch (error) {
+    throw new AppError(error.message, 200);
+  }
+});
   /*********************Forget Password *******************************/
 
   // used for sign_up and forget password api
@@ -808,7 +900,8 @@ export {
     SignUp,
     Login,
     resend_otp,
-    updatePassword
+    updatePassword,
+    resetpassword
 }
 
 

@@ -50,6 +50,9 @@ const orders = sequelize.define(
     status: {
       type: DataTypes.INTEGER
     },
+    order_status: {
+      type: DataTypes.INTEGER
+    },
     created_by:{
       type:DataTypes.INTEGER,
     },
