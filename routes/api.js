@@ -110,6 +110,10 @@ router.post("/sign-in", signInController.userLogin);
 // GET user logout
 router.get("/sign-out", authenticate, signInController.userLogout);
 
+
+//reset Password
+
+
 /* Users API Start ----------------------------------- */
 
 // POST get Users (datatables)
