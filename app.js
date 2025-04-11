@@ -36,10 +36,10 @@ const sessionStore = new SequelizeStore({
 //sessionStore.sync();
 
 // API Routes
-import api from "./routes/api.js";
+import api from "./routes/admin_api.js";
 
 // Admin View Routes
-import admin from "./routes/admin.js";
+import admin from "./routes/adminFront.js";
 
 // Front View Routes
 import front from "./routes/web.js";
