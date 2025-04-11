@@ -18,10 +18,26 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:3848';
 
 /* Category API Start ------------------------------- */
 
-// GET all categories (datatables)
+// GET all customer (datatables)
 const getCustomers = catchAsync(async (req, res) => {
     try {
+        const {page, search} = req.body
+
         const query_params = [1,1,1];
+
+        let pageCountQuery = '';
+        let searchQuery = ``;
+
+         if(page){
+            let pageCount = (page - 1) * 10;
+            pageCountQuery = `LIMIT $${query_params.length + 1} OFFSET $${query_params.length + 2}`
+            query_params.push(10,pageCount)
+         }
+
+         if (search) {
+            searchQuery = `AND CONCAT(c.first_name, ' ', c.last_name) ILIKE $${query_params.length + 1}`;
+            query_params.push(`%${search}%`);
+         }
 
         const query = `select c.id,CONCAT(c.first_name,' ',c.last_name) as customer_name,
         c.phone_no as contact_no,c.whatsapp_no,COUNT(DISTINCT o.id) as total_order,
@@ -30,14 +46,15 @@ const getCustomers = catchAsync(async (req, res) => {
         from customers as c
         LEFT JOIN orders as o ON c.id = o.customer_id AND o.status = $2
         LEFT JOIN order_items as oi ON o.id = oi.order_id AND o.status = $3
-        where c.status = $1
+        where c.status = $1 ${searchQuery}
         GROUP BY c.first_name,c.last_name,c.phone_no,c.whatsapp_no,c.id
-        order By c.id desc`;
+        order By c.id desc ${pageCountQuery}`;
 
         const result = await db.query(query,query_params)
 
         return res.status(200).json({
             status: true,
+            total:(result.rowCount > 0) ? result.rowCount : 0,
             message: 'Fetch customer details Successfully',
             data:(result.rowCount > 0) ? result.rows : []
           });

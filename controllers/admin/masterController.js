@@ -34,23 +34,40 @@ const __dirname = dirname(__filename);
 // GET all categories (datatables)
 const getCategories = catchAsync(async (req, res) => {
     try {
+        const {page, search } = req.body
+        let pageCountQuery = '';
+        let searchQuery = ``;
+        const query_params = [1];
+
+         if(page){
+            let pageCount = (page - 1) * 10;
+            pageCountQuery = `LIMIT $${query_params.length + 1} OFFSET $${query_params.length + 2}`
+            query_params.push(10,pageCount)
+         }
+
+         if (search) {
+            searchQuery = `AND c.cat_name ILIKE $${query_params.length + 1}`;
+            query_params.push(`%${search}%`);
+         }
+
         //get total number of categories
-        const totalCategories = await db.query(`select COUNT(id) FROM categories where status =$1 and deleted_at IS NULL`,
-            [1]
+        const totalCategories = await db.query(`select COUNT(c.id) FROM categories as c where c.status =$1 and c.deleted_at IS NULL ${searchQuery}
+            ${pageCountQuery}`,
+            query_params
         );
 
         //get get catgories list
         const query = `select c.id as cat_id,c.cat_name as category_name,c.slug,COALESCE(c.description,'') as description,
         COALESCE(COUNT(p.id),0) as No_of_products from categories as c
         LEFT JOIN products as p ON c.id = p.category
-        where c.status = $1 and c.deleted_at IS NULL
-        GROUP BY c.cat_name,c.id Order BY c.id desc`;
+        where c.status = $1 and c.deleted_at IS NULL ${searchQuery}
+        GROUP BY c.cat_name,c.id Order BY c.id desc ${pageCountQuery}`;
 
-        const getCategorieslist = await db.query(query,[1])
+        const getCategorieslist = await db.query(query,query_params)
 
         return res.status(200).json({
             status: true,
-            total:(totalCategories.rowCount > 0) ? totalCategories.rowCount : 0,
+            total:(totalCategories.rowCount > 0) ? parseInt(totalCategories.rows[0].count) : 0,
             message: 'Fetch Categories Successfully',
             data:(getCategorieslist.rowCount > 0) ? getCategorieslist.rows : []
           });
@@ -400,23 +417,44 @@ const excelExportCategory=catchAsync( async(req,res)=>{
 
 /* Product API Start ------------------------------- */
 const getProductlist = catchAsync(async (req, res) => {
+
     try {
-        const {category_id} = req.body;
+        const {category_id,page,search} = req.body;
         const query_params = [1];
+
         let categories = '';
+        let pageCountQuery = '';
+        let searchQuery = ``;
 
         if(category_id){
             categories = `and p.category = $${query_params.length + 1}`;
             query_params.push(category_id)
          }
 
+         if(page){
+            let pageCount = (page - 1) * 10;
+            pageCountQuery = `LIMIT $${query_params.length + 1} OFFSET $${query_params.length + 2}`
+            query_params.push(10,pageCount)
+         }
+
+         if(search){
+            searchQuery = `and p.name ILIKE $${query_params.length + 1}`;
+            query_params.push(`%${search}%`);
+         }
+
         //get total number of products
-        const totalProducts = await db.query(`select COUNT(p.id) as product_id
-         from products as p LEFT JOIN categories as c ON p.category = c.id
-         LEFT JOIN country_data as ca ON p.country_id = ca.id
-         WHERE p.status = $1 AND p.deleted_at IS NULL ${categories} GROUP BY p.id ORDER BY p.id desc`,
-         query_params
-        );
+        const totalCountQuery = `
+            SELECT COUNT(*) AS total
+            FROM products AS p
+            LEFT JOIN categories AS c ON p.category = c.id
+            LEFT JOIN country_data AS ca ON p.country_id = ca.id
+            WHERE p.status = $1 AND p.deleted_at IS NULL
+            ${categories}
+            ${searchQuery}
+            ${pageCountQuery}
+        `;
+
+        const totalProducts = await db.query(totalCountQuery, query_params);
 
         //get get product list
         const query = `select p.id as product_id,p.name as product_name,c.cat_name as category_name
@@ -428,13 +466,13 @@ const getProductlist = catchAsync(async (req, res) => {
         p.product_stock_status,p.status
          from products as p LEFT JOIN categories as c ON p.category = c.id
          LEFT JOIN country_data as ca ON p.country_id = ca.id
-         WHERE p.status = $1 AND p.deleted_at IS NULL ${categories} ORDER BY p.id desc`;
+         WHERE p.status = $1 AND p.deleted_at IS NULL ${categories} ${searchQuery} ORDER BY p.id desc ${pageCountQuery}`;
 
         const getProductslist = await db.query(query,query_params)
 
         return res.status(200).json({
             status: true,
-            total:(totalProducts.rowCount > 0) ? totalProducts.rowCount : 0,
+            total:(totalProducts.rowCount > 0) ? totalProducts.rows[0].total : 0,
             message: 'Fetch Product Successfully',
             data:(getProductslist.rowCount > 0) ? getProductslist.rows : []
           });
@@ -825,6 +863,56 @@ const updateProductStatusById = catchAsync(async (req, res) => {
     }
 });
 
+const changeProductStockStatus = catchAsync(async (req, res) => {
+    try {
+        await Promise.all([
+            body('product_id').notEmpty().withMessage('Product ID is required').run(req),
+            body('product_stock_status').notEmpty().withMessage('Product stock status is required').run(req),
+        ]);
+
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            const formattedErrors = await formatValidationArray(errors);
+            return res.status(200).json({ status: false, errors: formattedErrors });
+        }
+
+        const productId = parseInt(req.body.product_id);
+        const product_stock_status = parseInt(req.body.product_stock_status);
+
+        if (isNaN(productId) || isNaN(product_stock_status)) {
+            return res.status(200).json({ status: false, message: 'Invalid Product ID or Stock Status', error: '' });
+        }
+
+        const updated = await Product.update(
+            {
+                product_stock_status: product_stock_status,
+                updated_by: req.user.id,
+            },
+            {
+                where: { id: productId }
+            }
+        );
+
+        if (!updated || updated[0] === 0) {
+            return res.status(200).json({ status: false, message: 'Product Stock status not updated', error: '' });
+        }
+
+        const data = {
+            user_id: req.user.id,
+            table_id: productId,
+            table_name: 'products',
+            action: 'stock status to ' + product_stock_status,
+        };
+
+        adminLog(data);
+
+        return res.status(200).json({ status: true, message: 'Product stock status updated successfully' });
+
+    } catch (error) {
+        return res.status(200).json({ status: false, message: 'Product stock status not updated', error: error.message });
+    }
+});
+
 //excel export products
 const excelExportProducts = catchAsync(async(req,res)=>{
     try {
@@ -908,71 +996,6 @@ const excelExportProducts = catchAsync(async(req,res)=>{
 /*****************************************  Export and Import product for change price *********************/
 
 //export product list for update price change
-const excelExportProductsInfo_bkp = catchAsync(async(req,res)=>{
-    try {
-        const query = `SELECT
-                p.id,
-                p.name,
-                c.id as country_id,
-                c.country_name,
-                p.price,
-                p.maximum_order_place
-            FROM products p
-            LEFT JOIN product_images pi ON pi.product_id = p.id
-            LEFT JOIN country_data as c ON p.country_id = c.id
-            WHERE p.status = $1 and p.deleted_at IS NULL group by p.id,c.id,
-            p.maximum_order_place
-            ORDER BY p.id ASC
-        `;
-
-        const result = await db.query(query, [1]);
-        let list = result.rows;
-
-        // Create Excel file
-        const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet("Products");
-
-        worksheet.columns = [
-            { header: "Product_Id", key: "id", width: 10 },
-            { header: "Product_Name", key: "name", width: 25 },
-            { header: "Country_Name", key: "country_name", width: 20 },
-            { header: "Max_Quantity", key: "maximum_order_place", width: 20 },
-            { header: "Price", key: "price", width: 20 },
-        ];
-
-        list.forEach((row) => {
-            worksheet.addRow({
-                id: parseInt(row.id),
-                name: row.name,
-                country_name:row.country_name,
-                maximum_product_quantity: parseInt(row.maximum_product_quantity),
-                price: parseInt(row.price),
-            });
-        });
-
-
-        // Generate file name and path
-        const dateFormat = moment(new Date()).format('YYYY-MM-DD_HH-mm-ss');
-        const fileName = `price_change_product_list_${dateFormat}.xlsx`;
-        const filePath = path.join(process.cwd(), "public/uploads/exports_product", fileName);
-
-        // Ensure directory exists
-        if (!fs.existsSync(path.dirname(filePath))) {
-            fs.mkdirSync(path.dirname(filePath), { recursive: true });
-        }
-
-        // Save Excel file
-        await workbook.xlsx.writeFile(filePath);
-
-        // Send file path as response
-        return res.json({ success: true, data: BASE_URL+`/uploads/exports_product/${fileName}` });
-
-    } catch (error) {
-        return res.status(200).json({ success: false, message: "Internal Server Error",error:error.message });
-    }
-});
-
-//export product list in csv
 const excelExportProductsInfo = catchAsync(async(req,res)=>{
     try {
         const query = `
@@ -1136,18 +1159,18 @@ const importProductListwithPrice = catchAsync(async(req,res)=>{
 /***************************************** End  Export product for change price *********************/
 
 const changeProductPrice = catchAsync(async(req,res)=>{
+    await Promise.all([
+        body('product_id').notEmpty().withMessage('Product ID is required').run(req),
+        body('price').notEmpty().withMessage('Price is required').run(req),
+    ]);
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const formattedErrors = await formatValidationArray(errors);
+        return res.status(200).json({ status: false, errors: formattedErrors });
+    }
+
     try {
-        await Promise.all([
-            body('product_id').notEmpty().withMessage('Product ID is required').run(req),
-            body('price').notEmpty().withMessage('Price is required').run(req),
-        ]);
-
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            const formattedErrors = await formatValidationArray(errors);
-            return res.status(200).json({ status: false, errors: formattedErrors });
-        }
-
         const productId = parseInt(req.body.product_id);
         const price = parseInt(req.body.price);
 
@@ -1193,27 +1216,27 @@ const changeProductPrice = catchAsync(async(req,res)=>{
 });
 
 const getProductPriceLogs =catchAsync(async(req,res)=>{
+    await Promise.all([
+        body('product_id')
+            .notEmpty().withMessage('Product ID is required')
+            .run(req)
+    ]);
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const formattedErrors = await formatValidationArray(errors);
+        return res.status(200).json({ status: false, errors: formattedErrors });
+    }
+
     try
     {
-        await Promise.all([
-            body('product_id')
-                .notEmpty().withMessage('Product ID is required')
-                .run(req)
-        ]);
-
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            const formattedErrors = await formatValidationArray(errors);
-            return res.status(200).json({ status: false, errors: formattedErrors });
-        }
-
         const productId = parseInt(req.body.product_id);
 
         if (isNaN(productId)) {
             return res.status(200).json({ status: false, message: 'Invalid Product ID', error: '' });
         }
 
-        const query = `SELECT price, TO_CHAR(created_at, 'DD/Mon/YYYY') AS date_of_update
+        const query = `SELECT price, TO_CHAR(upload_date, 'DD-Mon-YYYY') AS date_of_update
             FROM products_price_logs
             WHERE product_id = ${productId} order by id desc`;
         const result=await db.query(query,[]);
@@ -1279,7 +1302,8 @@ const exportProductPriceLogs = catchAsync(async(req,res)=>{
         });
 
         // Generate file name and path
-        const fileName = `product_price_list.xlsx`;
+        const dateTime = moment().tz("Asia/Kolkata").format("YYYY-MM-DD_HH-mm-ss");;
+        const fileName = `product_price_log_list_${dateTime}.xlsx`;
         const filePath = path.join(process.cwd(), "public/uploads/exports", fileName);
 
         // Ensure directory exists
@@ -1298,55 +1322,67 @@ const exportProductPriceLogs = catchAsync(async(req,res)=>{
     }
 });
 
-const changeProductStockStatus = catchAsync(async (req, res) => {
-    try {
-        await Promise.all([
-            body('product_id').notEmpty().withMessage('Product ID is required').run(req),
-            body('product_stock_status').notEmpty().withMessage('Product stock status is required').run(req),
-        ]);
+const ChangePricelist = catchAsync(async(req,res)=>{
+    try
+    {
+        const {category_id,page,search} = req.body;
+        const query_params = [1];
+        let categories = '';
+        let pageCountQuery = '';
+        let searchQuery = ``;
 
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            const formattedErrors = await formatValidationArray(errors);
-            return res.status(200).json({ status: false, errors: formattedErrors });
-        }
+        if(category_id){
+            categories = `and p.category = $${query_params.length + 1}`;
+            query_params.push(category_id)
+         }
 
-        const productId = parseInt(req.body.product_id);
-        const product_stock_status = parseInt(req.body.product_stock_status);
+         if(page){
+            let pageCount = (page - 1) * 10;
+            pageCountQuery = `LIMIT $${query_params.length + 1} OFFSET $${query_params.length + 2}`
+            query_params.push(10,pageCount)
+         }
 
-        if (isNaN(productId) || isNaN(product_stock_status)) {
-            return res.status(200).json({ status: false, message: 'Invalid Product ID or Stock Status', error: '' });
-        }
+         if(search){
+            searchQuery = `and p.name ILIKE $${query_params.length + 1}`;
+            query_params.push(`%${search}%`);
+         }
 
-        const updated = await Product.update(
-            {
-                product_stock_status: product_stock_status,
-                updated_by: req.user.id,
-            },
-            {
-                where: { id: productId }
-            }
-        );
+        const query = `
+                SELECT
+                    p.id,
+                    p.name AS product_name,
+                    c.id as category_id,
+                    c.cat_name AS category_name,
+                    p.price::INTEGER AS current_price,
+                    COALESCE(pp.price, 0)::INTEGER AS price_yesterday
+                FROM
+                    products AS p
+                LEFT JOIN
+                    categories AS c ON p.category = c.id
+                LEFT JOIN
+                    products_price_logs AS pp ON p.id = pp.product_id
+                    AND pp.upload_date = CURRENT_DATE - INTERVAL '1 day'
+                WHERE
+                    p.status = $1 ${categories} ${searchQuery}
+                ORDER BY
+                p.id ASC ${pageCountQuery}
+                `;
 
-        if (!updated || updated[0] === 0) {
-            return res.status(200).json({ status: false, message: 'Product Stock status not updated', error: '' });
-        }
+                const result = await db.query(query, query_params);
 
-        const data = {
-            user_id: req.user.id,
-            table_id: productId,
-            table_name: 'products',
-            action: 'stock status to ' + product_stock_status,
-        };
 
-        adminLog(data);
-
-        return res.status(200).json({ status: true, message: 'Product stock status updated successfully' });
-
-    } catch (error) {
-        return res.status(200).json({ status: false, message: 'Product stock status not updated', error: error.message });
+        return res.status(200).json({ success: true,
+            total:(result.rowCount > 0) ? result.rowCount : 0,
+             message: "Fetch Change Price details successfully",
+            data:(result.rowCount > 0) ? result.rows : []
+        });
+    }
+    catch(error)
+    {
+        return res.status(200).json({ success: false, message: "Internal Server Error",error:error.message });
     }
 });
+
 /* Product API END ------------------------------- */
 
 export {
@@ -1373,5 +1409,6 @@ export {
     countries,
     getProductlist,
     excelExportProductsInfo,
-    importProductListwithPrice
+    importProductListwithPrice,
+    ChangePricelist
 }

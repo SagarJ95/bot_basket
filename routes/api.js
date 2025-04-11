@@ -66,7 +66,7 @@ const StorageFile = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const now = new Date();
-    const dateTime = moment().tz("Asia/Kolkata").format("YYYY-MM-DD_HH-mm-ss");;
+    const dateTime = moment().tz("Asia/Kolkata").format("YYYY-MM-DD_HH-mm-ss");
 
     const filename = `${dateTime}_${file.originalname}`;
     cb(null, filename);
@@ -151,6 +151,7 @@ router.post("/excelExportProducts", authenticate, masterController.excelExportPr
 router.post("/changeProductPrice", authenticate, masterController.changeProductPrice);
 router.post("/getProductPriceLogs", authenticate, masterController.getProductPriceLogs);
 router.post("/exportProductPriceLogs", authenticate, masterController.exportProductPriceLogs);
+router.post("/ChangePricelist",authenticate,masterController.ChangePricelist)
 router.post("/changeProductStockStatus", authenticate, masterController.changeProductStockStatus);
 router.post('/getProductlist',authenticate,masterController.getProductlist)
 

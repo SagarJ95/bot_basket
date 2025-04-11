@@ -31,14 +31,24 @@ const getOrderlist = catchAsync(async (req, res) => {
     }
 
     try {
-        const {order_status} = req.body
+        const {order_status, page , search} = req.body
         const query_params = [order_status,1,1];
+        let pageCountQuery = '';
+        let searchQuery = '';
 
-        //get total count
-        const totalCount = await db.query(`select COUNT(id) FROM orders WHERE status = $1`,[order_status])
+        if(page){
+            let pageCount = (page - 1) * 10;
+            pageCountQuery = `LIMIT $${query_params.length + 1} OFFSET $${query_params.length + 2}`
+            query_params.push(10,pageCount)
+         }
+
+         if (search) {
+            searchQuery = `AND o.customer_name ILIKE $${query_params.length + 1}`;
+            query_params.push(`%${search}%`);
+         }
 
         const query = `select o.id as order_id,o.order_ref_id,o.customer_name,TO_CHAR(o.created_at,'FMDDth Month YYYY') as order_date,
-        o.status,SUM(oi.quantity * oi.price::numeric) as total_price,
+        o.order_status,SUM(oi.quantity * oi.price::numeric) as total_price,
         CASE
             WHEN o.status = 1 THEN 'Pending'
             WHEN o.status = 2 THEN 'Confirmed'
@@ -49,15 +59,16 @@ const getOrderlist = catchAsync(async (req, res) => {
         END AS status_name,
         TO_CHAR(o.delivery_date,'FMDDth Month YYYY') as delivery_date
         from orders AS o
-        LEFt JOIN order_items as oi ON o.id = oi.order_id AND oi.order_item_status = $2
-        where o.order_status = $1 and o.status = $3
-        GROUP BY o.id,o.order_ref_id,o.customer_name,o.created_at, o.status, o.delivery_date`;
+        LEFT JOIN order_items as oi ON o.id = oi.order_id AND oi.order_item_status = $2
+        where o.order_status = $1 and o.status = $3 ${searchQuery}
+        GROUP BY o.id,o.order_ref_id,o.customer_name,o.created_at, o.order_status, o.delivery_date
+        ${pageCountQuery}`;
 
         const result = await db.query(query,query_params)
 
         return res.status(200).json({
             status: true,
-            total:(totalCount) ? totalCount.rowCount : 0,
+            total:(result.rowCount > 0) ? parseInt(result.rowCount) : 0,
             message: 'Fetch Order details Successfully',
             data:(result.rowCount > 0) ? result.rows : []
           });
