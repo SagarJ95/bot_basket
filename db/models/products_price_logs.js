@@ -17,6 +17,18 @@ const products_price_logs = sequelize.define(
     price: {
       type: DataTypes.INTEGER
     },
+    country_id: {
+      type: DataTypes.INTEGER
+    },
+    country_name: {
+      type: DataTypes.STRING
+    },
+    maximum_quantity:{
+      type:DataTypes.STRING
+    },
+    upload_date:{
+      type:DataTypes.DATE
+    },
     created_by: {
       type: DataTypes.INTEGER
     },

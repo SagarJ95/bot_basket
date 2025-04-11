@@ -11,7 +11,7 @@ import * as signInController from "../controllers/admin/signInController.js";
 import * as masterController from "../controllers/admin/masterController.js";
 import * as customerController from "../controllers/admin/customerController.js";
 import * as orderController from "../controllers/admin/orderManagementController.js";
-
+import moment from "moment";
 
 const router = Router();
 
@@ -38,14 +38,12 @@ const file_storage = diskStorage({
 });
 
 //uploadCategory
-const categorytorage = multer.diskStorage({
+const StorageFile = multer.diskStorage({
 
   destination: (req, file, cb) => {
     let uploadPath;
 
     if (file.fieldname === 'icon') {
-        uploadPath = './public/uploads/category';
-    } else if (file.fieldname === 'green_icon') {
         uploadPath = './public/uploads/category';
     }
     else if (file.fieldname === 'product_images') {
@@ -53,6 +51,8 @@ const categorytorage = multer.diskStorage({
     } else if(file.fieldname === 'invoice'){
       uploadPath = './public/uploads/invoice';
 
+    }else if(file.fieldname === 'csv_file'){
+      uploadPath = './public/uploads/import_product_update_price';
     }
     else {
       return cb(new Error('Invalid fieldname'), null);
@@ -63,14 +63,17 @@ const categorytorage = multer.diskStorage({
     }
 
     cb(null, uploadPath);
-    //cb(null, "public/uploads/category/"); // Files will be stored in 'uploads' folder
   },
   filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname)); // Unique filename with timestamp
+    const now = new Date();
+    const dateTime = moment().tz("Asia/Kolkata").format("YYYY-MM-DD_HH-mm-ss");;
+
+    const filename = `${dateTime}_${file.originalname}`;
+    cb(null, filename);
   },
 });
 
-const upload = multer({ storage: categorytorage });
+const upload = multer({ storage: StorageFile });
 const upload_profile = multer({ storage: file_storage });
 
 
@@ -150,6 +153,13 @@ router.post("/getProductPriceLogs", authenticate, masterController.getProductPri
 router.post("/exportProductPriceLogs", authenticate, masterController.exportProductPriceLogs);
 router.post("/changeProductStockStatus", authenticate, masterController.changeProductStockStatus);
 router.post('/getProductlist',authenticate,masterController.getProductlist)
+
+//export product list for price change
+router.post("/excelExportProductsInfo", authenticate, masterController.excelExportProductsInfo)
+
+//import product list with update price and store update price in log table
+router.post("/importProductListwithPrice",authenticate,
+  upload.fields([{ name: 'csv_file', maxCount: 1 }]),masterController.importProductListwithPrice)
 
 /* Customers */
 router.post("/getCustomers", authenticate, customerController.getCustomers);

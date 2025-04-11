@@ -18,13 +18,17 @@ import sequelize from "../../config/database.js";
 import moment from 'moment';
 import db from "../../config/db.js";
 import adminLog from '../../helpers/admin_log.js';
-
+import csvjson from 'csvjson'
 import ExcelJS  from "exceljs";
 import path  from "path";
 import fs  from "fs";
+import { format } from "fast-csv";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3848';
-
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 /* Category API Start ------------------------------- */
 
 // GET all categories (datatables)
@@ -386,7 +390,7 @@ const excelExportCategory=catchAsync( async(req,res)=>{
         await workbook.xlsx.writeFile(filePath);
 
         // Send file path as response
-        return res.status(200).json({ success: true, filePath: BASE_URL+`/uploads/exports/${fileName}` });
+        return res.status(200).json({ success: true, data: BASE_URL+`/uploads/exports/${fileName}` });
 
     } catch (error) {
         return res.status(200).json({ success: false, message: "Internal Server Error" ,error:error.message});
@@ -566,8 +570,6 @@ const createProduct = catchAsync(async (req, res) => {
 });
 
 const updateProduct = catchAsync(async (req, res) => {
-    const productId = req.body.product_id;
-
     // Apply validation rules
     await Promise.all([
         body('name').notEmpty().withMessage('Name is required').run(req),
@@ -577,7 +579,9 @@ const updateProduct = catchAsync(async (req, res) => {
 
     const errors = validationResult(req);
 
+
     try {
+        const productId = req.body.product_id;
         const body = req.body;
         const files = req.files;
 
@@ -666,19 +670,21 @@ const updateProduct = catchAsync(async (req, res) => {
 });
 
 const getProductById = catchAsync(async (req, res) => {
+    await Promise.all([
+        body('id')
+            .notEmpty().withMessage('Product ID is required')
+            .run(req)
+    ]);
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        // const formattedErrors = await formatValidationArray(errors);
+        // return res.status(200).json({ status: false, errors: formattedErrors });
+        const error_message = errors.array()[0].msg;
+        throw new AppError(error_message, 200, errors);
+    }
+
     try {
-        await Promise.all([
-            body('id')
-                .notEmpty().withMessage('Product ID is required')
-                .run(req)
-        ]);
-
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            const formattedErrors = await formatValidationArray(errors);
-            return res.status(200).json({ status: false, errors: formattedErrors });
-        }
-
         const productId = parseInt(req.body.id);
 
         if (isNaN(productId)) {
@@ -691,13 +697,9 @@ const getProductById = catchAsync(async (req, res) => {
                 p.name,
                 p.slug,
                 p.description,
-                p.minimum_order_place,
-                p.maximum_order_place,
-                p.price,
                 p.category,
-                p.ordering,
                 p.status,
-
+                p.country_id,
                 COALESCE(
                     JSON_AGG(
                         CASE
@@ -721,7 +723,7 @@ const getProductById = catchAsync(async (req, res) => {
         return res.status(200).json({
             status: true,
             message: 'Product Found',
-            data: result.rows[0]
+            data: result.rows
         });
 
     } catch (error) {
@@ -730,19 +732,19 @@ const getProductById = catchAsync(async (req, res) => {
 });
 
 const deleteProductById = catchAsync(async (req, res) => {
+    await Promise.all([
+        body('id')
+            .notEmpty().withMessage('Product ID is required')
+            .run(req)
+    ]);
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const formattedErrors = await formatValidationArray(errors);
+        return res.status(200).json({ status: false, errors: formattedErrors });
+    }
+
     try {
-        await Promise.all([
-            body('id')
-                .notEmpty().withMessage('Product ID is required')
-                .run(req)
-        ]);
-
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            const formattedErrors = await formatValidationArray(errors);
-            return res.status(200).json({ status: false, errors: formattedErrors });
-        }
-
         const productId = parseInt(req.body.id);
 
         if (isNaN(productId)) {
@@ -774,18 +776,18 @@ const deleteProductById = catchAsync(async (req, res) => {
 });
 
 const updateProductStatusById = catchAsync(async (req, res) => {
+    await Promise.all([
+        body('id').notEmpty().withMessage('Product ID is required').run(req),
+        body('status').notEmpty().withMessage('status is required').run(req),
+    ]);
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const error_message = errors.array()[0].msg;
+        throw new AppError(error_message, 200, errors);
+    }
+
     try {
-        await Promise.all([
-            body('id').notEmpty().withMessage('Product ID is required').run(req),
-            body('status').notEmpty().withMessage('status is required').run(req),
-        ]);
-
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            const formattedErrors = await formatValidationArray(errors);
-            return res.status(200).json({ status: false, errors: formattedErrors });
-        }
-
         const productId = parseInt(req.body.id);
         const status = parseInt(req.body.status);
 
@@ -833,12 +835,9 @@ const excelExportProducts = catchAsync(async(req,res)=>{
                 p.name,
                 p.slug,
                 p.description,
-                p.minimum_order_place,
-                p.maximum_order_place,
-                p.price,
                 ci.cat_name as category,
                 p.status,
-
+                c.country_name,
                 COALESCE(
                     JSON_AGG(
                         CASE
@@ -850,10 +849,9 @@ const excelExportProducts = catchAsync(async(req,res)=>{
             FROM products p
             LEFT JOIN product_images pi ON pi.product_id = p.id
             LEFT JOIN categories ci ON p.category = ci.id
-            WHERE p.deleted_at IS NULL group by p.id,ci.cat_name
+            LEFT JOIN country_data as c ON p.country_id = c.id
+            WHERE p.deleted_at IS NULL group by p.id,ci.cat_name,c.country_name
         `;
-
-        //return res.json(query)
 
         const result = await db.query(query, []);
         let list = result.rows;
@@ -867,10 +865,8 @@ const excelExportProducts = catchAsync(async(req,res)=>{
             { header: "Product Name", key: "name", width: 25 },
             { header: "Slug", key: "slug", width: 25 },
             { header: "Description", key: "description", width: 40 },
-            { header: "Min Order", key: "minimum_order_place", width: 15 },
-            { header: "Max Order", key: "maximum_order_place", width: 15 },
-            { header: "Price", key: "price", width: 10 },
             { header: "Category", key: "category", width: 15 },
+            { header: "Country Name", key: "country_name", width: 20 },
             { header: "Status", key: "status", width: 10 },
             { header: "Images", key: "product_images", width: 40 }
         ];
@@ -881,9 +877,7 @@ const excelExportProducts = catchAsync(async(req,res)=>{
                 name: row.name,
                 slug: row.slug,
                 description: row.description,
-                minimum_order_place: row.minimum_order_place,
-                maximum_order_place: row.maximum_order_place,
-                price: row.price,
+                country_name:row.country_name,
                 category: row.category,
                 status: row.status == 1 ? "Active" : "Inactive",
                 product_images: (row.product_images || []).join(", ")
@@ -904,12 +898,242 @@ const excelExportProducts = catchAsync(async(req,res)=>{
         await workbook.xlsx.writeFile(filePath);
 
         // Send file path as response
-        return res.json({ success: true, filePath: BASE_URL+`/uploads/exports/${fileName}` });
+        return res.json({ success: true, data: BASE_URL+`/uploads/exports/${fileName}` });
 
     } catch (error) {
         return res.status(200).json({ success: false, message: "Internal Server Error",error:error.message });
     }
 });
+
+/*****************************************  Export and Import product for change price *********************/
+
+//export product list for update price change
+const excelExportProductsInfo_bkp = catchAsync(async(req,res)=>{
+    try {
+        const query = `SELECT
+                p.id,
+                p.name,
+                c.id as country_id,
+                c.country_name,
+                p.price,
+                p.maximum_order_place
+            FROM products p
+            LEFT JOIN product_images pi ON pi.product_id = p.id
+            LEFT JOIN country_data as c ON p.country_id = c.id
+            WHERE p.status = $1 and p.deleted_at IS NULL group by p.id,c.id,
+            p.maximum_order_place
+            ORDER BY p.id ASC
+        `;
+
+        const result = await db.query(query, [1]);
+        let list = result.rows;
+
+        // Create Excel file
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet("Products");
+
+        worksheet.columns = [
+            { header: "Product_Id", key: "id", width: 10 },
+            { header: "Product_Name", key: "name", width: 25 },
+            { header: "Country_Name", key: "country_name", width: 20 },
+            { header: "Max_Quantity", key: "maximum_order_place", width: 20 },
+            { header: "Price", key: "price", width: 20 },
+        ];
+
+        list.forEach((row) => {
+            worksheet.addRow({
+                id: parseInt(row.id),
+                name: row.name,
+                country_name:row.country_name,
+                maximum_product_quantity: parseInt(row.maximum_product_quantity),
+                price: parseInt(row.price),
+            });
+        });
+
+
+        // Generate file name and path
+        const dateFormat = moment(new Date()).format('YYYY-MM-DD_HH-mm-ss');
+        const fileName = `price_change_product_list_${dateFormat}.xlsx`;
+        const filePath = path.join(process.cwd(), "public/uploads/exports_product", fileName);
+
+        // Ensure directory exists
+        if (!fs.existsSync(path.dirname(filePath))) {
+            fs.mkdirSync(path.dirname(filePath), { recursive: true });
+        }
+
+        // Save Excel file
+        await workbook.xlsx.writeFile(filePath);
+
+        // Send file path as response
+        return res.json({ success: true, data: BASE_URL+`/uploads/exports_product/${fileName}` });
+
+    } catch (error) {
+        return res.status(200).json({ success: false, message: "Internal Server Error",error:error.message });
+    }
+});
+
+//export product list in csv
+const excelExportProductsInfo = catchAsync(async(req,res)=>{
+    try {
+        const query = `
+      SELECT
+        p.id,
+        p.name,
+        c.id as country_id,
+        c.country_name,
+        p.price,
+        p.maximum_order_place
+      FROM products p
+      LEFT JOIN product_images pi ON pi.product_id = p.id
+      LEFT JOIN country_data as c ON p.country_id = c.id
+      WHERE p.status = $1 AND p.deleted_at IS NULL
+      GROUP BY p.id, c.id, p.maximum_order_place
+      ORDER BY p.id ASC
+    `;
+
+    const result = await db.query(query, [1]);
+    const list = result?.rows ?? [];
+
+    const dateFormat = moment().format("YYYY-MM-DD_HH-mm-ss");
+    const fileName = `price_change_product_list_${dateFormat}.csv`;
+    const exportDir = path.join(process.cwd(), "public", "uploads", "exports_product");
+    const filePath = path.join(exportDir, fileName);
+
+    // Ensure export directory exists
+    if (!fs.existsSync(exportDir)) {
+      fs.mkdirSync(exportDir, { recursive: true });
+    }
+
+    const writeStream = fs.createWriteStream(filePath);
+    const csvStream = format({ headers: true });
+
+    csvStream.pipe(writeStream);
+
+    list.forEach(({ id, name, country_name, maximum_order_place, price }) => {
+      csvStream.write({
+        Product_Id: id,
+        Product_Name: name,
+        Country_Name: country_name,
+        Max_Quantity: maximum_order_place,
+        Price: price,
+      });
+    });
+
+    csvStream.end();
+
+    writeStream.on("finish", () => {
+      res.json({
+        success: true,
+        data: `${BASE_URL}/uploads/exports_product/${fileName}`,
+      });
+    });
+
+    } catch (error) {
+        return res.status(200).json({ success: false, message: "Internal Server Error",error:error.message });
+    }
+});
+
+//import product list for update price and store product log
+const importProductListwithPrice = catchAsync(async(req,res)=>{
+    try{
+
+        const uploadedFile = req.files['csv_file']?.[0];
+        if (!uploadedFile) {
+        return res.status(400).json({ status: false, message: "No file uploaded" });
+        }
+
+        const data = fs.readFileSync(uploadedFile.path, { encoding: 'utf8' });
+        const csvData = csvjson.toObject(data);
+
+        const expectedHeaders = [
+            "Product_Id",
+            "Product_Name",
+            "Country_Name",
+            "Max_Quantity",
+            "Price"
+          ];
+
+          if (csvData.length === 0) {
+            return res.status(200).json({
+              code: 2,
+              status: false,
+              msg: "Data Not Available in CSV",
+            });
+          }
+
+          const actualHeaders = Object.keys(csvData[0] || {});
+          const isValidFile = expectedHeaders.every(header =>
+            actualHeaders.includes(header)
+          );
+
+          if (!isValidFile) {
+            return res.status(200).json({
+              status: false,
+              msg: "Invalid CSV format. Expected headers: " + expectedHeaders.join(", "),
+            });
+          }
+
+          for (const record of csvData) {
+            const product_id = record["Product_Id"];
+            const max_quantity = (record["Max_Quantity"]) ? record["Max_Quantity"] : 0;
+            const price = (record["Price"]) ? record["Price"] : 0;
+
+            //update the price and maximum quantity in products table
+            await db.query(
+              `UPDATE products SET maximum_order_place = $1, price = $2, updated_by = $3, updated_at = $4 WHERE id = $5`,
+              [max_quantity, price, req.user.id,new Date(),product_id]
+            );
+
+            //check country_name from table country_data
+            const country_name = record["Country_Name"];
+            const country_data = await db.query(`SELECT * FROM country_data WHERE country_name = $1`,
+                [country_name]);
+            const getCountryId = (country_data.rowCount > 0) ? country_data.rows[0].id :""
+
+            //insert or update product_id,price,country_id,price,upload_date,maximum_quantity,upload_date
+            const storeProductId = (product_id) ? parseInt(product_id) : 0;
+            const storePrice = (price) ? parseInt(price) : 0;
+            const storeCountryId = (getCountryId) ? parseInt(getCountryId) : null;
+            const storeCountryName = (country_name) ? country_name : null;
+            const storeMaxQuantity = (max_quantity) ? parseInt(max_quantity) : 0;
+            const currentDate = moment(new Date()).format('YYYY-MM-DD');
+
+            const checkProductAvailbleInProductLog = await db.query(
+                `SELECT * FROM products_price_logs WHERE product_id = $1  AND upload_date = $2`,
+                [storeProductId,currentDate]
+            )
+
+            if(checkProductAvailbleInProductLog.rowCount > 0){
+                //update the price and quantity in product_price_logs
+                await db.query(
+                    `UPDATE products_price_logs SET maximum_quantity = $1 , price = $2, updated_by = $3 , updated_at = $4
+                    WHERE product_id = $5 AND upload_date = $6`, [storeMaxQuantity, storePrice, req.user.id,new Date(),storeProductId, moment(new Date()).format('YYYY-MM-DD')]
+                    );
+            }else{
+                //Insert the price and quantity in product_price_logs
+                 await db.query(
+                `INSERT INTO products_price_logs (product_id,price,country_id,country_name,upload_date,maximum_quantity
+                ,created_by,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, [storeProductId, storePrice, storeCountryId,storeCountryName, moment(new Date()).format('YYYY-MM-DD'), storeMaxQuantity, req
+                    .user.id, new Date()]
+                );
+            }
+
+          }
+
+          return res.status(200).json({
+            status: true,
+            msg: "Product list updated successfully",
+          });
+
+
+         // console.log("importData>>",csvData)
+    }catch(e){
+        return res.status(200).json({ success: false, message: "Internal Server Error",
+            error:e.message });
+    }
+})
+
+/***************************************** End  Export product for change price *********************/
 
 const changeProductPrice = catchAsync(async(req,res)=>{
     try {
@@ -1147,5 +1371,7 @@ export {
     exportProductPriceLogs,
     changeProductStockStatus,
     countries,
-    getProductlist
+    getProductlist,
+    excelExportProductsInfo,
+    importProductListwithPrice
 }
