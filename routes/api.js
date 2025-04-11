@@ -9,32 +9,33 @@ import * as userManagementController from "../controllers/admin/userManagementCo
 import * as signInController from "../controllers/admin/signInController.js";
 // import * as adminController from "../controllers/admin/adminController.js";
 import * as masterController from "../controllers/admin/masterController.js";
+import * as dashboardController from "../controllers/admin/dashbordController.js";
+
 import * as customerController from "../controllers/admin/customerController.js";
 import * as orderController from "../controllers/admin/orderManagementController.js";
-
 
 const router = Router();
 
 const file_storage = diskStorage({
   destination: function (req, file, cb) {
-      let uploadPath;
+    let uploadPath;
 
-      if (file.fieldname === 'photo') {
-          uploadPath = './public/uploads/masters';
-      }else {
-        return cb(new Error('Invalid fieldname'), null);
-      }
+    if (file.fieldname === "photo") {
+      uploadPath = "./public/uploads/masters";
+    } else {
+      return cb(new Error("Invalid fieldname"), null);
+    }
 
-      if (!existsSync(uploadPath)) {
-          mkdirSync(uploadPath, { recursive: true });
-      }
+    if (!existsSync(uploadPath)) {
+      mkdirSync(uploadPath, { recursive: true });
+    }
 
-      cb(null, uploadPath);
+    cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      cb(null, file.fieldname + '-' + uniqueSuffix + extname(file.originalname));
-  }
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, file.fieldname + "-" + uniqueSuffix + extname(file.originalname));
+  },
 });
 
 // const upload = multer({
@@ -51,27 +52,23 @@ const file_storage = diskStorage({
 
 //uploadCategory
 const categorytorage = multer.diskStorage({
-
   destination: (req, file, cb) => {
     let uploadPath;
 
-    if (file.fieldname === 'icon') {
-        uploadPath = './public/uploads/category';
-    } else if (file.fieldname === 'green_icon') {
-        uploadPath = './public/uploads/category';
-    }
-    else if (file.fieldname === 'product_images') {
-        uploadPath = './public/uploads/product_images';
-    } else if(file.fieldname === 'invoice'){
-      uploadPath = './public/uploads/invoice';
-
-    }
-    else {
-      return cb(new Error('Invalid fieldname'), null);
+    if (file.fieldname === "icon") {
+      uploadPath = "./public/uploads/category";
+    } else if (file.fieldname === "green_icon") {
+      uploadPath = "./public/uploads/category";
+    } else if (file.fieldname === "product_images") {
+      uploadPath = "./public/uploads/product_images";
+    } else if (file.fieldname === "invoice") {
+      uploadPath = "./public/uploads/invoice";
+    } else {
+      return cb(new Error("Invalid fieldname"), null);
     }
 
     if (!existsSync(uploadPath)) {
-        mkdirSync(uploadPath, { recursive: true });
+      mkdirSync(uploadPath, { recursive: true });
     }
 
     cb(null, uploadPath);
@@ -85,19 +82,22 @@ const categorytorage = multer.diskStorage({
 const upload = multer({ storage: categorytorage });
 //const upload_product = multer({ storage: categorytorage });
 
-
 const compressImage = async (req, res, next) => {
-  if (req.file && req.file.mimetype.startsWith('image')) {
-      const outputFilePath = req.file.path.replace(extname(req.file.filename), '-compressed.jpg');
-      try {
-          await sharp(req.file.path)
-              .jpeg({ quality: 80 })
-              .toFile(outputFilePath);
-          req.file.path = outputFilePath;
-          req.file.filename = req.file.filename.replace(extname(req.file.filename), '-compressed.jpg');
-      } catch (err) {
-          return next(err);
-      }
+  if (req.file && req.file.mimetype.startsWith("image")) {
+    const outputFilePath = req.file.path.replace(
+      extname(req.file.filename),
+      "-compressed.jpg"
+    );
+    try {
+      await sharp(req.file.path).jpeg({ quality: 80 }).toFile(outputFilePath);
+      req.file.path = outputFilePath;
+      req.file.filename = req.file.filename.replace(
+        extname(req.file.filename),
+        "-compressed.jpg"
+      );
+    } catch (err) {
+      return next(err);
+    }
   }
   next();
 };
@@ -110,9 +110,7 @@ router.post("/sign-in", signInController.userLogin);
 // GET user logout
 router.get("/sign-out", authenticate, signInController.userLogout);
 
-
 //reset Password
-
 
 /* Users API Start ----------------------------------- */
 
@@ -132,7 +130,9 @@ router
   .patch(authenticate, userManagementController.updateUserById)
   .delete(authenticate, userManagementController.deleteUserById);
 
-router.route("/users_change_status/:id").patch(authenticate, userManagementController.activeUserById);
+router
+  .route("/users_change_status/:id")
+  .patch(authenticate, userManagementController.activeUserById);
 
 /* Users API End ------------------------------------ */
 
@@ -140,48 +140,121 @@ router.route("/users_change_status/:id").patch(authenticate, userManagementContr
 // POST add new category || GET get all categories
 router.post("/getCategories", authenticate, masterController.getCategories);
 
-router.post("/createCategory",authenticate,upload.fields([
-    { name: 'icon', maxCount: 1 }]) , masterController.createCategory);
+router.post(
+  "/createCategory",
+  authenticate,
+  upload.fields([{ name: "icon", maxCount: 1 }]),
+  masterController.createCategory
+);
 router.post("/getCategoryById", authenticate, masterController.getCategoryById);
-router.post("/updateCategoryById", authenticate,  upload.fields([
-    { name: 'icon', maxCount: 1 }]),masterController.updateCategoryById);
-router.post("/deleteCategoryById", authenticate, masterController.deleteCategoryById);
-router.post("/excelExportCategory", authenticate, masterController.excelExportCategory);
+router.post(
+  "/updateCategoryById",
+  authenticate,
+  upload.fields([{ name: "icon", maxCount: 1 }]),
+  masterController.updateCategoryById
+);
+router.post(
+  "/deleteCategoryById",
+  authenticate,
+  masterController.deleteCategoryById
+);
+router.post(
+  "/excelExportCategory",
+  authenticate,
+  masterController.excelExportCategory
+);
 //router.patch('/updateCategoryOrder',authenticate,masterController.updateCategoryOrder)
 
 /* Category API End ------------------------------------ */
-router.post("/createProduct",upload.fields([
-    { name: 'product_images', maxCount: 5 }]) ,authenticate, masterController.createProduct)
-router.post("/updateProduct",upload.fields([
-    { name: 'product_images', maxCount: 5 }]) ,authenticate, masterController.updateProduct)
+router.post(
+  "/createProduct",
+  upload.fields([{ name: "product_images", maxCount: 5 }]),
+  authenticate,
+  masterController.createProduct
+);
+router.post(
+  "/updateProduct",
+  upload.fields([{ name: "product_images", maxCount: 5 }]),
+  authenticate,
+  masterController.updateProduct
+);
 router.post("/getProductById", authenticate, masterController.getProductById);
-router.post("/deleteProductById", authenticate, masterController.deleteProductById);
-router.post("/updateProductStatusById", authenticate, masterController.updateProductStatusById);
-router.post("/excelExportProducts", authenticate, masterController.excelExportProducts);
-router.post("/changeProductPrice", authenticate, masterController.changeProductPrice);
-router.post("/getProductPriceLogs", authenticate, masterController.getProductPriceLogs);
-router.post("/exportProductPriceLogs", authenticate, masterController.exportProductPriceLogs);
-router.post("/changeProductStockStatus", authenticate, masterController.changeProductStockStatus);
-
+router.post(
+  "/deleteProductById",
+  authenticate,
+  masterController.deleteProductById
+);
+router.post(
+  "/updateProductStatusById",
+  authenticate,
+  masterController.updateProductStatusById
+);
+router.post(
+  "/excelExportProducts",
+  authenticate,
+  masterController.excelExportProducts
+);
+router.post(
+  "/changeProductPrice",
+  authenticate,
+  masterController.changeProductPrice
+);
+router.post(
+  "/getProductPriceLogs",
+  authenticate,
+  masterController.getProductPriceLogs
+);
+router.post(
+  "/exportProductPriceLogs",
+  authenticate,
+  masterController.exportProductPriceLogs
+);
+router.post(
+  "/changeProductStockStatus",
+  authenticate,
+  masterController.changeProductStockStatus
+);
 
 /* Customers */
 router.post("/getCustomers", authenticate, customerController.getCustomers);
-router.post("/exportCustomers", authenticate, customerController.exportCustomers);
-router.post('/getParticularCustomerInfo',authenticate,customerController.getParticularCustomerInfo)
-router.post('/update_customer_info',authenticate,customerController.update_customer_info)
-router.post('/add_customer',authenticate,customerController.add_customer)
-router.post('/activationStatus',authenticate,customerController.activationStatus)
+router.post(
+  "/exportCustomers",
+  authenticate,
+  customerController.exportCustomers
+);
+router.post(
+  "/getParticularCustomerInfo",
+  authenticate,
+  customerController.getParticularCustomerInfo
+);
+router.post(
+  "/update_customer_info",
+  authenticate,
+  customerController.update_customer_info
+);
+router.post("/add_customer", authenticate, customerController.add_customer);
+router.post(
+  "/activationStatus",
+  authenticate,
+  customerController.activationStatus
+);
 
 /* Permission API Start ----------------------------------- */
 
 // GET role by id
-router.route("/permission_role/:id").get(authenticate, userManagementController.getRoleBasedUserById);
+router
+  .route("/permission_role/:id")
+  .get(authenticate, userManagementController.getRoleBasedUserById);
 
 // POST add permission based on role id and user id
-router.route("/permission_role").post(authenticate, userManagementController.savePermissions);
+router
+  .route("/permission_role")
+  .post(authenticate, userManagementController.savePermissions);
 
 // GET permission based on role id and user id
-router.route("/getPermissions").post(authenticate, userManagementController.getPermissions);
+router
+  .route("/getPermissions")
+  .post(authenticate, userManagementController.getPermissions);
 
 /* Permission API End ------------------------------------ */
 
@@ -208,8 +281,20 @@ router
 /* Order Management */
 router.post("/getOrderlist", authenticate, orderController.getOrderlist);
 router.post("/changeOrderStatus", authenticate, orderController.changeStatus);
-router.post("/orderViewDetails", authenticate, orderController.orderViewDetails);
-router.post('/orderEditDetails',authenticate,upload.fields([
-  { name: 'invoice', maxCount: 1 }]),orderController.orderEditDetails)
+router.post(
+  "/orderViewDetails",
+  authenticate,
+  orderController.orderViewDetails
+);
+router.post(
+  "/orderEditDetails",
+  authenticate,
+  upload.fields([{ name: "invoice", maxCount: 1 }]),
+  orderController.orderEditDetails
+);
+
+//dashbord
+
+router.post("/dashbord", authenticate, dashboardController.dashboardController);
 
 export default router;

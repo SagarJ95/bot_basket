@@ -424,19 +424,7 @@ async function sendEmail(email, customer_name) {
       pass: process.env.MAIL_PASSWORD,
     },
   });
-  // const transport = nodemailer.createTransport({
-  //   host: process.env.MAIL_HOST,
-  //   port: process.env.MAIL_PORT, // Use port 587 for STARTTLS
-  //   secure: false, // Set to false since STARTTLS is being used
-  //   auth: {
-  //     user: process.env.MAIL_USERNAME,
-  //     pass: process.env.MAIL_PASSWORD,
-  //   },
-  //   tls: {
-  //     // This is optional but can help avoid some TLS-related issues.
-  //     rejectUnauthorized: false,
-  //   },
-  // });
+
   const mailconfig = {
     from: `${process.env.MAIL_USERNAME}`,
     to: email.toLowerCase(),
@@ -824,7 +812,6 @@ async function sendEmail(email, customer_name) {
 /******************* End Forget password************************ */
 
 //reset password
-
 const resetpassword = catchAsync(async (req, res) => {
   await Promise.all([
     body("old_password")
