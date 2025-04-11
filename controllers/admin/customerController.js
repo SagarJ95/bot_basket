@@ -11,16 +11,33 @@ import ExcelJS  from "exceljs";
 import path  from "path";
 import fs  from "fs";
 import Customer from "../../db/models/customers.js";
+import adminLog from '../../helpers/admin_log.js';
 import customer_address from "../../db/models/customer_address.js";
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3848';
 
 /* Category API Start ------------------------------- */
 
-// GET all categories (datatables)
+// GET all customer (datatables)
 const getCustomers = catchAsync(async (req, res) => {
     try {
+        const {page, search} = req.body
+
         const query_params = [1,1,1];
+
+        let pageCountQuery = '';
+        let searchQuery = ``;
+
+         if(page){
+            let pageCount = (page - 1) * 10;
+            pageCountQuery = `LIMIT $${query_params.length + 1} OFFSET $${query_params.length + 2}`
+            query_params.push(10,pageCount)
+         }
+
+         if (search) {
+            searchQuery = `AND CONCAT(c.first_name, ' ', c.last_name) ILIKE $${query_params.length + 1}`;
+            query_params.push(`%${search}%`);
+         }
 
         const query = `select c.id,CONCAT(c.first_name,' ',c.last_name) as customer_name,
         c.phone_no as contact_no,c.whatsapp_no,COUNT(DISTINCT o.id) as total_order,
@@ -28,14 +45,16 @@ const getCustomers = catchAsync(async (req, res) => {
         TO_CHAR(MAX(o.created_at), 'FMDDth Month YYYY') AS last_order_date
         from customers as c
         LEFT JOIN orders as o ON c.id = o.customer_id AND o.status = $2
-        LEFt JOIN order_items as oi ON o.id = oi.order_id AND o.status = $3
-        where c.status = $1
-        GROUP BY c.first_name,c.last_name,c.phone_no,c.whatsapp_no,c.id`;
+        LEFT JOIN order_items as oi ON o.id = oi.order_id AND o.status = $3
+        where c.status = $1 ${searchQuery}
+        GROUP BY c.first_name,c.last_name,c.phone_no,c.whatsapp_no,c.id
+        order By c.id desc ${pageCountQuery}`;
 
         const result = await db.query(query,query_params)
 
         return res.status(200).json({
             status: true,
+            total:(result.rowCount > 0) ? result.rowCount : 0,
             message: 'Fetch customer details Successfully',
             data:(result.rowCount > 0) ? result.rows : []
           });
@@ -198,14 +217,14 @@ const update_customer_info = catchAsync(async (req, res) => {
 
     try{
 
-        const {first_name,last_name,contact_number,whatsapp_no,email,password,enable_email_notification,address} = req.body;
+        const {first_name,last_name,contact_number,whatsapp_number,email,password,enable_email_notification,address,customer_id} = req.body;
         const files = req.files || {};
+
         let addressInfo;
         if (typeof address == 'string') {
           addressInfo = JSON.parse(address);
         }
 
-        const customer_id = req.user.id;
 
         const getCustomerInfo = await db.query(`
                 SELECT password
@@ -232,7 +251,7 @@ const update_customer_info = catchAsync(async (req, res) => {
           first_name:first_name,
           last_name:last_name,
           phone_no:contact_number,
-          whatsapp_no:whatsapp_no,
+          whatsapp_no:whatsapp_number,
           email:email,
           password:hashPassword,
           enable_email_notification:enable_email_notification
@@ -271,21 +290,28 @@ const update_customer_info = catchAsync(async (req, res) => {
         return res.status(200).json({
             status: false,
             message: "Failed to data",
-            errors: error.message
+            errors: e.message
         });
       }
-  });
+});
 
 //Add Customer
 const add_customer = catchAsync(async (req, res) => {
 
     await Promise.all([
-        body('customer_id').notEmpty().withMessage('Customer Id is required').run(req),
         body('first_name').notEmpty().withMessage('first name is required').run(req),
         body('last_name').notEmpty().withMessage('Last Name is required').run(req),
         body('contact_number').notEmpty().withMessage('Contact Number is required').run(req),
         body('whatsapp_number').notEmpty().withMessage('Whatsapp Number is required').run(req),
-        body('email').notEmpty().withMessage('Email is required').run(req),
+        body('email').notEmpty().withMessage('Email is required').isEmail().withMessage("Invalid email format").custom(async (value) => {
+        // Check if the email already exists in the database
+        if(value){
+        const existingEmail = await Customer.findOne({ where: { email: value } });
+        if (existingEmail) {
+            return res.status(200).json({status:false,message:"Email Id already exists",errors:{}})
+        }
+        }
+    }).run(req),
         body('password').notEmpty().withMessage('Pasword is required').run(req)
     ]);
 
@@ -297,8 +323,7 @@ const add_customer = catchAsync(async (req, res) => {
     }
 
     try{
-
-        const {first_name,last_name,contact_number,whatsapp_no,email,password,enable_email_notification,address} = req.body;
+        const {first_name,last_name,contact_number,whatsapp_no,email,password,address} = req.body;
 
         const files = req.files || {};
         let addressInfo;
@@ -315,7 +340,8 @@ const add_customer = catchAsync(async (req, res) => {
           whatsapp_no:whatsapp_no,
           email:email,
           password:hashPassword,
-          enable_email_notification:1
+          enable_email_notification:1,
+          status:1
           };
 
           const formatPath = (filePath) => {
@@ -356,7 +382,7 @@ const add_customer = catchAsync(async (req, res) => {
         return res.status(200).json({
             status: false,
             message: "Failed to data",
-            errors: error.message
+            errors: e.message
         });
       }
   });
@@ -379,18 +405,18 @@ const activationStatus = catchAsync(async (req, res) => {
     try{
 
         const {customer_id,status} = req.body;
-        const custId = req.user.id;
+        const custId = customer_id;
 
-            const updateStatus = await db.query(`update customers SET status = $1 and updated_by = $2 Where id = $3`,[status,custId,customer_id])
+        const updateStatus = await db.query(`update customers SET status = $1 , updated_by = $2 Where id = $3`,[status,req.user.id,custId])
 
-            const data = {
-                user_id: req.user.id,
-                table_id: updateStatus.id,
-                table_name: 'customers',
-                action: 'update activation status',
-            };
+        const data = {
+            user_id: customer_id,
+            table_id: updateStatus.id,
+            table_name: 'customers',
+            action: 'update activation status',
+        };
 
-            adminLog(data);
+        adminLog(data);
 
           return res.status(200).json({
             status: true,

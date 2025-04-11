@@ -150,9 +150,39 @@ const update_customer_profile = catchAsync(async (req, res) => {
       }
   });
 
+const getAddressList = catchAsync(async (req, res) => {
+    try{
+      const customer_id = req.user.id;
+
+      const getCustomeraddress = await db.query(`
+        SELECT id,customer_id,address, tag
+        FROM customer_addresses
+        WHERE customer_id = $1
+          AND status = $2
+          AND deleted_at IS NULL
+    `, [customer_id, "1"]);
+
+
+      return res.status(200).json({
+        status: true,
+        message: "fetch customer address list sucessfully",
+        data: (getCustomeraddress.rowCount > 0) ? getCustomeraddress.rows : []
+      });
+
+      }catch(e){
+        return res.status(200).json({
+            status: false,
+            message: "Failed to retrieve data",
+            errors: error.message
+        });
+      }
+});
+
+
   /******************* End  Profile Info ************************ */
 
   export {
     fetch_profile,
-    update_customer_profile
+    update_customer_profile,
+    getAddressList
 }

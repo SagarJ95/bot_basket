@@ -44,7 +44,13 @@ const orders = sequelize.define(
     special_instruction: {
       type: DataTypes.STRING
     },
+    invoice_path:{
+      type: DataTypes.STRING
+    },
     status: {
+      type: DataTypes.INTEGER
+    },
+    order_status: {
       type: DataTypes.INTEGER
     },
     created_by:{

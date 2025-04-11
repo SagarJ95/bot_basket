@@ -42,7 +42,13 @@ module.exports = {
       special_instruction: {
         type: Sequelize.STRING
       },
+      invoice_path:{
+        type: Sequelize.STRING
+      },
       status: {
+        type: Sequelize.INTEGER
+      },
+      order_status: {
         type: Sequelize.INTEGER
       },
       created_by:{

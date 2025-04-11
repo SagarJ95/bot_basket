@@ -18,6 +18,9 @@ module.exports = {
       slug: {
         type: Sequelize.STRING
       },
+      description:{
+        type:Sequelize.TEXT
+      },
       status: {
         type: Sequelize.ENUM('0', '1')
       },

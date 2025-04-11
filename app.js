@@ -36,10 +36,10 @@ const sessionStore = new SequelizeStore({
 //sessionStore.sync();
 
 // API Routes
-import api from "./routes/api.js";
+import api from "./routes/admin_api.js";
 
 // Admin View Routes
-import admin from "./routes/admin.js";
+import admin from "./routes/adminFront.js";
 
 // Front View Routes
 import front from "./routes/web.js";
@@ -79,8 +79,10 @@ app.set("view engine", "ejs");
 app.use(expressLayouts);
 
 app.use("/", front);
-app.use("/admin", admin);
 app.use("/api", api);
+app.use("*",function(req,res){
+  return res.status(404).json({message:"Route not found"})
+})
 
 app.locals.baseUrl = APP_URL + ":" + PORT;
 
@@ -102,13 +104,9 @@ app.use(
 app.use(globalErrorHandler);
 
 process.on("uncaughtException", (error) => {
-  //console.log("Uncaught Exception:", error);
-  // Optionally, destroy clients or clean up resources here
 });
 
 process.on("unhandledRejection", (reason, promise) => {
-  //console.log("Unhandled Rejection at:", promise, "reason:", reason);
-  // Optionally handle rejection
 });
 
 app.listen(PORT, () => {

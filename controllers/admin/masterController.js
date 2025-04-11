@@ -18,34 +18,56 @@ import sequelize from "../../config/database.js";
 import moment from 'moment';
 import db from "../../config/db.js";
 import adminLog from '../../helpers/admin_log.js';
-
+import csvjson from 'csvjson'
 import ExcelJS  from "exceljs";
 import path  from "path";
 import fs  from "fs";
+import { format } from "fast-csv";
+import { fileURLToPath } from "url";
+import { dirname } from "path";
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3848';
-
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 /* Category API Start ------------------------------- */
 
 // GET all categories (datatables)
 const getCategories = catchAsync(async (req, res) => {
     try {
+        const {page, search } = req.body
+        let pageCountQuery = '';
+        let searchQuery = ``;
+        const query_params = [1];
+
+         if(page){
+            let pageCount = (page - 1) * 10;
+            pageCountQuery = `LIMIT $${query_params.length + 1} OFFSET $${query_params.length + 2}`
+            query_params.push(10,pageCount)
+         }
+
+         if (search) {
+            searchQuery = `AND c.cat_name ILIKE $${query_params.length + 1}`;
+            query_params.push(`%${search}%`);
+         }
+
         //get total number of categories
-        const totalCategories = await db.query(`select COUNT(id) FROM category where status =$1 and deleted_at IS NULL`,
-            [1]
+        const totalCategories = await db.query(`select COUNT(c.id) FROM categories as c where c.status =$1 and c.deleted_at IS NULL ${searchQuery}
+            ${pageCountQuery}`,
+            query_params
         );
 
         //get get catgories list
-        const query = `select c.cat_name as category_name,c.description,
-        SUM(p.id) as No_of_products from category as c
+        const query = `select c.id as cat_id,c.cat_name as category_name,c.slug,COALESCE(c.description,'') as description,
+        COALESCE(COUNT(p.id),0) as No_of_products from categories as c
         LEFT JOIN products as p ON c.id = p.category
-        where c.status = $1 and deleted_at IS NULL`
+        where c.status = $1 and c.deleted_at IS NULL ${searchQuery}
+        GROUP BY c.cat_name,c.id Order BY c.id desc ${pageCountQuery}`;
 
-        const getCategorieslist = await db.query(query,[1])
+        const getCategorieslist = await db.query(query,query_params)
 
         return res.status(200).json({
             status: true,
-            total:totalCategories,
+            total:(totalCategories.rowCount > 0) ? parseInt(totalCategories.rows[0].count) : 0,
             message: 'Fetch Categories Successfully',
             data:(getCategorieslist.rowCount > 0) ? getCategorieslist.rows : []
           });
@@ -60,7 +82,7 @@ const createCategory = catchAsync(async (req, res) => {
 
     // Apply validation rules
     await Promise.all([
-        body('cat_name')
+        body('category_name')
             .notEmpty().withMessage('Category Name is required')
             .bail() // stops further validation if empty
             .custom(async (value) => {
@@ -76,11 +98,12 @@ const createCategory = catchAsync(async (req, res) => {
     const errors = validationResult(req);
 
     try {
-        const body = req.body;
+        const {category_name,description} = req.body;
 
         const category = await Category.create({
-            cat_name: body.cat_name,
-            slug: generateSlug(body.cat_name),
+            cat_name: category_name,
+            slug: generateSlug(category_name),
+            description:description,
             created_by: req.user.id,
             updated_by: req.user.id,
             status: '1',
@@ -144,15 +167,15 @@ const getCategoryById = catchAsync(async (req, res) => {
 // PATCH update category by ID
 const updateCategoryById = catchAsync(async (req, res) => {
 
-    const categoryId = parseInt(req.body.id);
+    const categoryId = parseInt(req.body.category_id);
 
     // Apply validation rules
     await Promise.all([
-        body('cat_name')
+        body('category_name')
             .notEmpty().withMessage('Category Name is required')
             .bail()
             .custom(async (value, { req }) => {
-                const categoryId = req.body.id; // define it here from the request
+                const categoryId = req.body.category_id; // define it here from the request
                 const existingCategory = await Category.findOne({
                     where: {
                         cat_name: value,
@@ -180,7 +203,7 @@ const updateCategoryById = catchAsync(async (req, res) => {
             return res.status(200).json({ status: false, message: 'Invalid Category ID', error: '' });
         }
 
-        const { cat_name, description } = req.body;
+        const { category_name, description } = req.body;
 
         const category_res = await Category.findOne({ where: { id: categoryId } });
         if (!category_res) {
@@ -188,8 +211,8 @@ const updateCategoryById = catchAsync(async (req, res) => {
         }
 
         const updateCategory = await Category.update({
-            cat_name: cat_name,
-            description,
+            cat_name: category_name,
+            description:description,
             updated_by: req.user.id,
         }, {
             where: { id: categoryId }
@@ -217,20 +240,21 @@ const updateCategoryById = catchAsync(async (req, res) => {
 
 // DELETE category by ID
 const deleteCategoryById = catchAsync(async (req, res) => {
+    await Promise.all([
+        body('category_id')
+            .notEmpty().withMessage('category id is required')
+            .run(req) // THIS is important
+    ]);
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const formattedErrors = await formatValidationArray(errors);
+        return res.status(200).json({ status: false, errors: formattedErrors });
+    }
+
     try {
-        await Promise.all([
-            body('id')
-                .notEmpty().withMessage('Id is required')
-                .run(req) // THIS is important
-        ]);
 
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            const formattedErrors = await formatValidationArray(errors);
-            return res.status(200).json({ status: false, errors: formattedErrors });
-        }
-
-        const categoryId = parseInt(req.body.id);
+        const categoryId = parseInt(req.body.category_id);
 
         if (isNaN(categoryId)) {
             return res.status(200).json({ status: false, message: 'Invalid Category ID', error: '' });
@@ -242,7 +266,10 @@ const deleteCategoryById = catchAsync(async (req, res) => {
             return res.status(200).json({ status: false, message: 'Category not found', error: '' });
         }
 
-        await result.destroy();
+        await db.query(
+            `UPDATE categories SET status = $1, deleted_at = $2 where id = $3`,
+            ["0", new Date(),categoryId]
+          );
 
         const data = {
             user_id: req.user.id,
@@ -253,7 +280,7 @@ const deleteCategoryById = catchAsync(async (req, res) => {
 
         adminLog(data);
 
-        return res.status(200).json({ status: true, message: 'Data Deleted' });
+        return res.status(200).json({ status: true, message: 'Data Deleted sucessfully' });
 
     } catch (error) {
         return res.status(200).json({ status: false, message: 'Category not found', error: error.message });
@@ -262,33 +289,59 @@ const deleteCategoryById = catchAsync(async (req, res) => {
 
 // PATCH update category status by ID
 const updateCategoryStatusById = catchAsync(async (req, res) => {
-    try {
-        const categoryId = parseInt(req.params.id);
-        const status = parseInt(req.params.status);
+    await Promise.all([
+        body('category_id')
+            .notEmpty().withMessage('category id is required')
+            .run(req),
+        body('status')
+            .notEmpty().withMessage('status is required')
+            .run(req)
+    ]);
 
-        if (isNaN(categoryId) || isNaN(status)) {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const formattedErrors = await formatValidationArray(errors);
+        return res.status(200).json({ status: false, errors: formattedErrors });
+    }
+
+    try {
+
+       let {category_id,status} = req.body;
+
+        if (isNaN(category_id) || isNaN(status)) {
             return res.status(200).json({ status: false, message: 'Invalid Category ID or Status', error: '' });
         }
 
-        const updateCategory = await Category.update({
-            status: status,
-            updated_by: req.user.id,
-        }, {
-            where: { id: categoryId }
-        });
+        //check no of product for particular category
+        const count = await db.query(`select c.id as cat_id,c.cat_name as category_name,c.slug,COALESCE(c.description,'') as description,
+        COALESCE(COUNT(p.id),0) as no_of_products from categories as c
+        LEFT JOIN products as p ON c.id = p.category
+        where c.id = $1 and c.status = $2 and c.deleted_at IS NULL
+        GROUP BY c.cat_name,c.id Order BY c.id desc`,[category_id,1]);
 
-        if (!updateCategory) {
-            return res.status(200).json({ status: false, message: 'Category Status Not Updated', error: '' });
+        if(count.rowCount > 0 && count.rows.no_of_products > 0){
+            return res.status(200).json({ status: false,
+                message: `Category has products cannot be deleted` });
+        }else{
+
+            const updateCategory = await db.query(
+                `UPDATE categories SET status = $1, updated_by = $2 where id = $3`,
+                [status, req.user.id,category_id]
+              );
+
+            if (!updateCategory) {
+                return res.status(200).json({ status: false, message: 'Category Status Not Updated', error: '' });
+            }
+
+            const data = {
+                user_id: req.user.id,
+                table_id: category_id,
+                table_name: 'categories',
+                action: 'status to ' + status,
+            };
+
+            adminLog(data);
         }
-
-        const data = {
-            user_id: req.user.id,
-            table_id: categoryId,
-            table_name: 'categories',
-            action: 'status to ' + status,
-        };
-
-        adminLog(data);
 
         return res.status(200).json({ status: true, message: 'Category status updated successfully' });
 
@@ -305,6 +358,7 @@ const excelExportCategory=catchAsync( async(req,res)=>{
         const query = `SELECT
                     c.id,
                     c.cat_name,
+                    c.description,
                     COUNT(p.id) AS product_count,
                     c.status
                 FROM categories c
@@ -326,6 +380,7 @@ const excelExportCategory=catchAsync( async(req,res)=>{
         worksheet.columns = [
             { header: "ID", key: "id", width: 10 },
             { header: "Category Name", key: "cat_name", width: 25 },
+            { header: "Description", key: "description", width: 25 },
             { header: "Product Count", key: "product_count", width: 25 },
             { header: "Status", key: "status", width: 10 },
         ];
@@ -352,7 +407,7 @@ const excelExportCategory=catchAsync( async(req,res)=>{
         await workbook.xlsx.writeFile(filePath);
 
         // Send file path as response
-        return res.status(200).json({ success: true, filePath: BASE_URL+`/uploads/exports/${fileName}` });
+        return res.status(200).json({ success: true, data: BASE_URL+`/uploads/exports/${fileName}` });
 
     } catch (error) {
         return res.status(200).json({ success: false, message: "Internal Server Error" ,error:error.message});
@@ -361,6 +416,90 @@ const excelExportCategory=catchAsync( async(req,res)=>{
 /* Category API End ------------------------------- */
 
 /* Product API Start ------------------------------- */
+const getProductlist = catchAsync(async (req, res) => {
+
+    try {
+        const {category_id,page,search} = req.body;
+        const query_params = [1];
+
+        let categories = '';
+        let pageCountQuery = '';
+        let searchQuery = ``;
+
+        if(category_id){
+            categories = `and p.category = $${query_params.length + 1}`;
+            query_params.push(category_id)
+         }
+
+         if(page){
+            let pageCount = (page - 1) * 10;
+            pageCountQuery = `LIMIT $${query_params.length + 1} OFFSET $${query_params.length + 2}`
+            query_params.push(10,pageCount)
+         }
+
+         if(search){
+            searchQuery = `and p.name ILIKE $${query_params.length + 1}`;
+            query_params.push(`%${search}%`);
+         }
+
+        //get total number of products
+        const totalCountQuery = `
+            SELECT COUNT(*) AS total
+            FROM products AS p
+            LEFT JOIN categories AS c ON p.category = c.id
+            LEFT JOIN country_data AS ca ON p.country_id = ca.id
+            WHERE p.status = $1 AND p.deleted_at IS NULL
+            ${categories}
+            ${searchQuery}
+            ${pageCountQuery}
+        `;
+
+        const totalProducts = await db.query(totalCountQuery, query_params);
+
+        //get get product list
+        const query = `select p.id as product_id,p.name as product_name,c.cat_name as category_name
+        ,p.price as current_price,
+        CONCAT('${BASE_URL}/images/img-country-flag/',ca.flag) as country_flag,
+        p.category as category_id,
+        ca.country_name,
+        TO_CHAR(p.created_at,'FMDD FMMonth YYYY') as last_updated_date,
+        p.product_stock_status,p.status
+         from products as p LEFT JOIN categories as c ON p.category = c.id
+         LEFT JOIN country_data as ca ON p.country_id = ca.id
+         WHERE p.status = $1 AND p.deleted_at IS NULL ${categories} ${searchQuery} ORDER BY p.id desc ${pageCountQuery}`;
+
+        const getProductslist = await db.query(query,query_params)
+
+        return res.status(200).json({
+            status: true,
+            total:(totalProducts.rowCount > 0) ? totalProducts.rows[0].total : 0,
+            message: 'Fetch Product Successfully',
+            data:(getProductslist.rowCount > 0) ? getProductslist.rows : []
+          });
+    } catch (error) {
+        throw new AppError(error.message, 400);
+    }
+
+});
+
+const countries = catchAsync(async (req, res) => {
+    try {
+
+        const query = `select c.id,c.country_name,c.code1 as code,CONCAT('${BASE_URL}/images/img-country-flag/',c.flag) from country_data as c`;
+
+        const getCountrylist = await db.query(query,[])
+
+        return res.status(200).json({
+            status: true,
+            message: 'Fetch Countries Successfully',
+            data:(getCountrylist.rowCount > 0) ? getCountrylist.rows : []
+          });
+    } catch (error) {
+        throw new AppError(error.message, 400);
+    }
+
+});
+
 const createProduct = catchAsync(async (req, res) => {
 
     // Apply validation rules
@@ -369,9 +508,8 @@ const createProduct = catchAsync(async (req, res) => {
             .notEmpty().withMessage('Name is required'),
         body('description').notEmpty().withMessage('Description is required'),
         body('category').notEmpty().withMessage('Category is required'),
-        body('minimum_order_place').notEmpty().withMessage('Minimum order place is required'),
-        body('maximum_order_place').notEmpty().withMessage('Maximum order place is required'),
-        body('price').notEmpty().withMessage('Price is required')
+        body('countryId').notEmpty().withMessage('Country is required'),
+        body('country_flag').notEmpty().withMessage('country flag is required')
     ]);
 
 
@@ -380,7 +518,7 @@ const createProduct = catchAsync(async (req, res) => {
     try {
         const body = req.body;
         const files = req.files;
-        // const errors = validationResult(req);
+
         if (!files || !files.product_images || files.product_images.length === 0) {
             errors.errors.push({ msg: "Please upload product image", path: "product_images" });
         }
@@ -397,7 +535,6 @@ const createProduct = catchAsync(async (req, res) => {
         if (existing) {
             errors.errors.push({ msg: "A product with the same name and category already exists", path: "name" });
         }
-
 
         if (!errors.isEmpty()) {
             const formattedErrors = await formatValidationArray(errors);
@@ -418,18 +555,19 @@ const createProduct = catchAsync(async (req, res) => {
             name: body.name,
             slug: generateSlug(body.name),
             description: body.description,
-            minimum_order_place: body.minimum_order_place,
-            maximum_order_place: body.maximum_order_place,
-            price: body.price,
+            minimum_order_place:1,
+            maximum_order_place: 10,
+            price: 0,
+            country_id:body.country_id,
+            country_flag:body.country_flag,
             category: body.category,
             created_by: req.user.id,
-            updated_by: req.user.id,
             ordering: (OrderingId) ? parseInt(OrderingId) + 1 : 1,
-            status: req.body.status,
+            status: 1,
         });
 
         const product_id=product.id;
-        //return res.json(product.id);
+
         if (!product) {
             return res.status(200).json({ status: false, message: 'Product not created' });
         }
@@ -446,13 +584,12 @@ const createProduct = catchAsync(async (req, res) => {
         }
 
 
-        const price_log = await Products_price_logs.create({
-            product_id: product_id,
-            price: body.price,
-            created_by: req.user.id,
-            updated_by: req.user.id
-        });
-
+        // const price_log = await Products_price_logs.create({
+        //     product_id: product_id,
+        //     price: body.price,
+        //     created_by: req.user.id,
+        //     updated_by: req.user.id
+        // });
 
         const data = {
             user_id: req.user.id,
@@ -471,21 +608,18 @@ const createProduct = catchAsync(async (req, res) => {
 });
 
 const updateProduct = catchAsync(async (req, res) => {
-    const productId = req.body.product_id;
-
     // Apply validation rules
     await Promise.all([
         body('name').notEmpty().withMessage('Name is required').run(req),
         body('description').notEmpty().withMessage('Description is required').run(req),
-        body('category').notEmpty().withMessage('Category is required').run(req),
-        body('minimum_order_place').notEmpty().withMessage('Minimum order place is required').run(req),
-        body('maximum_order_place').notEmpty().withMessage('Maximum order place is required').run(req),
-        body('price').notEmpty().withMessage('Price is required').run(req)
+        body('category').notEmpty().withMessage('Category is required').run(req)
     ]);
 
     const errors = validationResult(req);
 
+
     try {
+        const productId = req.body.product_id;
         const body = req.body;
         const files = req.files;
 
@@ -521,9 +655,7 @@ const updateProduct = catchAsync(async (req, res) => {
             name: body.name,
             slug: generateSlug(body.name),
             description: body.description,
-            minimum_order_place: body.minimum_order_place,
-            maximum_order_place: body.maximum_order_place,
-            price: body.price,
+            country_id:body.country_id,
             category: body.category,
             updated_by: req.user.id,
         },
@@ -575,21 +707,22 @@ const updateProduct = catchAsync(async (req, res) => {
     }
 });
 
-
 const getProductById = catchAsync(async (req, res) => {
+    await Promise.all([
+        body('id')
+            .notEmpty().withMessage('Product ID is required')
+            .run(req)
+    ]);
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        // const formattedErrors = await formatValidationArray(errors);
+        // return res.status(200).json({ status: false, errors: formattedErrors });
+        const error_message = errors.array()[0].msg;
+        throw new AppError(error_message, 200, errors);
+    }
+
     try {
-        await Promise.all([
-            body('id')
-                .notEmpty().withMessage('Product ID is required')
-                .run(req)
-        ]);
-
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            const formattedErrors = await formatValidationArray(errors);
-            return res.status(200).json({ status: false, errors: formattedErrors });
-        }
-
         const productId = parseInt(req.body.id);
 
         if (isNaN(productId)) {
@@ -602,13 +735,9 @@ const getProductById = catchAsync(async (req, res) => {
                 p.name,
                 p.slug,
                 p.description,
-                p.minimum_order_place,
-                p.maximum_order_place,
-                p.price,
                 p.category,
-                p.ordering,
                 p.status,
-
+                p.country_id,
                 COALESCE(
                     JSON_AGG(
                         CASE
@@ -632,7 +761,7 @@ const getProductById = catchAsync(async (req, res) => {
         return res.status(200).json({
             status: true,
             message: 'Product Found',
-            data: result.rows[0]
+            data: result.rows
         });
 
     } catch (error) {
@@ -640,21 +769,20 @@ const getProductById = catchAsync(async (req, res) => {
     }
 });
 
-
 const deleteProductById = catchAsync(async (req, res) => {
+    await Promise.all([
+        body('id')
+            .notEmpty().withMessage('Product ID is required')
+            .run(req)
+    ]);
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const formattedErrors = await formatValidationArray(errors);
+        return res.status(200).json({ status: false, errors: formattedErrors });
+    }
+
     try {
-        await Promise.all([
-            body('id')
-                .notEmpty().withMessage('Product ID is required')
-                .run(req)
-        ]);
-
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            const formattedErrors = await formatValidationArray(errors);
-            return res.status(200).json({ status: false, errors: formattedErrors });
-        }
-
         const productId = parseInt(req.body.id);
 
         if (isNaN(productId)) {
@@ -685,20 +813,19 @@ const deleteProductById = catchAsync(async (req, res) => {
     }
 });
 
-
 const updateProductStatusById = catchAsync(async (req, res) => {
+    await Promise.all([
+        body('id').notEmpty().withMessage('Product ID is required').run(req),
+        body('status').notEmpty().withMessage('status is required').run(req),
+    ]);
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const error_message = errors.array()[0].msg;
+        throw new AppError(error_message, 200, errors);
+    }
+
     try {
-        await Promise.all([
-            body('id').notEmpty().withMessage('Product ID is required').run(req),
-            body('status').notEmpty().withMessage('status is required').run(req),
-        ]);
-
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            const formattedErrors = await formatValidationArray(errors);
-            return res.status(200).json({ status: false, errors: formattedErrors });
-        }
-
         const productId = parseInt(req.body.id);
         const status = parseInt(req.body.status);
 
@@ -736,6 +863,55 @@ const updateProductStatusById = catchAsync(async (req, res) => {
     }
 });
 
+const changeProductStockStatus = catchAsync(async (req, res) => {
+    try {
+        await Promise.all([
+            body('product_id').notEmpty().withMessage('Product ID is required').run(req),
+            body('product_stock_status').notEmpty().withMessage('Product stock status is required').run(req),
+        ]);
+
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            const formattedErrors = await formatValidationArray(errors);
+            return res.status(200).json({ status: false, errors: formattedErrors });
+        }
+
+        const productId = parseInt(req.body.product_id);
+        const product_stock_status = parseInt(req.body.product_stock_status);
+
+        if (isNaN(productId) || isNaN(product_stock_status)) {
+            return res.status(200).json({ status: false, message: 'Invalid Product ID or Stock Status', error: '' });
+        }
+
+        const updated = await Product.update(
+            {
+                product_stock_status: product_stock_status,
+                updated_by: req.user.id,
+            },
+            {
+                where: { id: productId }
+            }
+        );
+
+        if (!updated || updated[0] === 0) {
+            return res.status(200).json({ status: false, message: 'Product Stock status not updated', error: '' });
+        }
+
+        const data = {
+            user_id: req.user.id,
+            table_id: productId,
+            table_name: 'products',
+            action: 'stock status to ' + product_stock_status,
+        };
+
+        adminLog(data);
+
+        return res.status(200).json({ status: true, message: 'Product stock status updated successfully' });
+
+    } catch (error) {
+        return res.status(200).json({ status: false, message: 'Product stock status not updated', error: error.message });
+    }
+});
 
 //excel export products
 const excelExportProducts = catchAsync(async(req,res)=>{
@@ -747,12 +923,9 @@ const excelExportProducts = catchAsync(async(req,res)=>{
                 p.name,
                 p.slug,
                 p.description,
-                p.minimum_order_place,
-                p.maximum_order_place,
-                p.price,
                 ci.cat_name as category,
                 p.status,
-
+                c.country_name,
                 COALESCE(
                     JSON_AGG(
                         CASE
@@ -764,10 +937,9 @@ const excelExportProducts = catchAsync(async(req,res)=>{
             FROM products p
             LEFT JOIN product_images pi ON pi.product_id = p.id
             LEFT JOIN categories ci ON p.category = ci.id
-            WHERE p.deleted_at IS NULL group by p.id,ci.cat_name
+            LEFT JOIN country_data as c ON p.country_id = c.id
+            WHERE p.deleted_at IS NULL group by p.id,ci.cat_name,c.country_name
         `;
-
-        //return res.json(query)
 
         const result = await db.query(query, []);
         let list = result.rows;
@@ -781,10 +953,8 @@ const excelExportProducts = catchAsync(async(req,res)=>{
             { header: "Product Name", key: "name", width: 25 },
             { header: "Slug", key: "slug", width: 25 },
             { header: "Description", key: "description", width: 40 },
-            { header: "Min Order", key: "minimum_order_place", width: 15 },
-            { header: "Max Order", key: "maximum_order_place", width: 15 },
-            { header: "Price", key: "price", width: 10 },
             { header: "Category", key: "category", width: 15 },
+            { header: "Country Name", key: "country_name", width: 20 },
             { header: "Status", key: "status", width: 10 },
             { header: "Images", key: "product_images", width: 40 }
         ];
@@ -795,9 +965,7 @@ const excelExportProducts = catchAsync(async(req,res)=>{
                 name: row.name,
                 slug: row.slug,
                 description: row.description,
-                minimum_order_place: row.minimum_order_place,
-                maximum_order_place: row.maximum_order_place,
-                price: row.price,
+                country_name:row.country_name,
                 category: row.category,
                 status: row.status == 1 ? "Active" : "Inactive",
                 product_images: (row.product_images || []).join(", ")
@@ -818,26 +986,191 @@ const excelExportProducts = catchAsync(async(req,res)=>{
         await workbook.xlsx.writeFile(filePath);
 
         // Send file path as response
-        return res.json({ success: true, filePath: BASE_URL+`/uploads/exports/${fileName}` });
+        return res.json({ success: true, data: BASE_URL+`/uploads/exports/${fileName}` });
 
     } catch (error) {
         return res.status(200).json({ success: false, message: "Internal Server Error",error:error.message });
     }
 });
 
-const changeProductPrice = catchAsync(async(req,res)=>{
-    try {
-        await Promise.all([
-            body('product_id').notEmpty().withMessage('Product ID is required').run(req),
-            body('price').notEmpty().withMessage('Price is required').run(req),
-        ]);
+/*****************************************  Export and Import product for change price *********************/
 
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            const formattedErrors = await formatValidationArray(errors);
-            return res.status(200).json({ status: false, errors: formattedErrors });
+//export product list for update price change
+const excelExportProductsInfo = catchAsync(async(req,res)=>{
+    try {
+        const query = `
+      SELECT
+        p.id,
+        p.name,
+        c.id as country_id,
+        c.country_name,
+        p.price,
+        p.maximum_order_place
+      FROM products p
+      LEFT JOIN product_images pi ON pi.product_id = p.id
+      LEFT JOIN country_data as c ON p.country_id = c.id
+      WHERE p.status = $1 AND p.deleted_at IS NULL
+      GROUP BY p.id, c.id, p.maximum_order_place
+      ORDER BY p.id ASC
+    `;
+
+    const result = await db.query(query, [1]);
+    const list = result?.rows ?? [];
+
+    const dateFormat = moment().format("YYYY-MM-DD_HH-mm-ss");
+    const fileName = `price_change_product_list_${dateFormat}.csv`;
+    const exportDir = path.join(process.cwd(), "public", "uploads", "exports_product");
+    const filePath = path.join(exportDir, fileName);
+
+    // Ensure export directory exists
+    if (!fs.existsSync(exportDir)) {
+      fs.mkdirSync(exportDir, { recursive: true });
+    }
+
+    const writeStream = fs.createWriteStream(filePath);
+    const csvStream = format({ headers: true });
+
+    csvStream.pipe(writeStream);
+
+    list.forEach(({ id, name, country_name, maximum_order_place, price }) => {
+      csvStream.write({
+        Product_Id: id,
+        Product_Name: name,
+        Country_Name: country_name,
+        Max_Quantity: maximum_order_place,
+        Price: price,
+      });
+    });
+
+    csvStream.end();
+
+    writeStream.on("finish", () => {
+      res.json({
+        success: true,
+        data: `${BASE_URL}/uploads/exports_product/${fileName}`,
+      });
+    });
+
+    } catch (error) {
+        return res.status(200).json({ success: false, message: "Internal Server Error",error:error.message });
+    }
+});
+
+//import product list for update price and store product log
+const importProductListwithPrice = catchAsync(async(req,res)=>{
+    try{
+
+        const uploadedFile = req.files['csv_file']?.[0];
+        if (!uploadedFile) {
+        return res.status(400).json({ status: false, message: "No file uploaded" });
         }
 
+        const data = fs.readFileSync(uploadedFile.path, { encoding: 'utf8' });
+        const csvData = csvjson.toObject(data);
+
+        const expectedHeaders = [
+            "Product_Id",
+            "Product_Name",
+            "Country_Name",
+            "Max_Quantity",
+            "Price"
+          ];
+
+          if (csvData.length === 0) {
+            return res.status(200).json({
+              code: 2,
+              status: false,
+              msg: "Data Not Available in CSV",
+            });
+          }
+
+          const actualHeaders = Object.keys(csvData[0] || {});
+          const isValidFile = expectedHeaders.every(header =>
+            actualHeaders.includes(header)
+          );
+
+          if (!isValidFile) {
+            return res.status(200).json({
+              status: false,
+              msg: "Invalid CSV format. Expected headers: " + expectedHeaders.join(", "),
+            });
+          }
+
+          for (const record of csvData) {
+            const product_id = record["Product_Id"];
+            const max_quantity = (record["Max_Quantity"]) ? record["Max_Quantity"] : 0;
+            const price = (record["Price"]) ? record["Price"] : 0;
+
+            //update the price and maximum quantity in products table
+            await db.query(
+              `UPDATE products SET maximum_order_place = $1, price = $2, updated_by = $3, updated_at = $4 WHERE id = $5`,
+              [max_quantity, price, req.user.id,new Date(),product_id]
+            );
+
+            //check country_name from table country_data
+            const country_name = record["Country_Name"];
+            const country_data = await db.query(`SELECT * FROM country_data WHERE country_name = $1`,
+                [country_name]);
+            const getCountryId = (country_data.rowCount > 0) ? country_data.rows[0].id :""
+
+            //insert or update product_id,price,country_id,price,upload_date,maximum_quantity,upload_date
+            const storeProductId = (product_id) ? parseInt(product_id) : 0;
+            const storePrice = (price) ? parseInt(price) : 0;
+            const storeCountryId = (getCountryId) ? parseInt(getCountryId) : null;
+            const storeCountryName = (country_name) ? country_name : null;
+            const storeMaxQuantity = (max_quantity) ? parseInt(max_quantity) : 0;
+            const currentDate = moment(new Date()).format('YYYY-MM-DD');
+
+            const checkProductAvailbleInProductLog = await db.query(
+                `SELECT * FROM products_price_logs WHERE product_id = $1  AND upload_date = $2`,
+                [storeProductId,currentDate]
+            )
+
+            if(checkProductAvailbleInProductLog.rowCount > 0){
+                //update the price and quantity in product_price_logs
+                await db.query(
+                    `UPDATE products_price_logs SET maximum_quantity = $1 , price = $2, updated_by = $3 , updated_at = $4
+                    WHERE product_id = $5 AND upload_date = $6`, [storeMaxQuantity, storePrice, req.user.id,new Date(),storeProductId, moment(new Date()).format('YYYY-MM-DD')]
+                    );
+            }else{
+                //Insert the price and quantity in product_price_logs
+                 await db.query(
+                `INSERT INTO products_price_logs (product_id,price,country_id,country_name,upload_date,maximum_quantity
+                ,created_by,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, [storeProductId, storePrice, storeCountryId,storeCountryName, moment(new Date()).format('YYYY-MM-DD'), storeMaxQuantity, req
+                    .user.id, new Date()]
+                );
+            }
+
+          }
+
+          return res.status(200).json({
+            status: true,
+            msg: "Product list updated successfully",
+          });
+
+
+         // console.log("importData>>",csvData)
+    }catch(e){
+        return res.status(200).json({ success: false, message: "Internal Server Error",
+            error:e.message });
+    }
+})
+
+/***************************************** End  Export product for change price *********************/
+
+const changeProductPrice = catchAsync(async(req,res)=>{
+    await Promise.all([
+        body('product_id').notEmpty().withMessage('Product ID is required').run(req),
+        body('price').notEmpty().withMessage('Price is required').run(req),
+    ]);
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const formattedErrors = await formatValidationArray(errors);
+        return res.status(200).json({ status: false, errors: formattedErrors });
+    }
+
+    try {
         const productId = parseInt(req.body.product_id);
         const price = parseInt(req.body.price);
 
@@ -883,27 +1216,27 @@ const changeProductPrice = catchAsync(async(req,res)=>{
 });
 
 const getProductPriceLogs =catchAsync(async(req,res)=>{
+    await Promise.all([
+        body('product_id')
+            .notEmpty().withMessage('Product ID is required')
+            .run(req)
+    ]);
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const formattedErrors = await formatValidationArray(errors);
+        return res.status(200).json({ status: false, errors: formattedErrors });
+    }
+
     try
     {
-        await Promise.all([
-            body('product_id')
-                .notEmpty().withMessage('Product ID is required')
-                .run(req)
-        ]);
-
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            const formattedErrors = await formatValidationArray(errors);
-            return res.status(200).json({ status: false, errors: formattedErrors });
-        }
-
         const productId = parseInt(req.body.product_id);
 
         if (isNaN(productId)) {
             return res.status(200).json({ status: false, message: 'Invalid Product ID', error: '' });
         }
 
-        const query = `SELECT price, TO_CHAR(created_at, 'DD/Mon/YYYY') AS date_of_update
+        const query = `SELECT price, TO_CHAR(upload_date, 'DD-Mon-YYYY') AS date_of_update
             FROM products_price_logs
             WHERE product_id = ${productId} order by id desc`;
         const result=await db.query(query,[]);
@@ -969,7 +1302,8 @@ const exportProductPriceLogs = catchAsync(async(req,res)=>{
         });
 
         // Generate file name and path
-        const fileName = `product_price_list.xlsx`;
+        const dateTime = moment().tz("Asia/Kolkata").format("YYYY-MM-DD_HH-mm-ss");;
+        const fileName = `product_price_log_list_${dateTime}.xlsx`;
         const filePath = path.join(process.cwd(), "public/uploads/exports", fileName);
 
         // Ensure directory exists
@@ -988,55 +1322,67 @@ const exportProductPriceLogs = catchAsync(async(req,res)=>{
     }
 });
 
-const changeProductStockStatus = catchAsync(async (req, res) => {
-    try {
-        await Promise.all([
-            body('product_id').notEmpty().withMessage('Product ID is required').run(req),
-            body('product_stock_status').notEmpty().withMessage('Product stock status is required').run(req),
-        ]);
+const ChangePricelist = catchAsync(async(req,res)=>{
+    try
+    {
+        const {category_id,page,search} = req.body;
+        const query_params = [1];
+        let categories = '';
+        let pageCountQuery = '';
+        let searchQuery = ``;
 
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            const formattedErrors = await formatValidationArray(errors);
-            return res.status(200).json({ status: false, errors: formattedErrors });
-        }
+        if(category_id){
+            categories = `and p.category = $${query_params.length + 1}`;
+            query_params.push(category_id)
+         }
 
-        const productId = parseInt(req.body.product_id);
-        const product_stock_status = parseInt(req.body.product_stock_status);
+         if(page){
+            let pageCount = (page - 1) * 10;
+            pageCountQuery = `LIMIT $${query_params.length + 1} OFFSET $${query_params.length + 2}`
+            query_params.push(10,pageCount)
+         }
 
-        if (isNaN(productId) || isNaN(product_stock_status)) {
-            return res.status(200).json({ status: false, message: 'Invalid Product ID or Stock Status', error: '' });
-        }
+         if(search){
+            searchQuery = `and p.name ILIKE $${query_params.length + 1}`;
+            query_params.push(`%${search}%`);
+         }
 
-        const updated = await Product.update(
-            {
-                product_stock_status: product_stock_status,
-                updated_by: req.user.id,
-            },
-            {
-                where: { id: productId }
-            }
-        );
+        const query = `
+                SELECT
+                    p.id,
+                    p.name AS product_name,
+                    c.id as category_id,
+                    c.cat_name AS category_name,
+                    p.price::INTEGER AS current_price,
+                    COALESCE(pp.price, 0)::INTEGER AS price_yesterday
+                FROM
+                    products AS p
+                LEFT JOIN
+                    categories AS c ON p.category = c.id
+                LEFT JOIN
+                    products_price_logs AS pp ON p.id = pp.product_id
+                    AND pp.upload_date = CURRENT_DATE - INTERVAL '1 day'
+                WHERE
+                    p.status = $1 ${categories} ${searchQuery}
+                ORDER BY
+                p.id ASC ${pageCountQuery}
+                `;
 
-        if (!updated || updated[0] === 0) {
-            return res.status(200).json({ status: false, message: 'Product Stock status not updated', error: '' });
-        }
+                const result = await db.query(query, query_params);
 
-        const data = {
-            user_id: req.user.id,
-            table_id: productId,
-            table_name: 'products',
-            action: 'stock status to ' + product_stock_status,
-        };
 
-        adminLog(data);
-
-        return res.status(200).json({ status: true, message: 'Product stock status updated successfully' });
-
-    } catch (error) {
-        return res.status(200).json({ status: false, message: 'Product stock status not updated', error: error.message });
+        return res.status(200).json({ success: true,
+            total:(result.rowCount > 0) ? result.rowCount : 0,
+             message: "Fetch Change Price details successfully",
+            data:(result.rowCount > 0) ? result.rows : []
+        });
+    }
+    catch(error)
+    {
+        return res.status(200).json({ success: false, message: "Internal Server Error",error:error.message });
     }
 });
+
 /* Product API END ------------------------------- */
 
 export {
@@ -1059,10 +1405,10 @@ export {
     changeProductPrice,
     getProductPriceLogs,
     exportProductPriceLogs,
-    changeProductStockStatus
-
-
-
-
-
+    changeProductStockStatus,
+    countries,
+    getProductlist,
+    excelExportProductsInfo,
+    importProductListwithPrice,
+    ChangePricelist
 }

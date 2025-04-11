@@ -4,8 +4,6 @@ import db from "../../config/db.js";
 import Sequelize from "../../config/database.js";
 import moment from "moment-timezone";
 
-// import { json } from "sequelize";
-
 const dashboardController = async (req, res) => {
   try {
     const date = moment().format("YYYY-MM-DD");
@@ -26,9 +24,9 @@ const dashboardController = async (req, res) => {
     );
 
     const get_customers_details = await db.query(
-      `select o.id,o.customer_name,o.order_status,
+      `select o.id as order_id,o.customer_name,o.order_status,
       SUM(ot.quantity::integer* ot.price::numeric) as total_price,
-      CASE 
+      CASE
       WHEN o.order_status =1 THEN 'Pending'
       WHEN o.order_status= 2 THEN 'Confirmed'
       WHEN o.order_status= 3 THEN 'Shipped'
@@ -43,7 +41,7 @@ const dashboardController = async (req, res) => {
       `,
       [date, "1", "1"]
     );
-    console.log(getTotalOrder);
+
 
     res.status(200).json({
       status: true,

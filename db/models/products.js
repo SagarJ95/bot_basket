@@ -14,11 +14,12 @@ const products = sequelize.define(
     ordering : {
       type: DataTypes.INTEGER
     },
-
     name: {
       type: DataTypes.STRING
     },
-
+    country_id:{
+      type: DataTypes.INTEGER
+    },
     description: {
         type: DataTypes.STRING
     },

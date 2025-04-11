@@ -17,10 +17,16 @@ const addTocarts = sequelize.define(
     qty: {
       type: DataTypes.BIGINT
     },
+    pervoius_price: {
+      type: DataTypes.STRING
+    },
     price: {
       type: DataTypes.STRING
     },
     status: {
+      type: DataTypes.INTEGER
+    },
+    repeat_status: {
       type: DataTypes.INTEGER
     },
     created_by:{
