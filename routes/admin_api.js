@@ -11,6 +11,7 @@ import * as signInController from "../controllers/admin/signInController.js";
 import * as masterController from "../controllers/admin/masterController.js";
 import * as customerController from "../controllers/admin/customerController.js";
 import * as orderController from "../controllers/admin/orderManagementController.js";
+import * as dashboardController from "../controllers/admin/dashbordController.js";
 import moment from "moment";
 
 const router = Router();
@@ -108,6 +109,9 @@ router.get("/sign-out", authenticate, signInController.userLogout);
 
 // POST get Users (datatables)
 router.post("/getUsers", authenticate, userManagementController.getUsers);
+
+//dashboard
+router.post("/dashboard", authenticate, dashboardController.dashboardController);
 
 // POST add new user || GET get all user
 router

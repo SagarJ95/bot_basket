@@ -8,6 +8,7 @@ import Orders from "../../db/models/orders.js"
 import OrderItem from "../../db/models/order_items.js"
 import bcrypt from "bcrypt";
 import { body, validationResult } from "express-validator";
+import { sendOrderConfirmation } from "../../helpers/orderconformation_mail.js";
 import AppError from "../../utils/appError.js";
 const project_name = process.env.APP_NAME;
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3848';
@@ -347,6 +348,25 @@ const create_order = catchAsync(async (req, res) => {
           const cart = await addToCart.update({status:0},{where:{id:cart_id}});
       }
     }
+
+    const getaddres = await db.query(
+      `select address from customer_addresses where customer_id=$1 AND id=$2 AND status=$3 `,
+      [customer_id, address, "1"]
+    );
+    const final_address = getaddres.rows[0]?.address || "";
+
+    // send conformation mail with pdf attach invoice
+    await sendOrderConfirmation(
+      email,
+      name,
+      getaddres.rows[0].address,
+      order_item.map((item) => ({
+        name: item.product_name,
+        quantity: item.quantity,
+        price: item.price,
+      })),
+      "BOT261846"
+    );
 
     return res.status(200).json({
       status: true,
