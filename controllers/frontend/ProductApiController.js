@@ -370,8 +370,8 @@ const create_order = catchAsync(async (req, res) => {
         name: item.product_name,
         quantity: item.quantity,
         price: item.price,
-      })),
-      "BOT261846"
+      }))
+      // "BOT261846"
     );
 
     return res.status(200).json({
