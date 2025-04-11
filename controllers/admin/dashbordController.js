@@ -24,7 +24,7 @@ const dashboardController = async (req, res) => {
     );
 
     const get_customers_details = await db.query(
-      `select o.id,o.customer_name,o.order_status,
+      `select o.id as order_id,o.customer_name,o.order_status,
       SUM(ot.quantity::integer* ot.price::numeric) as total_price,
       CASE
       WHEN o.order_status =1 THEN 'Pending'
