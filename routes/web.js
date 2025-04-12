@@ -63,60 +63,60 @@ router.post('/sign_up', cutomerController.SignUp);
 router.post('/login', cutomerController.Login);
 
 //forget password
-router.post('/forget_password',cutomerController.updatePassword)
+router.post('/forget_password', cutomerController.updatePassword)
 
 //reset password
 router.post(
     "/set_new_password",
     customer_authenticate,
     cutomerController.resetpassword
-  );
+);
 
 //send Email wwith OTP
-router.post('/resend_otp',cutomerController.resend_otp)
+router.post('/resend_otp', cutomerController.resend_otp)
 
 //get customer info
-router.post('/fetch_customer_profile',customer_authenticate,profileController.fetch_profile)
+router.post('/fetch_customer_profile', customer_authenticate, profileController.fetch_profile)
 
 //update customer info
-router.post('/update_customer_info',customer_authenticate,
+router.post('/update_customer_info', customer_authenticate,
     upload.fields([
         { name: "profile", maxCount: 1 }
-      ]),profileController.update_customer_profile);
+    ]), profileController.update_customer_profile);
 
 //Address list
-router.post('/getAddressList',customer_authenticate,profileController.getAddressList)
+router.post('/getAddressList', customer_authenticate, profileController.getAddressList)
 
 //category list
-router.get('/category_list',staticApiKey,productController.category_list);
+router.get('/category_list', staticApiKey, productController.category_list);
 
 //product list
-router.post('/product_list',customer_authenticate,productController.product_list);
+router.post('/product_list', staticApiKey, productController.product_list);
 
 //Add cart
-router.post('/add_update_cart',customer_authenticate,productController.add_update_cart)
+router.post('/add_update_cart', customer_authenticate, productController.add_update_cart)
 
 //display cart list
-router.post('/cart_list',customer_authenticate,productController.cart_list)
+router.post('/cart_list', customer_authenticate, productController.cart_list)
 
 //delete product cart
-router.post('/delete_product_cart',customer_authenticate,productController.delete_product_cart)
+router.post('/delete_product_cart', customer_authenticate, productController.delete_product_cart)
 
 
 //create_order
-router.post('/place_order',customer_authenticate,productController.create_order)
+router.post('/place_order', customer_authenticate, productController.create_order)
 
 //order_history
-router.post('/order_history',customer_authenticate,productController.order_history)
+router.post('/order_history', customer_authenticate, productController.order_history)
 
 //view_order
-router.post('/view_order',customer_authenticate,productController.view_order)
+router.post('/view_order', customer_authenticate, productController.view_order)
 
 //recommended_products
-router.post('/recommended_products',customer_authenticate,productController.recommended_products)
+router.post('/recommended_products', customer_authenticate, productController.recommended_products)
 
 //repeat_order
-router.post('/repeat_order',customer_authenticate,productController.repeat_order)
+router.post('/repeat_order', customer_authenticate, productController.repeat_order)
 
 
 /********************************** End Customer Section *********************************/

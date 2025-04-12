@@ -10,10 +10,12 @@ export async function sendOrderConfirmation(
   email,
   customer_name,
   delivery_address,
-  products = []
+  products = [],
+  order_id
 ) {
   const totalPrice = products.reduce((sum, p) => sum + p.price * p.quantity, 0);
-  const orderId = `BOT${Math.floor(100000 + Math.random() * 900000)}`;
+  // const orderId = `BOT${Math.floor(100000 + Math.random() * 900000)}`;
+  const orderId = `BOT${order_id}`;
   const orderDate = moment().format("YYYY-MM-DD HH:mm");
   const pdfPath = `./order_${Date.now()}.pdf`;
 
@@ -69,8 +71,8 @@ export async function sendOrderConfirmation(
           </thead>
           <tbody>
             ${products
-              .map(
-                (p) => `
+      .map(
+        (p) => `
               <tr>
                 <td>${p.name}</td>
                 <td>${p.quantity}</td>
@@ -78,14 +80,14 @@ export async function sendOrderConfirmation(
                 <td>₹${(p.price * p.quantity).toFixed(2)}</td>
               </tr>
             `
-              )
-              .join("")}
+      )
+      .join("")}
           </tbody>
         </table>
 
         <h3 style="text-align:right;">Total Price: ₹${totalPrice.toFixed(
-          2
-        )}</h3>
+        2
+      )}</h3>
 
         <p style="text-align:center;">Thank you for shopping with <strong>BotBasket</strong>!</p>
         <p style="text-align:center;">We appreciate your trust and look forward to serving you again.</p>
