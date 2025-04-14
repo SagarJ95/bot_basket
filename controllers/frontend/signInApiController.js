@@ -297,9 +297,8 @@ const resend_otp = catchAsync(async (req, res, next) => {
 
     const { first_name, last_name, email, status } = req.body;
     let customer_name;
+
     // 1 means sign up and 2 means forget password( need to check email id exits or not)
-
-
     if (status == 2) {
       const existingEmail = await Customer.findOne({
         where: {
@@ -462,8 +461,6 @@ async function otpexpire(email, otp, res) {
   if (otpRecord.otp !== parseInt(otp)) {
     return { status: false, message: "Incorrect OTP" };
   }
-
-
 
   return { status: true, message: "", data: otpRecord.id };
 
