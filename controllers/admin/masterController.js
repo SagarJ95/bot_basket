@@ -467,7 +467,7 @@ const getProductlist = catchAsync(async (req, res) => {
         CONCAT('${BASE_URL}/images/img-country-flag/',ca.flag) as country_flag,
         p.category as category_id,
         ca.country_name,
-        TO_CHAR(p.created_at,'FMDD FMMonth YYYY') as last_updated_date,
+        TO_CHAR(p.updated_at,'FMDD FMMonth YYYY') as last_updated_date,
         p.product_stock_status,p.status
          from products as p LEFT JOIN categories as c ON p.category = c.id
          LEFT JOIN country_data as ca ON p.country_id = ca.id
@@ -1139,8 +1139,8 @@ const importProductListwithPrice = catchAsync(async (req, res) => {
                 //Insert the price and quantity in product_price_logs
                 await db.query(
                     `INSERT INTO products_price_logs (product_id,price,country_id,country_name,upload_date,maximum_quantity
-                ,created_by,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`, [storeProductId, storePrice, storeCountryId, storeCountryName, moment(new Date()).format('YYYY-MM-DD'), storeMaxQuantity, req
-                    .user.id, new Date()]
+                ,created_by,created_at,updated_by,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [storeProductId, storePrice, storeCountryId, storeCountryName, moment(new Date()).format('YYYY-MM-DD'), storeMaxQuantity, req
+                    .user.id, new Date(),req.user.id,new Date()]
                 );
             }
 
@@ -1165,58 +1165,93 @@ const importProductListwithPrice = catchAsync(async (req, res) => {
 
 const changeProductPrice = catchAsync(async (req, res) => {
     await Promise.all([
-        body('product_id').notEmpty().withMessage('Product ID is required').run(req),
-        body('price').notEmpty().withMessage('Price is required').run(req),
+      body("product_id")
+        .notEmpty()
+        .withMessage("Product ID is required")
+        .run(req),
+      body("price").notEmpty().withMessage("Price is required").run(req),
     ]);
 
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-        const formattedErrors = await formatValidationArray(errors);
-        return res.status(200).json({ status: false, errors: formattedErrors });
+      const formattedErrors = await formatValidationArray(errors);
+      return res.status(200).json({ status: false, errors: formattedErrors });
     }
 
     try {
-        const productId = parseInt(req.body.product_id);
-        const price = parseInt(req.body.price);
+      const productId = req.body.product_id;
+      const price = req.body.price;
 
-        if (isNaN(productId) || isNaN(price)) {
-            return res.status(200).json({ status: false, message: 'Invalid Product ID or Status', error: '' });
-        }
+      //convert into array
+      const arrayProductId = productId.split(",").map((id) => parseInt(id));
+      console.log(arrayProductId);
 
-        const update_product = await Product.update(
-            {
-                price: price,
-                updated_by: req.user.id,
-            },
-            {
-                where: { id: productId }
-            }
+      const update_product = await db.query(
+        `UPDATE products SET price= $1,updated_by=$2
+          WHERE id =ANY($3)`,
+        [price, req.user.id, arrayProductId]
+      );
+
+      for (const id of arrayProductId) {
+        const isexistid = await db.query(
+          `select * from products_price_logs where upload_date::date= $1 AND product_id=$2`,
+          [moment(new Date()).format("YYYY-MM-DD"), id]
         );
 
-        const update_log = await Products_price_logs.create({
-            product_id: productId,
-            price: req.body.price,
-            created_by: req.user.id,
-            updated_by: req.user.id
-        });
+        if (isexistid.rowCount > 0) {
+          await db.query(
+            `UPDATE products_price_logs SET price=$1,updated_by=$2,updated_at=$4
+              WHERE product_id=$3`,
+            [price, req.user.id, id, new Date()]
+          );
+        } else {
+          const getCountryId = await db.query(
+            `select p.country_id,cd.country_name from products as p
+              LEFT JOIN country_data as cd ON p.country_id=cd.id WHERE p.id=$1`,
+            [id]
+          );
 
-        if (!update_log || update_log[0] === 0) {
-            return res.status(200).json({ status: false, message: 'Product price not updated', error: '' });
+          console.log(id);
+
+          await db.query(
+            `INSERT INTO products_price_logs
+            (product_id,price,created_by,updated_by,created_at,updated_at,
+            country_id,country_name,maximum_quantity,upload_date)
+            VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+            [
+              id,
+              price,
+              req.user.id,
+              req.user.id,
+              new Date(),
+              new Date(),
+              getCountryId.rows[0].country_id || null,
+              getCountryId.rows[0].country_name || null,
+              10,
+              moment(new Date()).format("YYYY-MM-DD"),
+            ]
+          );
         }
+      }
 
-        const data = {
-            user_id: req.user.id,
-            table_id: productId,
-            table_name: 'products_price_logs',
-            action: 'price to ' + price,
-        };
+      const data = {
+        user_id: req.user.id,
+        table_id: productId,
+        table_name: "products_price_logs",
+        action: "price to " + price,
+      };
 
-        adminLog(data);
+      adminLog(data);
 
-        return res.status(200).json({ status: true, message: 'Product price updated successfully' });
-
+      return res
+        .status(200)
+        .json({ status: true, message: "Product price updated successfully" });
     } catch (error) {
-        return res.status(200).json({ status: false, message: 'Product price not updated', error: error.message });
+      return res.status(200).json({
+        status: false,
+        message: "Product price not updated",
+        error: error.message,
+      });
     }
 });
 
@@ -1286,6 +1321,7 @@ const exportProductPriceLogs = catchAsync(async (req, res) => {
         //return res.json(query)
 
         const result = await db.query(query, []);
+        console.log("result>>",result)
         let list = result.rows;
 
         //return res.json(list);
@@ -1351,26 +1387,52 @@ const ChangePricelist = catchAsync(async (req, res) => {
             query_params.push(`%${search}%`);
         }
 
+        // const query = `
+        //         SELECT
+        //             p.id,
+        //             p.name AS product_name,
+        //             c.id as category_id,
+        //             c.cat_name AS category_name,
+        //             p.price AS current_price,
+        //             COALESCE(pp.price, 0) AS price_yesterday
+        //         FROM
+        //             products AS p
+        //         LEFT JOIN
+        //             categories AS c ON p.category = c.id
+        //         LEFT JOIN
+        //             products_price_logs AS pp ON p.id = pp.product_id
+        //             AND pp.upload_date = CURRENT_DATE - INTERVAL '1 day'
+        //         WHERE
+        //             p.status = $1 ${categories} ${searchQuery}
+        //         ORDER BY
+        //         p.id ASC ${pageCountQuery}
+        //         `;
+
         const query = `
-                SELECT
-                    p.id,
-                    p.name AS product_name,
-                    c.id as category_id,
-                    c.cat_name AS category_name,
-                    p.price::INTEGER AS current_price,
-                    COALESCE(pp.price, 0)::INTEGER AS price_yesterday
-                FROM
-                    products AS p
-                LEFT JOIN
-                    categories AS c ON p.category = c.id
-                LEFT JOIN
-                    products_price_logs AS pp ON p.id = pp.product_id
-                    AND pp.upload_date = CURRENT_DATE - INTERVAL '1 day'
-                WHERE
-                    p.status = $1 ${categories} ${searchQuery}
-                ORDER BY
-                p.id ASC ${pageCountQuery}
-                `;
+                    SELECT
+                            p.id,
+                            p.name AS product_name,
+                            c.id AS category_id,
+                            c.cat_name AS category_name,
+                            p.price AS current_price,
+                            COALESCE(pp.price, 0) AS price_yesterday
+                        FROM
+                            products AS p
+                        LEFT JOIN
+                            categories AS c ON p.category = c.id
+                        LEFT JOIN LATERAL (
+                            SELECT price
+                            FROM products_price_logs
+                            WHERE product_id = p.id
+                            AND upload_date < CURRENT_DATE
+                            ORDER BY upload_date DESC
+                            LIMIT 1
+                        ) AS pp ON true
+                        WHERE
+                            p.status = $1 ${categories} ${searchQuery}
+                        ORDER BY
+                            p.id ASC ${pageCountQuery}
+            `;
 
         const result = await db.query(query, query_params);
 

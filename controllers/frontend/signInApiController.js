@@ -182,8 +182,6 @@ const Login = catchAsync(async (req, res) => {
 });
 
 //set new password
-//reset password
-
 const resetpassword = catchAsync(async (req, res) => {
   await Promise.all([
     body("old_password")
@@ -364,7 +362,7 @@ const updatePassword = catchAsync(async (req, res, next) => {
 
     const { email, otp, new_password, confirm_password } = req.body;
 
-    if (new_password == '') {
+    if (new_password != '') {
       const checkCutomerInfo = await Customer.findOne({
         where: {
           email: email.toLowerCase(),
@@ -376,19 +374,7 @@ const updatePassword = catchAsync(async (req, res, next) => {
       }
       let customer_name = `${checkCutomerInfo.first_name}  ${checkCutomerInfo.last_name}`;
 
-      const checkOtpResponse = await sendEmail(email, customer_name)
 
-      if (!checkOtpResponse.status) {
-        return res.status(200).json({
-          status: false,
-          message: checkOtpResponse.message,
-        });
-      } else {
-        return res.status(200).json({
-          status: true,
-          message: checkOtpResponse.message,
-        });
-      }
     } else if (otp != '' || new_password != '' || confirm_password != '') {
       return res.status(200).json({
         status: false,
