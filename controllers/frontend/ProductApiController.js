@@ -566,8 +566,8 @@ const view_order = catchAsync(async (req, res) => {
     let Sumoflist;
     if (order_item.rowCount > 0) {
       Sumoflist = order_item.rows.reduce((acc, item) => {
-        acc.qty += parseInt(item.product_quantity);
-        acc.price += parseInt(item.total_price);
+        acc.qty += parseFloat(item.product_quantity) || 0;
+        acc.price += parseFloat(item.total_price) || 0;
         return acc;
       }, { qty: 0, price: 0 });
     }
