@@ -14,7 +14,7 @@ import * as dashboardController from "../controllers/admin/dashbordController.js
 import * as customerController from "../controllers/admin/customerController.js";
 import * as orderController from "../controllers/admin/orderManagementController.js";
 
-import * as dashboardController from "../controllers/admin/dashbordController.js";
+// import * as dashboardController from "../controllers/admin/dashbordController.js";
 import moment from "moment";
 
 const router = Router();

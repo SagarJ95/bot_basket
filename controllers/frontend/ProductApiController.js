@@ -9,8 +9,7 @@ import bcrypt from "bcrypt";
 import { body, validationResult } from "express-validator";
 import { sendOrderConfirmation } from "../../helpers/orderconformation_mail.js";
 import AppError from "../../utils/appError.js";
-import { sendOrderConfirmation } from "../../helpers/orderconformation_mail.js";
-// import { now } from "moment";
+
 const project_name = process.env.APP_NAME;
 const BASE_URL = process.env.BASE_URL || "http://localhost:3848";
 
@@ -72,12 +71,12 @@ const recommended_products = catchAsync(async (req, res) => {
 });
 
 const product_list = catchAsync(async (req, res) => {
-  try{
-      const {category_id,search} = req.body;
-      let query_params = [1,1];
-      let searchQuery = '';
-      let categories = '';
-      let wildcardSearch = '';
+  try {
+    const { category_id, search } = req.body;
+    let query_params = [1, 1];
+    let searchQuery = "";
+    let categories = "";
+    let wildcardSearch = "";
 
     if (category_id) {
       categories = `and p.category = $${query_params.length + 1}`;
@@ -90,7 +89,7 @@ const product_list = catchAsync(async (req, res) => {
       query_params.push(wildcardSearch);
     }
 
-      const productquery = `select
+    const productquery = `select
         p.id,p.name as product_name,p.slug,p.description,p.price,p.minimum_order_place,p.maximum_order_place,
         COALESCE(q.total_ordered_quantity_today, 0) AS total_ordered_quantity_today,
         (p.maximum_order_place - COALESCE(q.total_ordered_quantity_today, 0)) AS available_quantity,c.id as categoryId,c.cat_name as category_name,
@@ -148,47 +147,51 @@ const add_update_cart = catchAsync(async (req, res) => {
   try {
     const { id, product_id, qty, price } = req.body;
 
-      let infoUpdate;
-      let CartInfo;
-      //if id is empty then product insert into cart otherwise update product qty in add_to_carts table
-      if(!id && id == 0){
-
-        const pervPrice = await db.query(`
+    let infoUpdate;
+    let CartInfo;
+    //if id is empty then product insert into cart otherwise update product qty in add_to_carts table
+    if (!id && id == 0) {
+      const pervPrice = await db.query(
+        `
           SELECT price
           FROM products_price_logs
           WHERE product_id = $1 AND created_at < (CURRENT_DATE - INTERVAL '1 day')
           ORDER BY created_at DESC
           LIMIT 1
-        `, [product_id]);
+        `,
+        [product_id]
+      );
 
-        const previousPrice = pervPrice.rows[0]?.price || null;
+      const previousPrice = pervPrice.rows[0]?.price || null;
 
-         CartInfo = await addToCart.create({
-          product_id,
-          qty,
-          price,
-          prevprice: previousPrice,
-          created_by: req.user.id,
-          status: 1
-        });
+      CartInfo = await addToCart.create({
+        product_id,
+        qty,
+        price,
+        prevprice: previousPrice,
+        created_by: req.user.id,
+        status: 1,
+      });
 
-        infoUpdate = 'Add';
-      }else{
+      infoUpdate = "Add";
+    } else {
+      CartInfo = await addToCart.update(
+        {
+          qty: qty,
+          price: price,
+        },
+        {
+          where: {
+            id: parseInt(id),
+            product_id: product_id,
+            status: 1,
+            created_by: req.user.id,
+          },
+        }
+      );
 
-         CartInfo = await addToCart.update({
-          qty:qty,
-          price:price
-        },{
-          where:{
-            id:parseInt(id),
-            product_id:product_id,
-            status:1,
-            created_by:req.user.id
-          }
-        })
-
-        infoUpdate = 'Update';
-      }
+      infoUpdate = "Update";
+    }
 
     return res.status(200).json({
       status: true,
@@ -342,17 +345,17 @@ const create_order = catchAsync(async (req, res) => {
     } = req.body;
 
     const order_id = await Orders.create({
-      customer_id:customer_id,
-      order_ref_id:'00001',
-      customer_name:name,
-      whatsapp_number:whatsapp_number,
-      email:email,
-      perferred_delivery_date:perferred_delivery_date,
-      address:address,
-      special_instruction:instruction,
-      status:1,
-      order_status:1,
-      created_by:customer_id
+      customer_id: customer_id,
+      order_ref_id: "00001",
+      customer_name: name,
+      whatsapp_number: whatsapp_number,
+      email: email,
+      perferred_delivery_date: perferred_delivery_date,
+      address: address,
+      special_instruction: instruction,
+      status: 1,
+      order_status: 1,
+      created_by: customer_id,
     });
 
     if (order_id.id && order_item) {
@@ -427,7 +430,8 @@ const order_history = catchAsync(async (req, res) => {
     const customer_id = req.user.id;
     const { status } = req.body;
 
-    const result = await db.query(`SELECT
+    const result = await db.query(
+      `SELECT
     o.id as order_id,
     oi.product_id,
     TO_CHAR(o.perferred_delivery_date, 'FMDDth Month YYYY') AS delivery_date,
@@ -443,16 +447,16 @@ const order_history = catchAsync(async (req, res) => {
     LEFT JOIN order_items AS oi ON o.id = oi.order_id
     LEFT JOIN products AS p ON oi.product_id = p.id
     WHERE o.customer_id = $1 AND o.order_status = $2 and oi.order_item_status = $3 and o.status = $4
-    GROUP BY p.id,o.id, oi.product_id, o.perferred_delivery_date, p.name, p.description`,[customer_id,status,1,1]);
+    GROUP BY p.id,o.id, oi.product_id, o.perferred_delivery_date, p.name, p.description`,
+      [customer_id, status, 1, 1]
+    );
 
     return res.status(200).json({
       status: true,
       message: "Fetch Order History Successfully",
       data: result.rowCount > 0 ? result.rows : [],
     });
-
-
-  }catch(error){
+  } catch (error) {
     return res.status(200).json({
       status: false,
       message: error.message,
@@ -512,24 +516,35 @@ const view_order = catchAsync(async (req, res) => {
       FROM order_items AS oi
       LEFT JOIN products AS p ON oi.product_id = p.id
       WHERE oi.order_id = $1 And oi.order_item_status = $2
-      GROUP BY oi.id,p.id,p.description`,[order_id,1]);
+      GROUP BY oi.id,p.id,p.description`,
+      [order_id, 1]
+    );
 
-      let Sumoflist;
-      if(order_item.rowCount > 0){
-        Sumoflist = order_item.rows.reduce((acc, item) => {
-            acc.qty += parseInt(item.product_quantity);
-            acc.price += parseInt(item.total_price);
-            return acc;
-            }, { qty: 0, price: 0 });
-        }
+    let Sumoflist;
+    if (order_item.rowCount > 0) {
+      Sumoflist = order_item.rows.reduce(
+        (acc, item) => {
+          acc.qty += parseInt(item.product_quantity);
+          acc.price += parseInt(item.total_price);
+          return acc;
+        },
+        { qty: 0, price: 0 }
+      );
+    }
 
     return res.status(200).json({
       status: true,
-      message: 'Fetch Order Details Successfully',
-      data:(result.rowCount > 0) ? [{
-        ...result.rows[0],
-      order_items: order_item.rows,
-      Sumoflist:(Sumoflist) ? Sumoflist : ''}] : []
+      message: "Fetch Order Details Successfully",
+      data:
+        result.rowCount > 0
+          ? [
+              {
+                ...result.rows[0],
+                order_items: order_item.rows,
+                Sumoflist: Sumoflist ? Sumoflist : "",
+              },
+            ]
+          : [],
     });
   } catch (error) {
     return res.status(200).json({
@@ -538,9 +553,9 @@ const view_order = catchAsync(async (req, res) => {
       errors: error.message,
     });
   }
- })
+});
 
- // repeat order
+// repeat order
 const repeat_order = catchAsync(async (req, res) => {
   try {
     const customer_id = req.user.id;
@@ -584,7 +599,6 @@ const repeat_order = catchAsync(async (req, res) => {
       message: "Order fetched and added to cart successfully!",
       data: items,
     });
-
   } catch (error) {
     res.status(400).json({
       status: false,
@@ -592,7 +606,6 @@ const repeat_order = catchAsync(async (req, res) => {
     });
   }
 });
-
 
 /******************* End Order creation Flow ************************ */
 
