@@ -68,7 +68,7 @@ const getCategories = catchAsync(async (req, res) => {
         return res.status(200).json({
             status: true,
             total: (totalCategories.rowCount > 0) ? parseInt(totalCategories.rows[0].count) : 0,
-            message: 'Fetch Categories successfully',
+            message: 'Fetch Categories Successfully',
             data: (getCategorieslist.rowCount > 0) ? getCategorieslist.rows : []
         });
     } catch (error) {
@@ -989,10 +989,10 @@ const excelExportProducts = catchAsync(async (req, res) => {
         await workbook.xlsx.writeFile(filePath);
 
         // Send file path as response
-        return res.json({ status: true, data: BASE_URL + `/uploads/exports/${fileName}` });
+        return res.json({ success: true, data: BASE_URL + `/uploads/exports/${fileName}` });
 
     } catch (error) {
-        return res.status(200).json({ status: false, message: "Internal Server Error", error: error.message });
+        return res.status(200).json({ success: false, message: "Internal Server Error", error: error.message });
     }
 });
 
@@ -1049,13 +1049,13 @@ const excelExportProductsInfo = catchAsync(async (req, res) => {
 
         writeStream.on("finish", () => {
             res.json({
-                status: true,
+                success: true,
                 data: `${BASE_URL}/uploads/exports_product/${fileName}`,
             });
         });
 
     } catch (error) {
-        return res.status(200).json({ status: false, message: "Internal Server Error", error: error.message });
+        return res.status(200).json({ success: false, message: "Internal Server Error", error: error.message });
     }
 });
 
@@ -1155,7 +1155,7 @@ const importProductListwithPrice = catchAsync(async (req, res) => {
         // console.log("importData>>",csvData)
     } catch (e) {
         return res.status(200).json({
-            status: false, message: "Internal Server Error",
+            success: false, message: "Internal Server Error",
             error: e.message
         });
     }
@@ -1283,13 +1283,13 @@ const getProductPriceLogs = catchAsync(async (req, res) => {
 
 
         return res.status(200).json({
-            status: true,
+            success: true,
             message: "logs retrieved successfully",
             data: result.rows
         });
     }
     catch (error) {
-        return res.status(200).json({ status: false, message: "Internal Server Error", error: error.message });
+        return res.status(200).json({ success: false, message: "Internal Server Error", error: error.message });
     }
 });
 
@@ -1321,6 +1321,7 @@ const exportProductPriceLogs = catchAsync(async (req, res) => {
         //return res.json(query)
 
         const result = await db.query(query, []);
+        console.log("result>>",result)
         let list = result.rows;
 
         //return res.json(list);
@@ -1355,10 +1356,10 @@ const exportProductPriceLogs = catchAsync(async (req, res) => {
         await workbook.xlsx.writeFile(filePath);
 
         // Send file path as response
-        return res.status(200).json({ status: true, filePath: BASE_URL + `/uploads/exports/${fileName}` });
+        return res.status(200).json({ success: true, filePath: BASE_URL + `/uploads/exports/${fileName}` });
 
     } catch (error) {
-        return res.status(200).json({ status: false, message: "Internal Server Error", error: error.message });
+        return res.status(200).json({ success: false, message: "Internal Server Error", error: error.message });
     }
 });
 
@@ -1437,14 +1438,14 @@ const ChangePricelist = catchAsync(async (req, res) => {
 
 
         return res.status(200).json({
-            status: true,
+            success: true,
             total: (result.rowCount > 0) ? result.rowCount : 0,
             message: "Fetch Change Price details successfully",
             data: (result.rowCount > 0) ? result.rows : []
         });
     }
     catch (error) {
-        return res.status(200).json({ status: false, message: "Internal Server Error", error: error.message });
+        return res.status(200).json({ success: false, message: "Internal Server Error", error: error.message });
     }
 });
 
