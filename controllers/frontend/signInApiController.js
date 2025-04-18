@@ -38,8 +38,7 @@ const SignUp = catchAsync(async (req, res) => {
     }).run(req),
     body('phone_no').notEmpty().withMessage('Phone Number is required').isLength({ min: 10, max: 10 }).withMessage('Phone number must be exactly 10 digits.')
       .isNumeric().withMessage('Phone number must contain only digits.').run(req),
-    body('password').notEmpty().withMessage('Password is required').run(req),
-    body('otp').notEmpty().withMessage('OTP is required').run(req),
+    body('password').notEmpty().withMessage('Password is required').run(req)
   ]);
 
   // Handle validation result
@@ -49,22 +48,22 @@ const SignUp = catchAsync(async (req, res) => {
     throw new AppError(error_message, 200, errors);
   }
 
-  const { first_name, last_name, phone_no, otp, email, password } = req.body;
+  const { first_name, last_name, phone_no, email, password } = req.body;
 
   let creation = null;
   try {
-    //check otp expire and invalid, incorrect functionlity
-    const getOtpexpireStatus = await otpexpire(email, otp)
+    // //check otp expire and invalid, incorrect functionlity
+    // const getOtpexpireStatus = await otpexpire(email, otp)
 
-    if (!getOtpexpireStatus.status) {
-      return res.status(200).json({
-        status: false,
-        message: getOtpexpireStatus.message,
-      });
-    }
+    // if (!getOtpexpireStatus.status) {
+    //   return res.status(200).json({
+    //     status: false,
+    //     message: getOtpexpireStatus.message,
+    //   });
+    // }
 
-    // OTP is valid, delete it after verification
-    await db.query("DELETE FROM customer_otp_logs WHERE id = $1", [getOtpexpireStatus.id]);
+    // // OTP is valid, delete it after verification
+    // await db.query("DELETE FROM customer_otp_logs WHERE id = $1", [getOtpexpireStatus.id]);
 
     const hashPassword = await bcrypt.hash(password, 10);
 
@@ -359,7 +358,7 @@ const updatePassword = catchAsync(async (req, res, next) => {
 
   try {
 
-    const { email, otp, new_password, confirm_password } = req.body;
+    const { email,new_password, confirm_password } = req.body;
 
     if (new_password != '') {
       const checkCutomerInfo = await Customer.findOne({
@@ -374,7 +373,7 @@ const updatePassword = catchAsync(async (req, res, next) => {
       let customer_name = `${checkCutomerInfo.first_name}  ${checkCutomerInfo.last_name}`;
 
 
-    } else if (otp != '' || new_password != '' || confirm_password != '') {
+    } else if (new_password != '' || confirm_password != '') {
       return res.status(200).json({
         status: false,
         message: "Please Fill all fields"
@@ -382,24 +381,24 @@ const updatePassword = catchAsync(async (req, res, next) => {
     }
 
     //check otp expire and invalid, incorrect functionlity
-    const getOtpexpireStatus = await otpexpire(email.toLowerCase(), otp);
+    // const getOtpexpireStatus = await otpexpire(email.toLowerCase(), otp);
 
-    if (!getOtpexpireStatus.status) {
-      return res.status(200).json({
-        status: false,
-        message: getOtpexpireStatus.message,
-      });
-    }
+    // if (!getOtpexpireStatus.status) {
+    //   return res.status(200).json({
+    //     status: false,
+    //     message: getOtpexpireStatus.message,
+    //   });
+    // }
 
     //check otp from customer_otp_logs table
-    const checkotpstatus = await db.query(`select * from customer_otp_logs where otp = ${otp} and status = $1 and deleted_at IS NULL`, ["1"])
+    // const checkotpstatus = await db.query(`select * from customer_otp_logs where otp = ${otp} and status = $1 and deleted_at IS NULL`, ["1"])
 
-    if (checkotpstatus.rowCount <= 0) {
-      return res.status(200).json({
-        status: false,
-        message: "OTP doesn't match",
-      });
-    }
+    // if (checkotpstatus.rowCount <= 0) {
+    //   return res.status(200).json({
+    //     status: false,
+    //     message: "OTP doesn't match",
+    //   });
+    // }
 
     //check the new password and confirm password is match or not
     if (new_password !== confirm_password) {
@@ -417,7 +416,8 @@ const updatePassword = catchAsync(async (req, res, next) => {
     //update customer password in Customer Table
     const updateCustomerPassword = await Customer.update(updateInfo, {
       where: {
-        email: checkotpstatus.rows[0].email
+        //email: checkotpstatus.rows[0].email
+        email:email.toLowerCase()
       },
     });
 
@@ -425,16 +425,16 @@ const updatePassword = catchAsync(async (req, res, next) => {
 
       //update otp status in customer_otp_logs
       //const updateOtpStatus = await db.query(`update customer_otp_logs set status = "0" where id = ${checkotpstatus.rows[0].id} and status =1 and deleted_at IS NUll`);
-      await db.query("DELETE FROM customer_otp_logs WHERE id = $1", [checkotpstatus.rows[0].id]);
+     // await db.query("DELETE FROM customer_otp_logs WHERE id = $1", [checkotpstatus.rows[0].id]);
 
       return res
         .status(200)
         .json({ status: true, message: "Password Update successfully", data: [] });
-    } else {
-      return res
-        .status(200)
-        .json({ status: false, message: "Password Update Unsuccessfully", data: [] });
-    }
+      } else {
+        return res
+          .status(200)
+          .json({ status: false, message: "Password Update Unsuccessfully", data: [] });
+      }
   } catch (error) {
     throw new AppError(error.message, 200);
   }
@@ -876,6 +876,58 @@ async function sendEmail(email, customer_name) {
   }
 
 }
+
+//verify otp
+const verifyOtp = catchAsync(async (req, res) => {
+
+  // Apply validation rules
+  await Promise.all([
+    body('email').notEmpty().withMessage('Email is required').isEmail().withMessage("Invalid email format").run(req),
+    body('otp').notEmpty().withMessage('OTP is required').run(req)
+  ]);
+
+  // Handle validation result
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    const error_message = errors.array()[0].msg;
+    throw new AppError(error_message, 200, errors);
+  }
+
+  const { otp, email } = req.body;
+
+  try {
+    //check otp expire and invalid, incorrect functionlity
+    const getOtpexpireStatus = await otpexpire(email.toLowerCase(), otp)
+
+    if (!getOtpexpireStatus.status) {
+      return res.status(200).json({
+        status: false,
+        message: getOtpexpireStatus.message,
+      });
+    }
+
+    const checkotpstatus = await db.query(`select * from customer_otp_logs where otp = ${otp} and status = $1 and deleted_at IS NULL`, ["1"])
+
+    if (checkotpstatus.rowCount <= 0) {
+      return res.status(200).json({
+        status: false,
+        message: "OTP doesn't match",
+      });
+    }
+
+    // OTP is valid, delete it after verification
+    await db.query("DELETE FROM customer_otp_logs WHERE id = $1", [getOtpexpireStatus.id]);
+
+      return res.status(200).json({
+        status: true,
+        message: "OTP verified successfully",
+      });
+
+  } catch (err) {
+    // Handle errors
+    throw new AppError(err.message, 200, errors);
+  }
+});
 /******************* End Forget password************************ */
 
 
@@ -884,7 +936,8 @@ export {
   Login,
   resend_otp,
   updatePassword,
-  resetpassword
+  resetpassword,
+  verifyOtp
 }
 
 

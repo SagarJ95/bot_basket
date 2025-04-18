@@ -59,6 +59,9 @@ const upload = multer({
 //customer Sign Up API
 router.post('/sign_up', cutomerController.SignUp);
 
+//verfiy OTP (sign up and forget password)
+router.post('/verifyOtp',cutomerController.verifyOtp)
+
 //customer Login API
 router.post('/login', cutomerController.Login);
 
