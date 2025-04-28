@@ -52,7 +52,7 @@ const dashboardController = async (req, res) => {
           total_price: parseInt(total_price_result.rows[0].total_price) || 0,
           pending_order_count:
             parseInt(pendingOrder.rows[0].pending_order_count) || 0,
-          customers: get_customers_details.rows || [],
+          order_list: get_customers_details.rows || [],
         },
       ],
     });

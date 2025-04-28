@@ -13,6 +13,7 @@ import * as dashboardController from "../controllers/admin/dashbordController.js
 
 import * as customerController from "../controllers/admin/customerController.js";
 import * as orderController from "../controllers/admin/orderManagementController.js";
+import * as storeLocationController from "../controllers/admin/store_self_location_api_controllers.js";
 
 // import * as dashboardController from "../controllers/admin/dashbordController.js";
 import moment from "moment";
@@ -22,12 +23,6 @@ const router = Router();
 const file_storage = diskStorage({
   destination: function (req, file, cb) {
     let uploadPath;
-
-    if (file.fieldname === "photo") {
-      uploadPath = "./public/uploads/masters";
-    } else {
-      return cb(new Error("Invalid fieldname"), null);
-    }
 
     if (file.fieldname === "profile") {
       uploadPath = "./public/uploads/profile";
@@ -158,7 +153,6 @@ router.post(
   masterController.createCategory
 );
 router.post("/getCategoryById", authenticate, masterController.getCategoryById);
-
 router.post(
   "/updateCategoryById",
   authenticate,
@@ -195,7 +189,6 @@ router.post(
   masterController.updateProduct
 );
 router.post("/getProductById", authenticate, masterController.getProductById);
-
 router.post(
   "/deleteProductById",
   authenticate,
@@ -333,8 +326,29 @@ router.post(
   orderController.orderEditDetails
 );
 
-//dashbord
+//store self location
+router.post(
+  "/selfStoreLocaton",
+  authenticate,
+  storeLocationController.selfStoreLocation
+);
 
-router.post("/dashbord", authenticate, dashboardController.dashboardController);
+router.get(
+  "/getStoreLocation",
+  authenticate,
+  storeLocationController.getStoreLocation
+);
+
+router.post(
+  "/updateStoreLocation",
+  authenticate,
+  storeLocationController.updateStoreLocation
+);
+
+router.post(
+  "/deleteStoreLocation",
+  authenticate,
+  storeLocationController.deleteStoreLocation
+);
 
 export default router;

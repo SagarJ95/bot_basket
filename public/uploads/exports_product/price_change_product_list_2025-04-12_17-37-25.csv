@@ -1,0 +1,21 @@
+Product_Id,Product_Name,Country_Name,Max_Quantity,Price
+1,Apple,,50,1000
+2,Mango,,50,24
+3,Orange,,50,60
+4,Banana,,50,39
+5,Watermelon,,50,46
+6,tomatoe,,50,67
+7,potato,,50,56
+8,Onion,,50,22
+9,Cucumber,,50,67
+10,Tea,,50,67
+11,Milk,,50,0
+12,Soda,,50,768
+13,Coffee,,50,54
+14,Wine,,50,67
+15,Potato chips,,50,768
+16,Popcorn,,50,7
+17,Banana chips,,50,755
+18,Cheese,,50,56
+19,Ice cream,,50,65
+20,Carrot,,50,57

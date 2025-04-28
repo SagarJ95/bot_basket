@@ -10,10 +10,12 @@ export async function sendOrderConfirmation(
   email,
   customer_name,
   delivery_address,
-  products = []
+  products = [],
+  order_id
 ) {
   const totalPrice = products.reduce((sum, p) => sum + p.price * p.quantity, 0);
-  const orderId = `BOT${Math.floor(100000 + Math.random() * 900000)}`;
+  // const orderId = `BOT${Math.floor(100000 + Math.random() * 900000)}`;
+  const orderId = `BOT${order_id}`;
   const orderDate = moment().format("YYYY-MM-DD HH:mm");
   const pdfPath = `./order_${Date.now()}.pdf`;
 
@@ -69,8 +71,8 @@ export async function sendOrderConfirmation(
           </thead>
           <tbody>
             ${products
-              .map(
-                (p) => `
+      .map(
+        (p) => `
               <tr>
                 <td>${p.name}</td>
                 <td>${p.quantity}</td>
@@ -78,14 +80,14 @@ export async function sendOrderConfirmation(
                 <td>₹${(p.price * p.quantity).toFixed(2)}</td>
               </tr>
             `
-              )
-              .join("")}
+      )
+      .join("")}
           </tbody>
         </table>
 
         <h3 style="text-align:right;">Total Price: ₹${totalPrice.toFixed(
-          2
-        )}</h3>
+        2
+      )}</h3>
 
         <p style="text-align:center;">Thank you for shopping with <strong>BotBasket</strong>!</p>
         <p style="text-align:center;">We appreciate your trust and look forward to serving you again.</p>
@@ -97,15 +99,28 @@ export async function sendOrderConfirmation(
     </html>
   `;
 
-  // ✅ Generate PDF using Puppeteer
-  //   const browser = await puppeteer.launch({ headless: "new" });
 
+  //   const browser = await puppeteer.launch({ headless: "new" });
+ // work on local
   const browser = await puppeteer.launch({
     executablePath:
-      "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe", // Path to your system Chrome
+      "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
     headless: "new",
     args: ["--no-sandbox", "--disable-setuid-sandbox"],
   });
+
+  // work on server
+  // const browser = await puppeteer.launch({
+  //   executablePath:
+  //   "/usr/bin/google-chrome-stable",
+  //   headless: true,
+  //   args: [
+  //     "--no-sandbox",
+  //     "--disable-setuid-sandbox",
+  //     "--enable-logging", // Enable detailed logs
+  //   ],
+  // });
+
   const page = await browser.newPage();
   //   await page.setContent(htmlContent);
   await page.setContent(htmlContent, { waitUntil: "domcontentloaded" }); // faster than networkidle0
@@ -116,6 +131,7 @@ export async function sendOrderConfirmation(
   // Simple, faster
 
   // ✅ Nodemailer setup
+  //local work send mail
   const transport = nodemailer.createTransport({
     service: "gmail",
     auth: {
@@ -123,6 +139,20 @@ export async function sendOrderConfirmation(
       pass: process.env.MAIL_PASSWORD,
     },
   });
+
+  //server work send mail
+  // const transport = nodemailer.createTransport({
+  //   host: process.env.MAIL_HOST,
+  //   port: process.env.MAIL_PORT,
+  //   secure: false, // Set to false since STARTTLS is being used
+  //   auth: {
+  //     user: process.env.MAIL_USERNAME,
+  //     pass: process.env.MAIL_PASSWORD,
+  //   },
+  //   tls: {
+  //     rejectUnauthorized: false,
+  //   },
+  // });
 
   // ✅ Email Body
   const mailOptions = {
@@ -133,7 +163,7 @@ export async function sendOrderConfirmation(
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
         <h2 style="color: #4CAF50;">Hello ${customer_name},</h2>
         <p>Thank you for shopping with <strong>BotBasket</strong>! Your order has been successfully placed.</p>
-        
+
         <h3>🧾 Order Summary</h3>
         <p><strong>Total Price:</strong> ₹${totalPrice.toFixed(2)}</p>
         <p><strong>Delivery Address:</strong> ${delivery_address}</p>

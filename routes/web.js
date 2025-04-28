@@ -57,18 +57,21 @@ const upload = multer({
 //customer Sign Up API
 router.post("/sign_up", cutomerController.SignUp);
 
+//verfiy OTP (sign up and forget password)
+router.post("/verifyOtp", cutomerController.verifyOtp);
+
 //customer Login API
 router.post("/login", cutomerController.Login);
 
 //forget password
-router.post('/forget_password',cutomerController.updatePassword)
+router.post("/forget_password", cutomerController.updatePassword);
 
 //reset password
 router.post(
-    "/set_new_password",
-    customer_authenticate,
-    cutomerController.resetpassword
-  );
+  "/set_new_password",
+  customer_authenticate,
+  cutomerController.resetpassword
+);
 
 //send Email wwith OTP
 router.post("/resend_otp", cutomerController.resend_otp);
@@ -81,23 +84,25 @@ router.post(
 );
 
 //update customer info
-router.post('/update_customer_info',customer_authenticate,
-    upload.fields([
-        { name: "profile", maxCount: 1 }
-      ]),profileController.update_customer_profile);
+router.post(
+  "/update_customer_info",
+  customer_authenticate,
+  upload.fields([{ name: "profile", maxCount: 1 }]),
+  profileController.update_customer_profile
+);
 
 //Address list
-router.post('/getAddressList',customer_authenticate,profileController.getAddressList)
+router.post(
+  "/getAddressList",
+  customer_authenticate,
+  profileController.getAddressList
+);
 
 //category list
 router.get("/category_list", staticApiKey, productController.category_list);
 
 //product list
-router.post(
-  "/product_list",
-  customer_authenticate,
-  productController.product_list
-);
+router.post("/product_list", staticApiKey, productController.product_list);
 
 //Add cart
 router.post(
@@ -141,8 +146,11 @@ router.post(
 );
 
 //repeat_order
-router.post('/repeat_order',customer_authenticate,productController.repeat_order)
-
+router.post(
+  "/repeat_order",
+  customer_authenticate,
+  productController.repeat_order
+);
 
 /********************************** End Customer Section *********************************/
 

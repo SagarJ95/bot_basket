@@ -7,9 +7,9 @@ import { body, validationResult } from "express-validator";
 import bcrypt from "bcrypt";
 import moment from 'moment';
 import db from "../../config/db.js";
-import ExcelJS  from "exceljs";
-import path  from "path";
-import fs  from "fs";
+import ExcelJS from "exceljs";
+import path from "path";
+import fs from "fs";
 import Customer from "../../db/models/customers.js";
 import adminLog from '../../helpers/admin_log.js';
 import customer_address from "../../db/models/customer_address.js";
@@ -21,23 +21,23 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:3848';
 // GET all customer (datatables)
 const getCustomers = catchAsync(async (req, res) => {
     try {
-        const {page, search} = req.body
+        const { page, search } = req.body
 
-        const query_params = [1,1,1];
+        const query_params = [1, 1, 1];
 
         let pageCountQuery = '';
         let searchQuery = ``;
 
-         if(page){
+        if (page) {
             let pageCount = (page - 1) * 10;
             pageCountQuery = `LIMIT $${query_params.length + 1} OFFSET $${query_params.length + 2}`
-            query_params.push(10,pageCount)
-         }
+            query_params.push(10, pageCount)
+        }
 
-         if (search) {
+        if (search) {
             searchQuery = `AND CONCAT(c.first_name, ' ', c.last_name) ILIKE $${query_params.length + 1}`;
             query_params.push(`%${search}%`);
-         }
+        }
 
         const query = `select c.id,CONCAT(c.first_name,' ',c.last_name) as customer_name,
         c.phone_no as contact_no,c.whatsapp_no,COUNT(DISTINCT o.id) as total_order,
@@ -50,14 +50,14 @@ const getCustomers = catchAsync(async (req, res) => {
         GROUP BY c.first_name,c.last_name,c.phone_no,c.whatsapp_no,c.id
         order By c.id desc ${pageCountQuery}`;
 
-        const result = await db.query(query,query_params)
+        const result = await db.query(query, query_params)
 
         return res.status(200).json({
             status: true,
-            total:(result.rowCount > 0) ? result.rowCount : 0,
+            total: (result.rowCount > 0) ? result.rowCount : 0,
             message: 'Fetch customer details Successfully',
-            data:(result.rowCount > 0) ? result.rows : []
-          });
+            data: (result.rowCount > 0) ? result.rows : []
+        });
     } catch (error) {
         throw new AppError(error.message, 400);
     }
@@ -81,7 +81,7 @@ const exportCustomers = catchAsync(async (req, res) => {
         GROUP BY c.id,c.first_name,c.last_name,c.phone_no,c.whatsapp_no,c.status
         `;
 
-        const result = await db.query(query, [1,1,1]);
+        const result = await db.query(query, [1, 1, 1]);
         let list = result.rows;
 
         // Create Excel file
@@ -143,7 +143,7 @@ const exportCustomers = catchAsync(async (req, res) => {
 const getParticularCustomerInfo = catchAsync(async (req, res) => {
 
     await Promise.all([
-    body('customer_id').notEmpty().withMessage('Customer Id is required').run(req)
+        body('customer_id').notEmpty().withMessage('Customer Id is required').run(req)
     ]);
 
     // Handle validation result
@@ -154,8 +154,8 @@ const getParticularCustomerInfo = catchAsync(async (req, res) => {
     }
 
     try {
-        const {customer_id} = req.body;
-        const query_params = [customer_id,1,1];
+        const { customer_id } = req.body;
+        const query_params = [customer_id, 1, 1];
 
         const query = `SELECT
             c.first_name,
@@ -183,13 +183,13 @@ const getParticularCustomerInfo = catchAsync(async (req, res) => {
           AND c.deleted_at IS NULL
         GROUP BY c.id`;
 
-        const result = await db.query(query,query_params)
+        const result = await db.query(query, query_params)
 
         return res.status(200).json({
             status: true,
             message: 'Fetch customer details Successfully',
-            data:(result.rowCount > 0) ? result.rows : []
-          });
+            data: (result.rowCount > 0) ? result.rows : []
+        });
     } catch (error) {
         throw new AppError(error.message, 400);
     }
@@ -200,29 +200,29 @@ const getParticularCustomerInfo = catchAsync(async (req, res) => {
 const update_customer_info = catchAsync(async (req, res) => {
 
     await Promise.all([
-            body('customer_id').notEmpty().withMessage('Customer Id is required').run(req),
-            body('first_name').notEmpty().withMessage('first name is required').run(req),
-            body('last_name').notEmpty().withMessage('Last Name is required').run(req),
-            body('contact_number').notEmpty().withMessage('Contact Number is required').run(req),
-            body('whatsapp_number').notEmpty().withMessage('Whatsapp Number is required').run(req),
-            body('email').notEmpty().withMessage('Email is required').run(req)
-        ]);
+        body('customer_id').notEmpty().withMessage('Customer Id is required').run(req),
+        body('first_name').notEmpty().withMessage('first name is required').run(req),
+        body('last_name').notEmpty().withMessage('Last Name is required').run(req),
+        body('contact_number').notEmpty().withMessage('Contact Number is required').run(req),
+        body('whatsapp_number').notEmpty().withMessage('Whatsapp Number is required').run(req),
+        body('email').notEmpty().withMessage('Email is required').run(req)
+    ]);
 
-        // Handle validation result
-        const errors = validationResult(req);
-        if (!errors.isEmpty()) {
-            const error_message = errors.array()[0].msg;
-            throw new AppError(error_message, 200, errors);
-        }
+    // Handle validation result
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const error_message = errors.array()[0].msg;
+        throw new AppError(error_message, 200, errors);
+    }
 
-    try{
+    try {
 
-        const {first_name,last_name,contact_number,whatsapp_number,email,password,enable_email_notification,address,customer_id} = req.body;
+        const { first_name, last_name, contact_number, whatsapp_number, email, password, enable_email_notification, address, customer_id } = req.body;
         const files = req.files || {};
 
         let addressInfo;
         if (typeof address == 'string') {
-          addressInfo = JSON.parse(address);
+            addressInfo = JSON.parse(address);
         }
 
 
@@ -234,30 +234,29 @@ const update_customer_info = catchAsync(async (req, res) => {
 
         const hashPassword = (password) ? await bcrypt.hash(password, 10) : getCustomerInfo.rows[0].password;
 
-        if(Array.isArray(addressInfo))
-        {
-          for (const val of addressInfo) {
-            if(val.id == ''){
-              const Insertquery = `INSERT INTO customer_addresses (customer_id, address, tag,status,created_by) values ($1, $2, $3,$4,$5)`;
-                await db.query(Insertquery, [customer_id, val.address, val.tag,1,customer_id])
-            }else{
-              const updatequery = `Update customer_addresses SET address = $1, tag = $2 Where customer_id = $3 and id = $4 and status = $5`;
-              await db.query(updatequery, [val.address, val.tag,customer_id,val.id,1])
+        if (Array.isArray(addressInfo)) {
+            for (const val of addressInfo) {
+                if (val.id == '') {
+                    const Insertquery = `INSERT INTO customer_addresses (customer_id, address, tag,status,created_by) values ($1, $2, $3,$4,$5)`;
+                    await db.query(Insertquery, [customer_id, val.address, val.tag, 1, customer_id])
+                } else {
+                    const updatequery = `Update customer_addresses SET address = $1, tag = $2 Where customer_id = $3 and id = $4 and status = $5`;
+                    await db.query(updatequery, [val.address, val.tag, customer_id, val.id, 1])
+                }
             }
-          }
         }
 
         const updateInfo = {
-          first_name:first_name,
-          last_name:last_name,
-          phone_no:contact_number,
-          whatsapp_no:whatsapp_number,
-          email:email,
-          password:hashPassword,
-          enable_email_notification:enable_email_notification
-          };
+            first_name: first_name,
+            last_name: last_name,
+            phone_no: contact_number,
+            whatsapp_no: whatsapp_number,
+            email: email,
+            password: hashPassword,
+            enable_email_notification: enable_email_notification
+        };
 
-          const formatPath = (filePath) => {
+        const formatPath = (filePath) => {
             return filePath ? filePath.replace(/^public[\\/]/, '/').replace(/\\/g, '/') : null;
         };
 
@@ -266,33 +265,33 @@ const update_customer_info = catchAsync(async (req, res) => {
             : null;
 
         if (profile_pic) updateInfo.profile = profile_pic;
-        const updateCustomerPassword = await Customer.update(updateInfo,{
-            where:{
-              id:customer_id
-              }
-          });
+        const updateCustomerPassword = await Customer.update(updateInfo, {
+            where: {
+                id: customer_id
+            }
+        });
 
-          const data = {
+        const data = {
             user_id: req.user.id,
             table_id: customer_id,
             table_name: 'customer',
             action: 'update',
-           };
+        };
 
-            adminLog(data);
+        adminLog(data);
 
-          return res.status(200).json({
+        return res.status(200).json({
             status: true,
             message: (updateCustomerPassword.length > 0) ? "update customer info sucessfully" : "update customer info Unsucessfully",
-          });
+        });
 
-      }catch(e){
+    } catch (e) {
         return res.status(200).json({
             status: false,
             message: "Failed to data",
             errors: e.message
         });
-      }
+    }
 });
 
 //Add Customer
@@ -304,14 +303,14 @@ const add_customer = catchAsync(async (req, res) => {
         body('contact_number').notEmpty().withMessage('Contact Number is required').run(req),
         body('whatsapp_number').notEmpty().withMessage('Whatsapp Number is required').run(req),
         body('email').notEmpty().withMessage('Email is required').isEmail().withMessage("Invalid email format").custom(async (value) => {
-        // Check if the email already exists in the database
-        if(value){
-        const existingEmail = await Customer.findOne({ where: { email: value } });
-        if (existingEmail) {
-            return res.status(200).json({status:false,message:"Email Id already exists",errors:{}})
-        }
-        }
-    }).run(req),
+            // Check if the email already exists in the database
+            if (value) {
+                const existingEmail = await Customer.findOne({ where: { email: value } });
+                if (existingEmail) {
+                    return res.status(200).json({ status: false, message: "Email Id already exists", errors: {} })
+                }
+            }
+        }).run(req),
         body('password').notEmpty().withMessage('Pasword is required').run(req)
     ]);
 
@@ -322,29 +321,29 @@ const add_customer = catchAsync(async (req, res) => {
         throw new AppError(error_message, 200, errors);
     }
 
-    try{
-        const {first_name,last_name,contact_number,whatsapp_no,email,password,address} = req.body;
+    try {
+        const { first_name, last_name, contact_number, whatsapp_number, email, password, address } = req.body;
 
         const files = req.files || {};
         let addressInfo;
         if (typeof address == 'string') {
-          addressInfo = JSON.parse(address);
+            addressInfo = JSON.parse(address);
         }
 
         const hashPassword = await bcrypt.hash(password, 10)
 
         const createInfo = {
-          first_name:first_name,
-          last_name:last_name,
-          phone_no:contact_number,
-          whatsapp_no:whatsapp_no,
-          email:email,
-          password:hashPassword,
-          enable_email_notification:1,
-          status:1
-          };
+            first_name: first_name,
+            last_name: last_name,
+            phone_no: contact_number,
+            whatsapp_no: whatsapp_number,
+            email: email,
+            password: hashPassword,
+            enable_email_notification: 1,
+            status: 1
+        };
 
-          const formatPath = (filePath) => {
+        const formatPath = (filePath) => {
             return filePath ? filePath.replace(/^public[\\/]/, '/').replace(/\\/g, '/') : null;
         };
 
@@ -355,39 +354,38 @@ const add_customer = catchAsync(async (req, res) => {
         if (profile_pic) updateInfo.profile = profile_pic;
         const customerInfo = await Customer.create(createInfo);
 
-          if(Array.isArray(addressInfo))
-            {
-              for (const val of addressInfo) {
-                  const Insertquery = `INSERT INTO customer_addresses (customer_id, address, tag,status,created_by) values ($1, $2, $3,$4,$5)`;
-                    await db.query(Insertquery, [customerInfo.id, val.address, val.tag,1,customerInfo.id])
-              }
+        if (Array.isArray(addressInfo)) {
+            for (const val of addressInfo) {
+                const Insertquery = `INSERT INTO customer_addresses (customer_id, address, tag,status,created_by) values ($1, $2, $3,$4,$5)`;
+                await db.query(Insertquery, [customerInfo.id, val.address, val.tag, 1, customerInfo.id])
             }
+        }
 
 
-            const data = {
-                user_id: req.user.id,
-                table_id: customerInfo.id,
-                table_name: 'customer',
-                action: 'insert',
-            };
+        const data = {
+            user_id: req.user.id,
+            table_id: customerInfo.id,
+            table_name: 'customer',
+            action: 'insert',
+        };
 
-            adminLog(data);
+        adminLog(data);
 
-          return res.status(200).json({
+        return res.status(200).json({
             status: true,
             message: (customerInfo) ? "Customer create sucessfully" : "Customer create Unsucessfully",
-          });
+        });
 
-      }catch(e){
+    } catch (e) {
         return res.status(200).json({
             status: false,
             message: "Failed to data",
             errors: e.message
         });
-      }
-  });
+    }
+});
 
-  //activation and deactivation
+//activation and deactivation
 const activationStatus = catchAsync(async (req, res) => {
 
     await Promise.all([
@@ -402,12 +400,12 @@ const activationStatus = catchAsync(async (req, res) => {
         throw new AppError(error_message, 200, errors);
     }
 
-    try{
+    try {
 
-        const {customer_id,status} = req.body;
+        const { customer_id, status } = req.body;
         const custId = customer_id;
 
-        const updateStatus = await db.query(`update customers SET status = $1 , updated_by = $2 Where id = $3`,[status,req.user.id,custId])
+        const updateStatus = await db.query(`update customers SET status = $1 , updated_by = $2 Where id = $3`, [status, req.user.id, custId])
 
         const data = {
             user_id: customer_id,
@@ -418,19 +416,19 @@ const activationStatus = catchAsync(async (req, res) => {
 
         adminLog(data);
 
-          return res.status(200).json({
+        return res.status(200).json({
             status: true,
             message: (updateStatus.id) ? "update status successfully" : "update status Unsuccessfully"
-          });
+        });
 
-      }catch(e){
+    } catch (e) {
         return res.status(200).json({
             status: false,
             message: "Failed to data",
             errors: error.message
         });
-      }
-  });
+    }
+});
 
 export {
     getCustomers,

@@ -97,7 +97,7 @@ const changeStatus = catchAsync(async (req, res) => {
         const {status,order_id} = req.body
         const query_params = [status,order_id];
 
-        const query = `update orders SET status = $1 WHERE id = $2`;
+        const query = `update orders SET order_status = $1 WHERE id = $2`;
         const result = await db.query(query,query_params)
 
         return res.status(200).json({
@@ -137,7 +137,8 @@ const orderViewDetails = catchAsync(async (req, res) => {
                             TO_CHAR(o.perferred_delivery_date, 'FMDDth Month YYYY') AS perferred_delivery_date,
                             TO_CHAR(o.created_at, 'FMDDth Month YYYY') AS order_date,
                             ca.address as address,
-                            o.address as address_id
+                            o.address as address_id,
+                            o.order_status as order_status
                             FROM orders AS o
                             LEFT JOIN customer_addresses as ca ON o.address = ca.id
                             WHERE o.id = $1 `,[order_id]);
@@ -165,8 +166,8 @@ const orderViewDetails = catchAsync(async (req, res) => {
                             let Sumoflist;
                             if(order_item.rowCount > 0){
                                 Sumoflist = order_item.rows.reduce((acc, item) => {
-                                    acc.qty += parseInt(item.product_quantity);
-                                    acc.price += parseInt(item.total_price);
+                                    acc.qty += parseFloat(item.product_quantity) || 0;
+                                    acc.price += parseFloat(item.total_price) || 0;
                                     return acc;
                                     }, { qty: 0, price: 0 });
                                 }
@@ -192,7 +193,7 @@ const orderEditDetails = catchAsync(async (req, res) => {
         body('order_id').notEmpty().withMessage('order Id is required').run(req),
         body('payment_mode').notEmpty().withMessage('Payment mode is required').run(req),
         body('payment_status').notEmpty().withMessage('Payment status is required').run(req),
-        body('status').notEmpty().withMessage('status is required').run(req)
+        body('order_status').notEmpty().withMessage('order_status is required').run(req)
     ]);
 
     // Handle validation result
@@ -204,17 +205,17 @@ const orderEditDetails = catchAsync(async (req, res) => {
 
     try {
 
-        const {order_id,status,payment_status,payment_mode} = req.body;
+        const {order_id,order_status,payment_status,payment_mode} = req.body;
         const files = req.files || {};
-        //status 4 means delivered. Need to Update delivery date in orders table
+        //order_status 4 means delivered. Need to Update delivery date in orders table
         let deliverDate = '';
 
-        if(status == 4){
+        if(order_status == 4){
             deliverDate = new Date()
         }
 
         const updateInfo = {
-            order_status:status,
+            order_status:order_status,
             payment_status:payment_status,
             payment_mode:payment_mode,
             delivery_date:(deliverDate) ? deliverDate :null

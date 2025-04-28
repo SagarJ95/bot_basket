@@ -1,14 +1,10 @@
-import dotenv from "dotenv";
+import dotenv from 'dotenv';
 dotenv.config({ path: `${process.cwd()}/.env` });
 
 // Defaults
 import catchAsync from "../../utils/catchAsync.js";
 import AppError from "../../utils/appError.js";
-import {
-  generateSlug,
-  media_url,
-  formatValidationArray,
-} from "../../helpers/slug_helper.js";
+import { generateSlug, media_url, formatValidationArray } from "../../helpers/slug_helper.js";
 import Category from "../../db/models/category.js";
 import Product from "../../db/models/products.js";
 import Product_images from "../../db/models/product_images.js";
@@ -19,7 +15,7 @@ import { Op, QueryTypes, Sequelize } from "sequelize";
 import { compare } from "bcrypt";
 import bcrypt from "bcrypt";
 import sequelize from "../../config/database.js";
-import moment from "moment";
+import moment from 'moment';
 import db from "../../config/db.js";
 import adminLog from '../../helpers/admin_log.js';
 import csvjson from 'csvjson'
@@ -30,7 +26,7 @@ import { format } from "fast-csv";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 
-const BASE_URL = process.env.BASE_URL || "http://localhost:3848";
+const BASE_URL = process.env.BASE_URL || 'http://localhost:3848';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 /* Category API Start ------------------------------- */
@@ -54,15 +50,14 @@ const getCategories = catchAsync(async (req, res) => {
             query_params.push(`%${search}%`);
         }
 
-    //get total number of categories
-    const totalCategories = await db.query(
-      `select COUNT(c.id) FROM categories as c where c.status =$1 and c.deleted_at IS NULL ${searchQuery}
+        //get total number of categories
+        const totalCategories = await db.query(`select COUNT(c.id) FROM categories as c where c.status =$1 and c.deleted_at IS NULL ${searchQuery}
             ${pageCountQuery}`,
-      query_params
-    );
+            query_params
+        );
 
-    //get get catgories list
-    const query = `select c.id as cat_id,c.cat_name as category_name,c.slug,COALESCE(c.description,'') as description,
+        //get get catgories list
+        const query = `select c.id as cat_id,c.cat_name as category_name,c.slug,COALESCE(c.description,'') as description,
         COALESCE(COUNT(p.id),0) as No_of_products from categories as c
         LEFT JOIN products as p ON c.id = p.category
         where c.status = $1 and c.deleted_at IS NULL ${searchQuery}
@@ -73,7 +68,7 @@ const getCategories = catchAsync(async (req, res) => {
         return res.status(200).json({
             status: true,
             total: (totalCategories.rowCount > 0) ? parseInt(totalCategories.rows[0].count) : 0,
-            message: 'Fetch Categories successfully',
+            message: 'Fetch Categories Successfully',
             data: (getCategorieslist.rowCount > 0) ? getCategorieslist.rows : []
         });
     } catch (error) {
@@ -84,25 +79,23 @@ const getCategories = catchAsync(async (req, res) => {
 
 // POST create category
 const createCategory = catchAsync(async (req, res) => {
-  // Apply validation rules
-  await Promise.all([
-    body("category_name")
-      .notEmpty()
-      .withMessage("Category Name is required")
-      .bail() // stops further validation if empty
-      .custom(async (value) => {
-        const existingCategory = await Category.findOne({
-          where: { cat_name: value },
-        });
-        if (existingCategory) {
-          throw new Error("Category Name already exists");
-        }
-      })
-      .run(req),
-  ]);
 
-  // Handle validation result
-  const errors = validationResult(req);
+    // Apply validation rules
+    await Promise.all([
+        body('category_name')
+            .notEmpty().withMessage('Category Name is required')
+            .bail() // stops further validation if empty
+            .custom(async (value) => {
+                const existingCategory = await Category.findOne({ where: { cat_name: value } });
+                if (existingCategory) {
+                    throw new Error('Category Name already exists');
+                }
+            })
+            .run(req)
+    ]);
+
+    // Handle validation result
+    const errors = validationResult(req);
 
     try {
         const { category_name, description } = req.body;
@@ -116,124 +109,106 @@ const createCategory = catchAsync(async (req, res) => {
             status: '1',
         });
 
-    if (!category) {
-      return res
-        .status(200)
-        .json({ status: false, message: "Category not created" });
+        if (!category) {
+            return res.status(200).json({ status: false, message: 'Category not created' });
+        }
+
+        const data = {
+            user_id: req.user.id,
+            table_id: category.id,
+            table_name: 'categories',
+            action: 'insert',
+        };
+
+        adminLog(data);
+
+        return res.status(200).json({ status: true, message: 'Category created successfully' });
+
+    } catch (error) {
+        return res.status(200).json({ status: false, message: 'Category not created', error: error.message });
     }
-
-    const data = {
-      user_id: req.user.id,
-      table_id: category.id,
-      table_name: "categories",
-      action: "insert",
-    };
-
-    adminLog(data);
-
-    return res
-      .status(200)
-      .json({ status: true, message: "Category created successfully" });
-  } catch (error) {
-    return res.status(200).json({
-      status: false,
-      message: "Category not created",
-      error: error.message,
-    });
-  }
 });
 
 // GET category by ID
 const getCategoryById = catchAsync(async (req, res) => {
-  try {
-    await Promise.all([
-      body("id").notEmpty().withMessage("Id is required").run(req),
-    ]);
+    try {
+        await Promise.all([
+            body('id')
+                .notEmpty().withMessage('Id is required')
+                .run(req)
+        ]);
 
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      const formattedErrors = await formatValidationArray(errors);
-      return res.status(200).json({ status: false, errors: formattedErrors });
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            const formattedErrors = await formatValidationArray(errors);
+            return res.status(200).json({ status: false, errors: formattedErrors });
+        }
+        const categoryId = parseInt(req.body.id);
+
+        if (isNaN(categoryId)) {
+            return res.status(200).json({ status: false, message: 'Invalid Category ID', error: '' });
+        }
+
+        // Fetch data from the database
+        const query = `SELECT cat_name,description FROM categories WHERE deleted_at IS NULL AND id = ${categoryId}`;
+
+        const result = await db.query(query);
+
+        if (result.rowCount <= 0) {
+            return res.status(200).json({ status: false, message: 'Data Not Found', error: '' });
+        }
+
+        return res.status(200).json({ status: true, message: 'Data Found', data: result.rows[0] });
+    } catch (error) {
+        return res.status(200).json({ status: false, message: 'Data Not Found', error: error.message });
     }
-    const categoryId = parseInt(req.body.id);
-
-    if (isNaN(categoryId)) {
-      return res
-        .status(200)
-        .json({ status: false, message: "Invalid Category ID", error: "" });
-    }
-
-    // Fetch data from the database
-    const query = `SELECT cat_name,description FROM categories WHERE deleted_at IS NULL AND id = ${categoryId}`;
-
-    const result = await db.query(query);
-
-    if (result.rowCount <= 0) {
-      return res
-        .status(200)
-        .json({ status: false, message: "Data Not Found", error: "" });
-    }
-
-    return res
-      .status(200)
-      .json({ status: true, message: "Data Found", data: result.rows[0] });
-  } catch (error) {
-    return res
-      .status(200)
-      .json({ status: false, message: "Data Not Found", error: error.message });
-  }
 });
 
 // PATCH update category by ID
 const updateCategoryById = catchAsync(async (req, res) => {
-  const categoryId = parseInt(req.body.category_id);
 
-  // Apply validation rules
-  await Promise.all([
-    body("category_name")
-      .notEmpty()
-      .withMessage("Category Name is required")
-      .bail()
-      .custom(async (value, { req }) => {
-        const categoryId = req.body.category_id; // define it here from the request
-        const existingCategory = await Category.findOne({
-          where: {
-            cat_name: value,
-            id: { [Op.ne]: categoryId },
-          },
-        });
+    const categoryId = parseInt(req.body.category_id);
 
-        if (existingCategory) {
-          throw new Error("Category Name already exists");
+    // Apply validation rules
+    await Promise.all([
+        body('category_name')
+            .notEmpty().withMessage('Category Name is required')
+            .bail()
+            .custom(async (value, { req }) => {
+                const categoryId = req.body.category_id; // define it here from the request
+                const existingCategory = await Category.findOne({
+                    where: {
+                        cat_name: value,
+                        id: { [Op.ne]: categoryId }
+                    }
+                });
+
+                if (existingCategory) {
+                    throw new Error('Category Name already exists');
+                }
+            })
+            .run(req),
+    ]);
+
+    // Handle validation result
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const formattedErrors = await formatValidationArray(errors);
+        return res.status(200).json({ status: false, errors: formattedErrors });
+    }
+
+    try {
+
+        if (isNaN(categoryId)) {
+            return res.status(200).json({ status: false, message: 'Invalid Category ID', error: '' });
         }
-      })
-      .run(req),
-  ]);
 
-  // Handle validation result
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    const formattedErrors = await formatValidationArray(errors);
-    return res.status(200).json({ status: false, errors: formattedErrors });
-  }
+        const { category_name, description } = req.body;
 
-  try {
-    if (isNaN(categoryId)) {
-      return res
-        .status(200)
-        .json({ status: false, message: "Invalid Category ID", error: "" });
-    }
-
-    const { category_name, description } = req.body;
-
-    const category_res = await Category.findOne({ where: { id: categoryId } });
-    if (!category_res) {
-      return res.json({
-        status: false,
-        message: "Category not found",
-        error: "",
-      });
-    }
+        const category_res = await Category.findOne({ where: { id: categoryId } });
+        if (!category_res) {
+            return res.json({ status: false, message: "Category not found", error: '' });
+        }
 
         const updateCategory = await Category.update({
             cat_name: category_name,
@@ -243,122 +218,102 @@ const updateCategoryById = catchAsync(async (req, res) => {
             where: { id: categoryId }
         });
 
-    if (!updateCategory) {
-      return res
-        .status(200)
-        .json({ status: false, message: "Category Not Updated", error: "" });
+        if (!updateCategory) {
+            return res.status(200).json({ status: false, message: 'Category Not Updated', error: '' });
+        }
+
+        const data = {
+            user_id: req.user.id,
+            table_id: categoryId,
+            table_name: 'categories',
+            action: 'update',
+        };
+
+        adminLog(data);
+
+        return res.status(200).json({ status: true, message: 'Category updated successfully' });
+
+    } catch (error) {
+        return res.status(200).json({ status: false, message: 'Category Not Updated', error: error.message });
     }
-
-    const data = {
-      user_id: req.user.id,
-      table_id: categoryId,
-      table_name: "categories",
-      action: "update",
-    };
-
-    adminLog(data);
-
-    return res
-      .status(200)
-      .json({ status: true, message: "Category updated successfully" });
-  } catch (error) {
-    return res.status(200).json({
-      status: false,
-      message: "Category Not Updated",
-      error: error.message,
-    });
-  }
 });
 
 // DELETE category by ID
 const deleteCategoryById = catchAsync(async (req, res) => {
-  await Promise.all([
-    body("category_id")
-      .notEmpty()
-      .withMessage("category id is required")
-      .run(req), // THIS is important
-  ]);
+    await Promise.all([
+        body('category_id')
+            .notEmpty().withMessage('category id is required')
+            .run(req) // THIS is important
+    ]);
 
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    const formattedErrors = await formatValidationArray(errors);
-    return res.status(200).json({ status: false, errors: formattedErrors });
-  }
-
-  try {
-    const categoryId = parseInt(req.body.category_id);
-
-    if (isNaN(categoryId)) {
-      return res
-        .status(200)
-        .json({ status: false, message: "Invalid Category ID", error: "" });
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const formattedErrors = await formatValidationArray(errors);
+        return res.status(200).json({ status: false, errors: formattedErrors });
     }
 
-    const result = await Category.findByPk(categoryId);
+    try {
 
-    if (!result) {
-      return res
-        .status(200)
-        .json({ status: false, message: "Category not found", error: "" });
-    }
+        const categoryId = parseInt(req.body.category_id);
+
+        if (isNaN(categoryId)) {
+            return res.status(200).json({ status: false, message: 'Invalid Category ID', error: '' });
+        }
+
+        const result = await Category.findByPk(categoryId);
+
+        if (!result) {
+            return res.status(200).json({ status: false, message: 'Category not found', error: '' });
+        }
 
         await db.query(
             `UPDATE categories SET status = $1, deleted_at = $2 where id = $3`,
             ["0", new Date(), categoryId]
         );
 
-    const data = {
-      user_id: req.user.id,
-      table_id: categoryId,
-      table_name: "categories",
-      action: "delete",
-    };
+        const data = {
+            user_id: req.user.id,
+            table_id: categoryId,
+            table_name: 'categories',
+            action: 'delete',
+        };
 
-    adminLog(data);
+        adminLog(data);
 
-    return res
-      .status(200)
-      .json({ status: true, message: "Data Deleted sucessfully" });
-  } catch (error) {
-    return res.status(200).json({
-      status: false,
-      message: "Category not found",
-      error: error.message,
-    });
-  }
+        return res.status(200).json({ status: true, message: 'Data Deleted sucessfully' });
+
+    } catch (error) {
+        return res.status(200).json({ status: false, message: 'Category not found', error: error.message });
+    }
 });
 
 // PATCH update category status by ID
 const updateCategoryStatusById = catchAsync(async (req, res) => {
-  await Promise.all([
-    body("category_id")
-      .notEmpty()
-      .withMessage("category id is required")
-      .run(req),
-    body("status").notEmpty().withMessage("status is required").run(req),
-  ]);
+    await Promise.all([
+        body('category_id')
+            .notEmpty().withMessage('category id is required')
+            .run(req),
+        body('status')
+            .notEmpty().withMessage('status is required')
+            .run(req)
+    ]);
 
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    const formattedErrors = await formatValidationArray(errors);
-    return res.status(200).json({ status: false, errors: formattedErrors });
-  }
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const formattedErrors = await formatValidationArray(errors);
+        return res.status(200).json({ status: false, errors: formattedErrors });
+    }
 
     try {
 
         let { category_id, status } = req.body;
 
-    if (isNaN(category_id) || isNaN(status)) {
-      return res.status(200).json({
-        status: false,
-        message: "Invalid Category ID or Status",
-        error: "",
-      });
-    }
+        if (isNaN(category_id) || isNaN(status)) {
+            return res.status(200).json({ status: false, message: 'Invalid Category ID or Status', error: '' });
+        }
 
-    //check no of product for particular category
-    const count = await db.query(
-      `select c.id as cat_id,c.cat_name as category_name,c.slug,COALESCE(c.description,'') as description,
+        //check no of product for particular category
+        const count = await db.query(`select c.id as cat_id,c.cat_name as category_name,c.slug,COALESCE(c.description,'') as description,
         COALESCE(COUNT(p.id),0) as no_of_products from categories as c
         LEFT JOIN products as p ON c.id = p.category
         where c.id = $1 and c.status = $2 and c.deleted_at IS NULL
@@ -376,34 +331,26 @@ const updateCategoryStatusById = catchAsync(async (req, res) => {
                 [status, req.user.id, category_id]
             );
 
-      if (!updateCategory) {
-        return res.status(200).json({
-          status: false,
-          message: "Category Status Not Updated",
-          error: "",
-        });
-      }
+            if (!updateCategory) {
+                return res.status(200).json({ status: false, message: 'Category Status Not Updated', error: '' });
+            }
 
-      const data = {
-        user_id: req.user.id,
-        table_id: category_id,
-        table_name: "categories",
-        action: "status to " + status,
-      };
+            const data = {
+                user_id: req.user.id,
+                table_id: category_id,
+                table_name: 'categories',
+                action: 'status to ' + status,
+            };
 
-      adminLog(data);
+            adminLog(data);
+        }
+
+        return res.status(200).json({ status: true, message: 'Category status updated successfully' });
+
+    } catch (error) {
+
+        return res.status(200).json({ status: false, message: 'Category Status Not Updated', error: error.message });
     }
-
-    return res
-      .status(200)
-      .json({ status: true, message: "Category status updated successfully" });
-  } catch (error) {
-    return res.status(200).json({
-      status: false,
-      message: "Category Status Not Updated",
-      error: error.message,
-    });
-  }
 });
 
 const excelExportCategory = catchAsync(async (req, res) => {
@@ -422,45 +369,45 @@ const excelExportCategory = catchAsync(async (req, res) => {
                 GROUP BY c.id, c.cat_name
                 ORDER BY c.id`;
 
-    //return res.json(query)
+        //return res.json(query)
 
-    const result = await db.query(query, []);
-    let list = result.rows;
+        const result = await db.query(query, []);
+        let list = result.rows;
 
-    //return res.json(list);
-    // Create Excel file
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Products");
+        //return res.json(list);
+        // Create Excel file
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet("Products");
 
-    worksheet.columns = [
-      { header: "ID", key: "id", width: 10 },
-      { header: "Category Name", key: "cat_name", width: 25 },
-      { header: "Description", key: "description", width: 25 },
-      { header: "Product Count", key: "product_count", width: 25 },
-      { header: "Status", key: "status", width: 10 },
-    ];
+        worksheet.columns = [
+            { header: "ID", key: "id", width: 10 },
+            { header: "Category Name", key: "cat_name", width: 25 },
+            { header: "Description", key: "description", width: 25 },
+            { header: "Product Count", key: "product_count", width: 25 },
+            { header: "Status", key: "status", width: 10 },
+        ];
 
-    list.forEach((row) => {
-      worksheet.addRow({
-        id: row.id,
-        cat_name: row.cat_name,
-        product_count: row.product_count,
-        status: row.status == 1 ? "Active" : "Inactive",
-      });
-    });
+        list.forEach((row) => {
+            worksheet.addRow({
+                id: row.id,
+                cat_name: row.cat_name,
+                product_count: row.product_count,
+                status: row.status == 1 ? "Active" : "Inactive",
+            });
+        });
 
         // Generate file name and path
         const dateTime = moment().tz("Asia/Kolkata").format("YYYY-MM-DD_HH-mm-ss");;
         const fileName = `category_list_${dateTime}.xlsx`;
         const filePath = path.join(process.cwd(), "public/uploads/exports", fileName);
 
-    // Ensure directory exists
-    if (!fs.existsSync(path.dirname(filePath))) {
-      fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    }
+        // Ensure directory exists
+        if (!fs.existsSync(path.dirname(filePath))) {
+            fs.mkdirSync(path.dirname(filePath), { recursive: true });
+        }
 
-    // Save Excel file
-    await workbook.xlsx.writeFile(filePath);
+        // Save Excel file
+        await workbook.xlsx.writeFile(filePath);
 
         // Send file path as response
         return res.status(200).json({ status: true, data: BASE_URL + `/uploads/exports/${fileName}` });
@@ -479,9 +426,9 @@ const getProductlist = catchAsync(async (req, res) => {
         const query_params = [1];
         const total_query_params = [1];
 
-    let categories = "";
-    let pageCountQuery = "";
-    let searchQuery = ``;
+        let categories = '';
+        let pageCountQuery = '';
+        let searchQuery = ``;
 
         if (category_id) {
             categories = `and p.category = $${query_params.length + 1}`;
@@ -501,8 +448,8 @@ const getProductlist = catchAsync(async (req, res) => {
             total_query_params.push(`%${search}%`)
         }
 
-    //get total number of products
-    const totalCountQuery = `
+        //get total number of products
+        const totalCountQuery = `
             SELECT COUNT(*) AS total
             FROM products AS p
             LEFT JOIN categories AS c ON p.category = c.id
@@ -514,8 +461,8 @@ const getProductlist = catchAsync(async (req, res) => {
 
         const totalProducts = await db.query(totalCountQuery, total_query_params);
 
-    //get get product list
-    const query = `select p.id as product_id,p.name as product_name,c.cat_name as category_name
+        //get get product list
+        const query = `select p.id as product_id,p.name as product_name,c.cat_name as category_name
         ,p.price as current_price,
         CONCAT('${BASE_URL}/images/img-country-flag/',ca.flag) as country_flag,
         p.category as category_id,
@@ -541,8 +488,9 @@ const getProductlist = catchAsync(async (req, res) => {
 });
 
 const countries = catchAsync(async (req, res) => {
-  try {
-    const query = `select c.id,c.country_name,c.code1 as code,CONCAT('${BASE_URL}/images/img-country-flag/',c.flag) from country_data as c`;
+    try {
+
+        const query = `select c.id,c.country_name,c.code1 as code,CONCAT('${BASE_URL}/images/img-country-flag/',c.flag) from country_data as c`;
 
         const getCountrylist = await db.query(query, [])
 
@@ -569,49 +517,43 @@ const createProduct = catchAsync(async (req, res) => {
     ]);
 
 
-  // Handle validation result
-  const errors = validationResult(req);
-  try {
-    const body = req.body;
-    const files = req.files;
+    // Handle validation result
+    const errors = validationResult(req);
+    try {
+        const body = req.body;
+        const files = req.files;
 
-    if (!files || !files.product_images || files.product_images.length === 0) {
-      errors.errors.push({
-        msg: "Please upload product image",
-        path: "product_images",
-      });
-    }
+        if (!files || !files.product_images || files.product_images.length === 0) {
+            errors.errors.push({ msg: "Please upload product image", path: "product_images" });
+        }
 
-    // After validationResult()
-    const existing = await Product.findOne({
-      where: {
-        name: req.body.name,
-        category: req.body.category,
-        deleted_at: null,
-      },
-    });
+        // After validationResult()
+        const existing = await Product.findOne({
+            where: {
+                name: req.body.name,
+                category: req.body.category,
+                deleted_at: null
+            }
+        });
 
-    if (existing) {
-      errors.errors.push({
-        msg: "A product with the same name and category already exists",
-        path: "name",
-      });
-    }
+        if (existing) {
+            errors.errors.push({ msg: "A product with the same name and category already exists", path: "name" });
+        }
 
-    if (!errors.isEmpty()) {
-      const formattedErrors = await formatValidationArray(errors);
-      return res.status(200).json({ status: false, errors: formattedErrors });
-    }
+        if (!errors.isEmpty()) {
+            const formattedErrors = await formatValidationArray(errors);
+            return res.status(200).json({ status: false, errors: formattedErrors });
+        }
 
-    let OrderingId = 0;
-    // Get the current highest ordering
-    const getCountOrdering = await db.query(
-      "SELECT * FROM products where deleted_at IS NULL ORDER BY ordering DESC LIMIT 1"
-    );
+        let OrderingId = 0;
+        // Get the current highest ordering
+        const getCountOrdering = await db.query(
+            "SELECT * FROM products where deleted_at IS NULL ORDER BY ordering DESC LIMIT 1"
+        );
 
-    if (getCountOrdering.rows.length > 0) {
-      OrderingId = getCountOrdering.rows[0].ordering;
-    }
+        if (getCountOrdering.rows.length > 0) {
+            OrderingId = getCountOrdering.rows[0].ordering;
+        }
 
         const product = await Product.create({
             name: body.name,
@@ -629,49 +571,43 @@ const createProduct = catchAsync(async (req, res) => {
 
         const product_id = product.id;
 
-    if (!product) {
-      return res
-        .status(200)
-        .json({ status: false, message: "Product not created" });
+        if (!product) {
+            return res.status(200).json({ status: false, message: 'Product not created' });
+        }
+
+        const images = files && files.product_images ? files.product_images : [];
+
+        if (images.length > 0) {
+            for (const img of images) {
+                await Product_images.create({
+                    product_id: product_id,
+                    image_path: media_url(img.path),
+                });
+            }
+        }
+
+
+        // const price_log = await Products_price_logs.create({
+        //     product_id: product_id,
+        //     price: body.price,
+        //     created_by: req.user.id,
+        //     updated_by: req.user.id
+        // });
+
+        const data = {
+            user_id: req.user.id,
+            table_id: product.id,
+            table_name: 'products',
+            action: 'insert',
+        };
+
+        adminLog(data);
+
+        return res.status(200).json({ status: true, message: 'Product created successfully' });
+
+    } catch (error) {
+        return res.status(200).json({ status: false, message: 'Product not created', error: error.message });
     }
-
-    const images = files && files.product_images ? files.product_images : [];
-
-    if (images.length > 0) {
-      for (const img of images) {
-        await Product_images.create({
-          product_id: product_id,
-          image_path: media_url(img.path),
-        });
-      }
-    }
-
-    // const price_log = await Products_price_logs.create({
-    //     product_id: product_id,
-    //     price: body.price,
-    //     created_by: req.user.id,
-    //     updated_by: req.user.id
-    // });
-
-    const data = {
-      user_id: req.user.id,
-      table_id: product.id,
-      table_name: "products",
-      action: "insert",
-    };
-
-    adminLog(data);
-
-    return res
-      .status(200)
-      .json({ status: true, message: "Product created successfully" });
-  } catch (error) {
-    return res.status(200).json({
-      status: false,
-      message: "Product not created",
-      error: error.message,
-    });
-  }
 });
 
 const updateProduct = catchAsync(async (req, res) => {
@@ -682,43 +618,40 @@ const updateProduct = catchAsync(async (req, res) => {
         body('countryId').notEmpty().withMessage('Country is required'),
     ]);
 
-  const errors = validationResult(req);
+    const errors = validationResult(req);
 
-  try {
-    const productId = req.body.product_id;
-    const body = req.body;
-    const files = req.files;
 
-    const product = await Product.findOne({
-      where: { id: productId, deleted_at: null },
-    });
+    try {
+        const productId = req.body.product_id;
+        const body = req.body;
+        const files = req.files;
 
-    if (!product) {
-      return res
-        .status(404)
-        .json({ status: false, message: "Product not found" });
-    }
+        const product = await Product.findOne({ where: { id: productId, deleted_at: null } });
 
-    const existing = await Product.findOne({
-      where: {
-        name: req.body.name,
-        category: req.body.category,
-        deleted_at: null,
-        id: { [Op.ne]: productId }, // Exclude current product
-      },
-    });
+        if (!product) {
+            return res.status(404).json({ status: false, message: "Product not found" });
+        }
 
-    if (existing) {
-      errors.errors.push({
-        msg: "A product with the same name and category already exists",
-        path: "name",
-      });
-    }
+        const existing = await Product.findOne({
+            where: {
+                name: req.body.name,
+                category: req.body.category,
+                deleted_at: null,
+                id: { [Op.ne]: productId } // Exclude current product
+            }
+        });
 
-    if (!errors.isEmpty()) {
-      const formattedErrors = await formatValidationArray(errors);
-      return res.status(200).json({ status: false, errors: formattedErrors });
-    }
+        if (existing) {
+            errors.errors.push({
+                msg: "A product with the same name and category already exists",
+                path: "name"
+            });
+        }
+
+        if (!errors.isEmpty()) {
+            const formattedErrors = await formatValidationArray(errors);
+            return res.status(200).json({ status: false, errors: formattedErrors });
+        }
 
         // Update product fields
         await Product.update({
@@ -734,21 +667,21 @@ const updateProduct = catchAsync(async (req, res) => {
             }
         );
 
-    // Handle product images
-    const images = files && files.product_images ? files.product_images : [];
+        // Handle product images
+        const images = files && files.product_images ? files.product_images : [];
 
-    if (images.length > 0) {
-      // Optional: delete old images first (if you want to replace them)
-      await Product_images.destroy({ where: { product_id: productId } });
+        if (images.length > 0) {
+            // Optional: delete old images first (if you want to replace them)
+            await Product_images.destroy({ where: { product_id: productId } });
 
-      // Then add new images
-      for (const img of images) {
-        await Product_images.create({
-          product_id: productId,
-          image_path: media_url(img.path),
-        });
-      }
-    }
+            // Then add new images
+            for (const img of images) {
+                await Product_images.create({
+                    product_id: productId,
+                    image_path: media_url(img.path),
+                });
+            }
+        }
 
         // Optional: log price change
         if (product.price != body.price) {
@@ -767,43 +700,38 @@ const updateProduct = catchAsync(async (req, res) => {
             action: 'update',
         };
 
-    adminLog(data);
+        adminLog(data);
 
-    return res
-      .status(200)
-      .json({ status: true, message: "Product updated successfully" });
-  } catch (error) {
-    return res.status(500).json({
-      status: false,
-      message: "Product not updated",
-      error: error.message,
-    });
-  }
+        return res.status(200).json({ status: true, message: 'Product updated successfully' });
+
+    } catch (error) {
+        return res.status(500).json({ status: false, message: 'Product not updated', error: error.message });
+    }
 });
 
 const getProductById = catchAsync(async (req, res) => {
-  await Promise.all([
-    body("id").notEmpty().withMessage("Product ID is required").run(req),
-  ]);
+    await Promise.all([
+        body('id')
+            .notEmpty().withMessage('Product ID is required')
+            .run(req)
+    ]);
 
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    // const formattedErrors = await formatValidationArray(errors);
-    // return res.status(200).json({ status: false, errors: formattedErrors });
-    const error_message = errors.array()[0].msg;
-    throw new AppError(error_message, 200, errors);
-  }
-
-  try {
-    const productId = parseInt(req.body.id);
-
-    if (isNaN(productId)) {
-      return res
-        .status(200)
-        .json({ status: false, message: "Invalid Product ID", error: "" });
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        // const formattedErrors = await formatValidationArray(errors);
+        // return res.status(200).json({ status: false, errors: formattedErrors });
+        const error_message = errors.array()[0].msg;
+        throw new AppError(error_message, 200, errors);
     }
 
-    const query = `
+    try {
+        const productId = parseInt(req.body.id);
+
+        if (isNaN(productId)) {
+            return res.status(200).json({ status: false, message: 'Invalid Product ID', error: '' });
+        }
+
+        const query = `
             SELECT
                 p.id,
                 p.name,
@@ -826,210 +754,165 @@ const getProductById = catchAsync(async (req, res) => {
             GROUP BY p.id
         `;
 
-    const result = await db.query(query, [productId]);
+        const result = await db.query(query, [productId]);
 
-    if (result.rowCount <= 0) {
-      return res
-        .status(200)
-        .json({ status: false, message: "Product Not Found", error: "" });
+        if (result.rowCount <= 0) {
+            return res.status(200).json({ status: false, message: 'Product Not Found', error: '' });
+        }
+
+        return res.status(200).json({
+            status: true,
+            message: 'Product Found',
+            data: result.rows
+        });
+
+    } catch (error) {
+        return res.status(200).json({ status: false, message: 'Product Not Found', error: error.message });
     }
-
-    return res.status(200).json({
-      status: true,
-      message: "Product Found",
-      data: result.rows,
-    });
-  } catch (error) {
-    return res.status(200).json({
-      status: false,
-      message: "Product Not Found",
-      error: error.message,
-    });
-  }
 });
 
 const deleteProductById = catchAsync(async (req, res) => {
-  await Promise.all([
-    body("id").notEmpty().withMessage("Product ID is required").run(req),
-  ]);
-
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    const formattedErrors = await formatValidationArray(errors);
-    return res.status(200).json({ status: false, errors: formattedErrors });
-  }
-
-  try {
-    const productId = parseInt(req.body.id);
-
-    if (isNaN(productId)) {
-      return res
-        .status(200)
-        .json({ status: false, message: "Invalid Product ID", error: "" });
-    }
-
-    const result = await Product.findByPk(productId);
-
-    if (!result) {
-      return res
-        .status(200)
-        .json({ status: false, message: "Product not found", error: "" });
-    }
-
-    await result.destroy(); // uses Sequelize's soft delete (paranoid)
-
-    const data = {
-      user_id: req.user.id,
-      table_id: productId,
-      table_name: "products",
-      action: "delete",
-    };
-
-    adminLog(data);
-
-    return res
-      .status(200)
-      .json({ status: true, message: "Product deleted successfully" });
-  } catch (error) {
-    return res.status(200).json({
-      status: false,
-      message: "Product not deleted",
-      error: error.message,
-    });
-  }
-});
-
-const updateProductStatusById = catchAsync(async (req, res) => {
-  await Promise.all([
-    body("id").notEmpty().withMessage("Product ID is required").run(req),
-    body("status").notEmpty().withMessage("status is required").run(req),
-  ]);
-
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    const error_message = errors.array()[0].msg;
-    throw new AppError(error_message, 200, errors);
-  }
-
-  try {
-    const productId = parseInt(req.body.id);
-    const status = parseInt(req.body.status);
-
-    if (isNaN(productId) || isNaN(status)) {
-      return res.status(200).json({
-        status: false,
-        message: "Invalid Product ID or Status",
-        error: "",
-      });
-    }
-
-    const updated = await Product.update(
-      {
-        status: status,
-        updated_by: req.user.id,
-      },
-      {
-        where: { id: productId },
-      }
-    );
-
-    if (!updated || updated[0] === 0) {
-      return res.status(200).json({
-        status: false,
-        message: "Product status not updated",
-        error: "",
-      });
-    }
-
-    const data = {
-      user_id: req.user.id,
-      table_id: productId,
-      table_name: "products",
-      action: "status to " + status,
-    };
-
-    adminLog(data);
-
-    return res
-      .status(200)
-      .json({ status: true, message: "Product status updated successfully" });
-  } catch (error) {
-    return res.status(200).json({
-      status: false,
-      message: "Product status not updated",
-      error: error.message,
-    });
-  }
-});
-
-const changeProductStockStatus = catchAsync(async (req, res) => {
-  try {
     await Promise.all([
-      body("product_id")
-        .notEmpty()
-        .withMessage("Product ID is required")
-        .run(req),
-      body("product_stock_status")
-        .notEmpty()
-        .withMessage("Product stock status is required")
-        .run(req),
+        body('id')
+            .notEmpty().withMessage('Product ID is required')
+            .run(req)
     ]);
 
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      const formattedErrors = await formatValidationArray(errors);
-      return res.status(200).json({ status: false, errors: formattedErrors });
+        const formattedErrors = await formatValidationArray(errors);
+        return res.status(200).json({ status: false, errors: formattedErrors });
     }
 
-    const productId = parseInt(req.body.product_id);
-    const product_stock_status = parseInt(req.body.product_stock_status);
+    try {
+        const productId = parseInt(req.body.id);
 
-    if (isNaN(productId) || isNaN(product_stock_status)) {
-      return res.status(200).json({
-        status: false,
-        message: "Invalid Product ID or Stock Status",
-        error: "",
-      });
+        if (isNaN(productId)) {
+            return res.status(200).json({ status: false, message: 'Invalid Product ID', error: '' });
+        }
+
+        const result = await Product.findByPk(productId);
+
+        if (!result) {
+            return res.status(200).json({ status: false, message: 'Product not found', error: '' });
+        }
+
+        await result.destroy(); // uses Sequelize's soft delete (paranoid)
+
+        const data = {
+            user_id: req.user.id,
+            table_id: productId,
+            table_name: 'products',
+            action: 'delete',
+        };
+
+        adminLog(data);
+
+        return res.status(200).json({ status: true, message: 'Product deleted successfully' });
+
+    } catch (error) {
+        return res.status(200).json({ status: false, message: 'Product not deleted', error: error.message });
+    }
+});
+
+const updateProductStatusById = catchAsync(async (req, res) => {
+    await Promise.all([
+        body('id').notEmpty().withMessage('Product ID is required').run(req),
+        body('status').notEmpty().withMessage('status is required').run(req),
+    ]);
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const error_message = errors.array()[0].msg;
+        throw new AppError(error_message, 200, errors);
     }
 
-    const updated = await Product.update(
-      {
-        product_stock_status: product_stock_status,
-        updated_by: req.user.id,
-      },
-      {
-        where: { id: productId },
-      }
-    );
+    try {
+        const productId = parseInt(req.body.id);
+        const status = parseInt(req.body.status);
 
-    if (!updated || updated[0] === 0) {
-      return res.status(200).json({
-        status: false,
-        message: "Product Stock status not updated",
-        error: "",
-      });
+        if (isNaN(productId) || isNaN(status)) {
+            return res.status(200).json({ status: false, message: 'Invalid Product ID or Status', error: '' });
+        }
+
+        const updated = await Product.update(
+            {
+                status: status,
+                updated_by: req.user.id,
+            },
+            {
+                where: { id: productId }
+            }
+        );
+
+        if (!updated || updated[0] === 0) {
+            return res.status(200).json({ status: false, message: 'Product status not updated', error: '' });
+        }
+
+        const data = {
+            user_id: req.user.id,
+            table_id: productId,
+            table_name: 'products',
+            action: 'status to ' + status,
+        };
+
+        adminLog(data);
+
+        return res.status(200).json({ status: true, message: 'Product status updated successfully' });
+
+    } catch (error) {
+        return res.status(200).json({ status: false, message: 'Product status not updated', error: error.message });
     }
+});
 
-    const data = {
-      user_id: req.user.id,
-      table_id: productId,
-      table_name: "products",
-      action: "stock status to " + product_stock_status,
-    };
+const changeProductStockStatus = catchAsync(async (req, res) => {
+    try {
+        await Promise.all([
+            body('product_id').notEmpty().withMessage('Product ID is required').run(req),
+            body('product_stock_status').notEmpty().withMessage('Product stock status is required').run(req),
+        ]);
 
-    adminLog(data);
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            const formattedErrors = await formatValidationArray(errors);
+            return res.status(200).json({ status: false, errors: formattedErrors });
+        }
 
-    return res.status(200).json({
-      status: true,
-      message: "Product stock status updated successfully",
-    });
-  } catch (error) {
-    return res.status(200).json({
-      status: false,
-      message: "Product stock status not updated",
-      error: error.message,
-    });
-  }
+        const productId = parseInt(req.body.product_id);
+        const product_stock_status = parseInt(req.body.product_stock_status);
+
+        if (isNaN(productId) || isNaN(product_stock_status)) {
+            return res.status(200).json({ status: false, message: 'Invalid Product ID or Stock Status', error: '' });
+        }
+
+        const updated = await Product.update(
+            {
+                product_stock_status: product_stock_status,
+                updated_by: req.user.id,
+            },
+            {
+                where: { id: productId }
+            }
+        );
+
+        if (!updated || updated[0] === 0) {
+            return res.status(200).json({ status: false, message: 'Product Stock status not updated', error: '' });
+        }
+
+        const data = {
+            user_id: req.user.id,
+            table_id: productId,
+            table_name: 'products',
+            action: 'stock status to ' + product_stock_status,
+        };
+
+        adminLog(data);
+
+        return res.status(200).json({ status: true, message: 'Product stock status updated successfully' });
+
+    } catch (error) {
+        return res.status(200).json({ status: false, message: 'Product stock status not updated', error: error.message });
+    }
 });
 
 //excel export products
@@ -1060,23 +943,23 @@ const excelExportProducts = catchAsync(async (req, res) => {
             WHERE p.deleted_at IS NULL group by p.id,ci.cat_name,c.country_name
         `;
 
-    const result = await db.query(query, []);
-    let list = result.rows;
+        const result = await db.query(query, []);
+        let list = result.rows;
 
-    // Create Excel file
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Products");
+        // Create Excel file
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet("Products");
 
-    worksheet.columns = [
-      { header: "ID", key: "id", width: 10 },
-      { header: "Product Name", key: "name", width: 25 },
-      { header: "Slug", key: "slug", width: 25 },
-      { header: "Description", key: "description", width: 40 },
-      { header: "Category", key: "category", width: 15 },
-      { header: "Country Name", key: "country_name", width: 20 },
-      { header: "Status", key: "status", width: 10 },
-      { header: "Images", key: "product_images", width: 40 },
-    ];
+        worksheet.columns = [
+            { header: "ID", key: "id", width: 10 },
+            { header: "Product Name", key: "name", width: 25 },
+            { header: "Slug", key: "slug", width: 25 },
+            { header: "Description", key: "description", width: 40 },
+            { header: "Category", key: "category", width: 15 },
+            { header: "Country Name", key: "country_name", width: 20 },
+            { header: "Status", key: "status", width: 10 },
+            { header: "Images", key: "product_images", width: 40 }
+        ];
 
         list.forEach((row) => {
             worksheet.addRow({
@@ -1097,19 +980,19 @@ const excelExportProducts = catchAsync(async (req, res) => {
         const fileName = `product_list_${dateTime}.xlsx`;
         const filePath = path.join(process.cwd(), "public/uploads/exports", fileName);
 
-    // Ensure directory exists
-    if (!fs.existsSync(path.dirname(filePath))) {
-      fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    }
+        // Ensure directory exists
+        if (!fs.existsSync(path.dirname(filePath))) {
+            fs.mkdirSync(path.dirname(filePath), { recursive: true });
+        }
 
-    // Save Excel file
-    await workbook.xlsx.writeFile(filePath);
+        // Save Excel file
+        await workbook.xlsx.writeFile(filePath);
 
         // Send file path as response
-        return res.json({ status: true, data: BASE_URL + `/uploads/exports/${fileName}` });
+        return res.json({ success: true, data: BASE_URL + `/uploads/exports/${fileName}` });
 
     } catch (error) {
-        return res.status(200).json({ status: false, message: "Internal Server Error", error: error.message });
+        return res.status(200).json({ success: false, message: "Internal Server Error", error: error.message });
     }
 });
 
@@ -1166,13 +1049,13 @@ const excelExportProductsInfo = catchAsync(async (req, res) => {
 
         writeStream.on("finish", () => {
             res.json({
-                status: true,
+                success: true,
                 data: `${BASE_URL}/uploads/exports_product/${fileName}`,
             });
         });
 
     } catch (error) {
-        return res.status(200).json({ status: false, message: "Internal Server Error", error: error.message });
+        return res.status(200).json({ success: false, message: "Internal Server Error", error: error.message });
     }
 });
 
@@ -1185,8 +1068,8 @@ const importProductListwithPrice = catchAsync(async (req, res) => {
             return res.status(400).json({ status: false, message: "No file uploaded" });
         }
 
-    const data = fs.readFileSync(uploadedFile.path, { encoding: "utf8" });
-    const csvData = csvjson.toObject(data);
+        const data = fs.readFileSync(uploadedFile.path, { encoding: 'utf8' });
+        const csvData = csvjson.toObject(data);
 
         const expectedHeaders = [
             "Product_Id",
@@ -1233,13 +1116,13 @@ const importProductListwithPrice = catchAsync(async (req, res) => {
                 [country_name]);
             const getCountryId = (country_data.rowCount > 0) ? country_data.rows[0].id : ""
 
-      //insert or update product_id,price,country_id,price,upload_date,maximum_quantity,upload_date
-      const storeProductId = product_id ? parseInt(product_id) : 0;
-      const storePrice = price ? parseInt(price) : 0;
-      const storeCountryId = getCountryId ? parseInt(getCountryId) : null;
-      const storeCountryName = country_name ? country_name : null;
-      const storeMaxQuantity = max_quantity ? parseInt(max_quantity) : 0;
-      const currentDate = moment(new Date()).format("YYYY-MM-DD");
+            //insert or update product_id,price,country_id,price,upload_date,maximum_quantity,upload_date
+            const storeProductId = (product_id) ? parseInt(product_id) : 0;
+            const storePrice = (price) ? parseInt(price) : 0;
+            const storeCountryId = (getCountryId) ? parseInt(getCountryId) : null;
+            const storeCountryName = (country_name) ? country_name : null;
+            const storeMaxQuantity = (max_quantity) ? parseInt(max_quantity) : 0;
+            const currentDate = moment(new Date()).format('YYYY-MM-DD');
 
             const checkProductAvailbleInProductLog = await db.query(
                 `SELECT * FROM products_price_logs WHERE product_id = $1  AND upload_date = $2`,
@@ -1272,7 +1155,7 @@ const importProductListwithPrice = catchAsync(async (req, res) => {
         // console.log("importData>>",csvData)
     } catch (e) {
         return res.status(200).json({
-            status: false, message: "Internal Server Error",
+            success: false, message: "Internal Server Error",
             error: e.message
         });
     }
@@ -1379,22 +1262,20 @@ const getProductPriceLogs = catchAsync(async (req, res) => {
             .run(req)
     ]);
 
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    const formattedErrors = await formatValidationArray(errors);
-    return res.status(200).json({ status: false, errors: formattedErrors });
-  }
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const formattedErrors = await formatValidationArray(errors);
+        return res.status(200).json({ status: false, errors: formattedErrors });
+    }
 
     try {
         const productId = parseInt(req.body.product_id);
 
-    if (isNaN(productId)) {
-      return res
-        .status(200)
-        .json({ status: false, message: "Invalid Product ID", error: "" });
-    }
+        if (isNaN(productId)) {
+            return res.status(200).json({ status: false, message: 'Invalid Product ID', error: '' });
+        }
 
-    const query = `SELECT price, TO_CHAR(upload_date, 'DD-Mon-YYYY') AS date_of_update
+        const query = `SELECT price, TO_CHAR(upload_date, 'DD-Mon-YYYY') AS date_of_update
             FROM products_price_logs
             WHERE product_id = ${productId} order by id desc`;
         const result = await db.query(query, []);
@@ -1402,13 +1283,13 @@ const getProductPriceLogs = catchAsync(async (req, res) => {
 
 
         return res.status(200).json({
-            status: true,
+            success: true,
             message: "logs retrieved successfully",
             data: result.rows
         });
     }
     catch (error) {
-        return res.status(200).json({ status: false, message: "Internal Server Error", error: error.message });
+        return res.status(200).json({ success: false, message: "Internal Server Error", error: error.message });
     }
 });
 
@@ -1419,65 +1300,66 @@ const exportProductPriceLogs = catchAsync(async (req, res) => {
             .run(req)
     ]);
 
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    const formattedErrors = await formatValidationArray(errors);
-    return res.status(200).json({ status: false, errors: formattedErrors });
-  }
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const formattedErrors = await formatValidationArray(errors);
+        return res.status(200).json({ status: false, errors: formattedErrors });
+    }
 
-  const productId = parseInt(req.body.product_id);
+    const productId = parseInt(req.body.product_id);
 
-  if (isNaN(productId)) {
-    return res
-      .status(200)
-      .json({ status: false, message: "Invalid Product ID", error: "" });
-  }
-  try {
-    // Query database
-    const query = `SELECT price, TO_CHAR(created_at, 'DD/Mon/YYYY') AS date_of_update
+    if (isNaN(productId)) {
+        return res.status(200).json({ status: false, message: 'Invalid Product ID', error: '' });
+    }
+    try {
+
+        // Query database
+        const query = `SELECT price, TO_CHAR(created_at, 'DD/Mon/YYYY') AS date_of_update
             FROM products_price_logs
             WHERE product_id = ${productId} order by id desc`;
 
-    //return res.json(query)
+        //return res.json(query)
 
-    const result = await db.query(query, []);
-    let list = result.rows;
+        const result = await db.query(query, []);
+        console.log("result>>",result)
+        let list = result.rows;
 
-    //return res.json(list);
-    // Create Excel file
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet("Products Price Logs");
+        //return res.json(list);
+        // Create Excel file
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet("Products Price Logs");
 
-    worksheet.columns = [
-      { header: "Price", key: "price", width: 25 },
-      { header: "Date of Update", key: "date_of_update", width: 25 },
-    ];
+        worksheet.columns = [
 
-    list.forEach((row) => {
-      worksheet.addRow({
-        price: row.price,
-        date_of_update: row.date_of_update,
-      });
-    });
+            { header: "Price", key: "price", width: 25 },
+            { header: "Date of Update", key: "date_of_update", width: 25 },
+        ];
+
+        list.forEach((row) => {
+            worksheet.addRow({
+                price: row.price,
+                date_of_update: row.date_of_update,
+            });
+        });
 
         // Generate file name and path
         const dateTime = moment().tz("Asia/Kolkata").format("YYYY-MM-DD_HH-mm-ss");
         const fileName = `product_price_log_list_${dateTime}.xlsx`;
         const filePath = path.join(process.cwd(), "public/uploads/exports", fileName);
 
-    // Ensure directory exists
-    if (!fs.existsSync(path.dirname(filePath))) {
-      fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    }
+        // Ensure directory exists
+        if (!fs.existsSync(path.dirname(filePath))) {
+            fs.mkdirSync(path.dirname(filePath), { recursive: true });
+        }
 
-    // Save Excel file
-    await workbook.xlsx.writeFile(filePath);
+        // Save Excel file
+        await workbook.xlsx.writeFile(filePath);
 
         // Send file path as response
-        return res.status(200).json({ status: true, filePath: BASE_URL + `/uploads/exports/${fileName}` });
+        return res.status(200).json({ success: true, filePath: BASE_URL + `/uploads/exports/${fileName}` });
 
     } catch (error) {
-        return res.status(200).json({ status: false, message: "Internal Server Error", error: error.message });
+        return res.status(200).json({ success: false, message: "Internal Server Error", error: error.message });
     }
 });
 
@@ -1556,43 +1438,43 @@ const ChangePricelist = catchAsync(async (req, res) => {
 
 
         return res.status(200).json({
-            status: true,
+            success: true,
             total: (result.rowCount > 0) ? result.rowCount : 0,
             message: "Fetch Change Price details successfully",
             data: (result.rowCount > 0) ? result.rows : []
         });
     }
     catch (error) {
-        return res.status(200).json({ status: false, message: "Internal Server Error", error: error.message });
+        return res.status(200).json({ success: false, message: "Internal Server Error", error: error.message });
     }
 });
 
 /* Product API END ------------------------------- */
 
 export {
-  /* Category API */
-  getCategories,
-  createCategory,
-  getCategoryById,
-  updateCategoryById,
-  deleteCategoryById,
-  updateCategoryStatusById,
-  excelExportCategory,
+    /* Category API */
+    getCategories,
+    createCategory,
+    getCategoryById,
+    updateCategoryById,
+    deleteCategoryById,
+    updateCategoryStatusById,
+    excelExportCategory,
 
-  /* Products */
-  createProduct,
-  updateProduct,
-  getProductById,
-  deleteProductById,
-  updateProductStatusById,
-  excelExportProducts,
-  changeProductPrice,
-  getProductPriceLogs,
-  exportProductPriceLogs,
-  changeProductStockStatus,
-  countries,
-  getProductlist,
-  excelExportProductsInfo,
-  importProductListwithPrice,
-  ChangePricelist,
-};
+    /* Products */
+    createProduct,
+    updateProduct,
+    getProductById,
+    deleteProductById,
+    updateProductStatusById,
+    excelExportProducts,
+    changeProductPrice,
+    getProductPriceLogs,
+    exportProductPriceLogs,
+    changeProductStockStatus,
+    countries,
+    getProductlist,
+    excelExportProductsInfo,
+    importProductListwithPrice,
+    ChangePricelist
+}
