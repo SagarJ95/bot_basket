@@ -5,7 +5,7 @@ import { validationResult } from "express-validator";
 import { Op } from "sequelize";
 import store_self_location from "../../db/models/store_self_location.js";
 
-const selfStoreLocation = async (req, res) => {
+const selfStoreLocation = catchAsync(async (req, res) => {
   try {
     const { store_name, store_address, store_pincode } = req.body;
 
@@ -37,9 +37,9 @@ const selfStoreLocation = async (req, res) => {
     console.error("Error in selfStoreLocation:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
-};
+});
 
-const getStoreLocation = async (req, res) => {
+const getStoreLocation = catchAsync(async (req, res) => {
   try {
     const getStoreLocation = await db.query(
       `SELECT * FROM store_self_locations WHERE status = $1`,
@@ -57,9 +57,9 @@ const getStoreLocation = async (req, res) => {
     console.error("Error in getStoreLocation:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
-};
+});
 
-const updateStoreLocation = async (req, res) => {
+const updateStoreLocation = catchAsync(async (req, res) => {
   try {
     const { id, store_name, store_address, store_pincode } = req.body;
 
@@ -80,9 +80,9 @@ const updateStoreLocation = async (req, res) => {
     console.error("Error in updateStoreLocation:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
-};
+});
 
-const deleteStoreLocation = async (req, res) => {
+const deleteStoreLocation = catchAsync(async (req, res) => {
   try {
     const { id } = req.body;
 
@@ -103,7 +103,7 @@ const deleteStoreLocation = async (req, res) => {
     console.error("Error in deleteStoreLocation:", error);
     return res.status(500).json({ message: "Internal server error" });
   }
-};
+});
 
 export {
   selfStoreLocation,

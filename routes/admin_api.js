@@ -14,6 +14,7 @@ import * as dashboardController from "../controllers/admin/dashbordController.js
 import * as customerController from "../controllers/admin/customerController.js";
 import * as orderController from "../controllers/admin/orderManagementController.js";
 import * as storeLocationController from "../controllers/admin/store_self_location_api_controllers.js";
+import * as deliveryOptionController from "../controllers/admin/deliveryOptionController.js";
 
 // import * as dashboardController from "../controllers/admin/dashbordController.js";
 import moment from "moment";
@@ -349,6 +350,19 @@ router.post(
   "/deleteStoreLocation",
   authenticate,
   storeLocationController.deleteStoreLocation
+);
+
+//delivery option
+
+router.post(
+  "/deliveryOption",
+  authenticate,
+  deliveryOptionController.storedeliveryOption
+);
+router.get(
+  "/getDeliveryOption",
+  authenticate,
+  deliveryOptionController.getDeliveryOption
 );
 
 export default router;

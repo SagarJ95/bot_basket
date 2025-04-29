@@ -409,6 +409,7 @@ const create_order = catchAsync(async (req, res) => {
       address,
       instruction,
       order_item,
+      delivery_option_id,
     } = req.body;
 
     //get order id from order table
@@ -425,6 +426,7 @@ const create_order = catchAsync(async (req, res) => {
       perferred_delivery_date: perferred_delivery_date,
       address: address,
       special_instruction: instruction,
+      delivery_option_id: delivery_option_id,
       status: 1,
       order_status: 1,
       created_by: customer_id,
@@ -453,18 +455,31 @@ const create_order = catchAsync(async (req, res) => {
         );
       }
     }
+    let getaddres;
+    let final_address = "";
 
-    const getaddres = await db.query(
-      `select address from customer_addresses where customer_id=$1 AND id=$2 AND status=$3 `,
-      [customer_id, address, "1"]
-    );
-    const final_address = getaddres.rows[0]?.address || "";
+    if (delivery_option_id == 1) {
+      getaddres = await db.query(
+        `select address from customer_addresses where customer_id=$1 AND id=$2 AND status=$3 `,
+        [customer_id, address, "1"]
+      );
+      final_address = getaddres.rows[0]?.address || "";
+      console.log("final_address", final_address);
+    } else if (delivery_option_id == 2) {
+      getaddres = await db.query(
+        `select store_address from store_self_locations where status=$1 `,
+        ["1"]
+      );
+      final_address = getaddres.rows[0]?.store_address || "";
+      console.log("final_address", final_address);
+    }
 
     // send conformation mail with pdf attach invoice
     await sendOrderConfirmation(
+      req,
       email,
       name,
-      getaddres.rows[0].address,
+      final_address,
       order_item.map((item) => ({
         name: item.product_name,
         quantity: item.quantity,
