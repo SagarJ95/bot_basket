@@ -161,9 +161,6 @@ import puppeteer from "puppeteer-core";
 //   }
 // }
 
-
-
-
 export async function sendOrderConfirmation(
   req,
   email,
@@ -172,8 +169,6 @@ export async function sendOrderConfirmation(
   products = [],
   order_id
 ) {
-  console.log("Sending order confirmation email...");
-
   const totalPrice = products.reduce((sum, p) => sum + p.price * p.quantity, 0);
   const orderId = `BOT${order_id}`;
   const orderDate = moment().format("YYYY-MM-DD HH:mm");
