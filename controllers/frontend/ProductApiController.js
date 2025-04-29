@@ -143,8 +143,9 @@ const product_list = catchAsync(async (req, res) => {
     let wildcardSearch = "";
 
     if (category_id) {
-      categories = `and p.category = $${query_params.length + 1}`;
+      categories = `and p.category = ANY ($${query_params.length + 1})`;
       query_params.push(category_id);
+      console.log("query_params", query_params);
     }
 
     if (search) {
