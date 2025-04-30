@@ -38,6 +38,83 @@ const category_list = catchAsync(async (req, res) => {
   }
 });
 
+/******************     Country           *************************************** */
+
+const country_list = catchAsync(async (req, res) => {
+  try {
+    const getCountryList = await db.query(
+      `select id,country_name from country_data ORDER BY id ASC `
+    );
+
+    if (getCountryList.rowCount > 0) {
+      return res.status(200).json({
+        status: true,
+        message: "county get successfully!",
+        data: getCountryList.rows,
+      });
+    } else {
+      return res.status(200).json({
+        status: false,
+        message: "country not found",
+      });
+    }
+  } catch (error) {
+    res.status(500).json({
+      status: false,
+      message: error.message,
+    });
+  }
+});
+
+/*******************     price             *********************************/
+const get_price = catchAsync(async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT 
+        MIN(price::numeric) AS min_price, 
+        MAX(price::numeric) AS max_price 
+      FROM products_price_logs 
+      WHERE deleted_at IS NULL
+    `);
+
+    if (
+      result.rowCount === 0 ||
+      !result.rows[0].min_price ||
+      !result.rows[0].max_price
+    ) {
+      return res.status(400).json({
+        status: false,
+        message: "Price data not found!",
+      });
+    }
+
+    const min = parseFloat(result.rows[0].min_price);
+    const max = parseFloat(result.rows[0].max_price);
+    const range = (max - min) / 4;
+
+    // Create 4 price ranges
+    const priceRanges = [
+      { min: min.toFixed(2), max: (min + range).toFixed(2) },
+      { min: (min + range).toFixed(2), max: (min + 2 * range).toFixed(2) },
+      { min: (min + 2 * range).toFixed(2), max: (min + 3 * range).toFixed(2) },
+      { min: (min + 3 * range).toFixed(2), max: max.toFixed(2) },
+    ];
+
+    res.status(200).json({
+      status: true,
+      message: "Price ranges fetched successfully!",
+      data: priceRanges,
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: false,
+      message: error.message,
+    });
+  }
+});
+
+/*******************          getprice        **********************************************/
+
 /******************* category  Info ************************ */
 
 /******************* product  Info ************************ */
@@ -136,16 +213,17 @@ const recommended_products = catchAsync(async (req, res) => {
 
 const product_list = catchAsync(async (req, res) => {
   try {
-    const { category_id, search } = req.body;
+    const { category_id, search, country_id, price_ranges } = req.body;
     let query_params = [1, 1];
     let searchQuery = "";
     let categories = "";
     let wildcardSearch = "";
+    let countryFilter = "";
+    let priceFilter = "";
 
     if (category_id) {
       categories = `and p.category = ANY ($${query_params.length + 1})`;
       query_params.push(category_id);
-      console.log("query_params", query_params);
     }
 
     if (search) {
@@ -153,6 +231,33 @@ const product_list = catchAsync(async (req, res) => {
       searchQuery = `AND lower(p.name) LIKE $${query_params.length + 1}`;
       query_params.push(wildcardSearch);
     }
+
+    if (country_id) {
+      countryFilter = `AND p.country_id = ANY ($${query_params.length + 1})`;
+      query_params.push(country_id);
+    }
+    if (price_ranges && price_ranges.length > 0) {
+      let priceRangeFilter = "";
+      let priceParams = [];
+
+      price_ranges.forEach((range) => {
+        priceParams.push(range.min, range.max);
+      });
+
+      // Get the starting index of price params in the final array
+      const baseIndex = query_params.length + 1;
+
+      price_ranges.forEach((range, i) => {
+        const minIndex = baseIndex + i * 2;
+        const maxIndex = baseIndex + i * 2 + 1;
+        priceRangeFilter += `(pl.price BETWEEN $${minIndex} AND $${maxIndex}) OR `;
+      });
+
+      priceFilter = `AND (${priceRangeFilter.slice(0, -4)})`; // remove last OR
+      query_params.push(...priceParams);
+    }
+
+    console.log("query_params", query_params);
 
     // const productquery = `select
     //     p.id,p.name as product_name,p.slug,p.description,p.price,p.minimum_order_place,p.maximum_order_place,
@@ -176,39 +281,53 @@ const product_list = catchAsync(async (req, res) => {
     //     GROUP BY p.id,c.cat_name,c.id,q.total_ordered_quantity_today`;
 
     const productquery = `
-    SELECT  
-      p.id,
-      p.name AS product_name,
-      p.slug,
-      p.description,
-      p.price,
-      p.minimum_order_place,
-      p.maximum_order_place,
-      COALESCE(q.total_ordered_quantity_today, 0) AS total_ordered_quantity_today,
-      (p.maximum_order_place - COALESCE(q.total_ordered_quantity_today, 0)) AS available_quantity,
-      c.id AS categoryId,
-      c.cat_name AS category_name,
-      ARRAY[pi.image_path] AS product_images
-    FROM products AS p
-    LEFT JOIN categories AS c ON p.category = c.id
-    LEFT JOIN LATERAL (
-      SELECT CONCAT('${BASE_URL}', pi.image_path) AS image_path
-      FROM product_images pi
-      WHERE pi.product_id = p.id
-      ORDER BY pi.id DESC
-      LIMIT 1
-    ) AS pi ON true
-    LEFT JOIN (
-      SELECT
-        product_id,
-        SUM(quantity) AS total_ordered_quantity_today
-      FROM order_items
-      WHERE order_item_status = $2 AND DATE(created_at) = CURRENT_DATE
-      GROUP BY product_id
-    ) AS q ON p.id = q.product_id
-    WHERE p.status = $1 AND p.deleted_at IS NULL ${categories} ${searchQuery}
-    GROUP BY p.id, c.cat_name, c.id, q.total_ordered_quantity_today, pi.image_path
-  `;
+      SELECT  
+        p.id,
+        p.name AS product_name,
+        p.slug,
+        p.description,
+        pl.price,
+        p.minimum_order_place,
+        p.maximum_order_place,
+        COALESCE(q.total_ordered_quantity_today, 0) AS total_ordered_quantity_today,
+        (p.maximum_order_place - COALESCE(q.total_ordered_quantity_today, 0)) AS available_quantity,
+        c.id AS categoryId,
+        c.cat_name AS category_name,
+        cd.id AS country_id,
+        cd.country_name,
+        ARRAY[pi.image_path] AS product_images
+      FROM products AS p
+      LEFT JOIN categories AS c ON p.category = c.id
+      LEFT JOIN country_data AS cd ON p.country_id = cd.id 
+      LEFT JOIN LATERAL (
+        SELECT CONCAT('${BASE_URL}', pi.image_path) AS image_path
+        FROM product_images pi
+        WHERE pi.product_id = p.id
+        ORDER BY pi.id DESC
+        LIMIT 1
+      ) AS pi ON true
+      LEFT JOIN (
+        SELECT
+          product_id,
+          SUM(quantity) AS total_ordered_quantity_today
+        FROM order_items
+        WHERE order_item_status = $2 AND DATE(created_at) = CURRENT_DATE
+        GROUP BY product_id
+      ) AS q ON p.id = q.product_id
+      LEFT JOIN (
+        SELECT DISTINCT ON (product_id)
+          product_id,
+          price,
+          upload_date
+        FROM products_price_logs
+        WHERE deleted_at IS NULL
+        ORDER BY product_id, upload_date DESC
+      ) AS pl ON pl.product_id = p.id
+      WHERE p.status = $1 AND p.deleted_at IS NULL
+      ${categories} ${searchQuery} ${countryFilter} ${priceFilter}
+      GROUP BY p.id, c.cat_name, c.id, q.total_ordered_quantity_today, pi.image_path, pl.price, cd.id, cd.country_name
+    `;
+
     const getproductlist = await db.query(productquery, query_params);
 
     return res.status(200).json({
@@ -221,7 +340,7 @@ const product_list = catchAsync(async (req, res) => {
     return res.status(200).json({
       status: false,
       message: "Failed to retrieve data",
-      errors: error.message,
+      errors: e.message,
     });
   }
 });
@@ -501,7 +620,7 @@ const create_order = catchAsync(async (req, res) => {
 
     if (delivery_option_id == 1) {
       getaddres = await db.query(
-        `select address from customer_addresses where customer_id=$1 AND id=$2 AND status=$3 `,
+        `select CONCAT(address1,' ',address2) as address from customer_addresses where customer_id=$1 AND id=$2 AND status=$3 `,
         [customer_id, address, "1"]
       );
       final_address = getaddres.rows[0]?.address || "";
@@ -627,8 +746,9 @@ const view_order = catchAsync(async (req, res) => {
     o.email,
     o.special_instruction,
     TO_CHAR(o.perferred_delivery_date, 'FMDDth Month YYYY') AS delivery_date,
-    ca.address as address,
-    o.address as address_id
+    ca.address1 as address_1,
+    ca.address2 as address_2,
+    o.address as orders_address_id
     FROM orders AS o
     LEFT JOIN customer_addresses as ca ON o.address = ca.id
     WHERE o.customer_id = $1`,
@@ -759,4 +879,6 @@ export {
   order_history,
   view_order,
   repeat_order,
+  country_list,
+  get_price,
 };

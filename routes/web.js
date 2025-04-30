@@ -98,8 +98,23 @@ router.post(
   profileController.getAddressList
 );
 
+router.post(
+  "/addUpdateAddress",
+  customer_authenticate,
+  profileController.addAddress
+);
+router.post(
+  "/deleteAddress",
+  customer_authenticate,
+  profileController.deleteAddress
+);
+
+router.post("/getLocationByZip", profileController.getLocationByZip);
+
 //category list
 router.get("/category_list", staticApiKey, productController.category_list);
+router.get("/country_list", staticApiKey, productController.country_list);
+router.get("/price_list", staticApiKey, productController.get_price);
 
 //product list
 router.post("/product_list", staticApiKey, productController.product_list);
