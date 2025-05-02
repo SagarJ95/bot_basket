@@ -4,6 +4,8 @@ import authenticate from "../middlewares/authenticate.js";
 import { Router } from "express";
 import db from "../config/db.js";
 import * as adminController from "../controllers/admin/adminController.js";
+import * as dashboardController from "../controllers/admin/dashbordController.js";
+
 import checkPermissionRoute from "../middlewares/check_access_route.js";
 import category from "../db/models/category.js";
 import multer from "multer";
@@ -63,5 +65,9 @@ router.route('/view-customer/:id').get([authenticate], adminController.viewCusto
 // Sign Out Route
 router.route("/sign-out").get(authenticate, userLogout, adminController.sign_out);
 
+//getdashbord
+router
+  .route("/dashbord")
+  .get(authenticate, dashboardController.dashboardController);
 
 export default router;

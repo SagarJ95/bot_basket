@@ -9,9 +9,14 @@ import * as userManagementController from "../controllers/admin/userManagementCo
 import * as signInController from "../controllers/admin/signInController.js";
 // import * as adminController from "../controllers/admin/adminController.js";
 import * as masterController from "../controllers/admin/masterController.js";
+import * as dashboardController from "../controllers/admin/dashbordController.js";
+
 import * as customerController from "../controllers/admin/customerController.js";
 import * as orderController from "../controllers/admin/orderManagementController.js";
-import * as dashboardController from "../controllers/admin/dashbordController.js";
+import * as storeLocationController from "../controllers/admin/store_self_location_api_controllers.js";
+import * as deliveryOptionController from "../controllers/admin/deliveryOptionController.js";
+
+// import * as dashboardController from "../controllers/admin/dashbordController.js";
 import moment from "moment";
 
 const router = Router();
@@ -214,8 +219,54 @@ router
 /* Order Management */
 router.post("/getOrderlist", authenticate, orderController.getOrderlist);
 router.post("/changeOrderStatus", authenticate, orderController.changeStatus);
-router.post("/orderViewDetails", authenticate, orderController.orderViewDetails);
-router.post('/orderEditDetails', authenticate, upload.fields([
-  { name: 'invoice', maxCount: 1 }]), orderController.orderEditDetails)
+router.post(
+  "/orderViewDetails",
+  authenticate,
+  orderController.orderViewDetails
+);
+router.post(
+  "/orderEditDetails",
+  authenticate,
+  upload.fields([{ name: "invoice", maxCount: 1 }]),
+  orderController.orderEditDetails
+);
+
+//store self location
+router.post(
+  "/selfStoreLocaton",
+  authenticate,
+  storeLocationController.selfStoreLocation
+);
+
+router.get(
+  "/getStoreLocation",
+  authenticate,
+  storeLocationController.getStoreLocation
+);
+
+router.post(
+  "/updateStoreLocation",
+  authenticate,
+  storeLocationController.updateStoreLocation
+);
+
+router.post(
+  "/deleteStoreLocation",
+  authenticate,
+  storeLocationController.deleteStoreLocation
+);
+
+//delivery option
+
+router.post(
+  "/deliveryOption",
+  authenticate,
+  deliveryOptionController.storedeliveryOption
+);
+router.get(
+  "/getDeliveryOption",
+  authenticate,
+  deliveryOptionController.getDeliveryOption
+);
 
 export default router;

@@ -2,50 +2,20 @@
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
   async up(queryInterface, Sequelize) {
-    await queryInterface.createTable("customer_addresses", {
+    await queryInterface.createTable("delivery_options", {
       id: {
         allowNull: false,
         autoIncrement: true,
         primaryKey: true,
         type: Sequelize.INTEGER,
       },
-      customer_id: {
-        type: Sequelize.BIGINT,
-      },
-      full_name: {
-        type: Sequelize.STRING,
-      },
-      mobile_number: {
-        type: Sequelize.STRING,
-      },
-      address1: {
-        type: Sequelize.TEXT,
-      },
-      address2: {
-        type: Sequelize.TEXT,
-      },
-      zip_code: {
-        type: Sequelize.INTEGER,
-      },
-      contry: {
-        type: Sequelize.STRING,
-      },
-      city: {
-        type: Sequelize.STRING,
-      },
-      state: {
-        type: Sequelize.STRING,
-      },
-      zip_code: {
-        type: Sequelize.INTEGER,
-      },
-      tag: {
+      delivery_option_name: {
         type: Sequelize.STRING,
       },
       status: {
-        defaultValue: 1,
-        type: Sequelize.INTEGER,
+        type: Sequelize.ENUM("0", "1"),
       },
+
       created_by: {
         type: Sequelize.INTEGER,
       },
@@ -69,6 +39,6 @@ module.exports = {
     });
   },
   async down(queryInterface, Sequelize) {
-    await queryInterface.dropTable("customer_addresses");
+    await queryInterface.dropTable("delivery_options");
   },
 };
