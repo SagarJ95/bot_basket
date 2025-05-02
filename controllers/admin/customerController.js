@@ -409,10 +409,10 @@ const add_customer = catchAsync(async (req, res) => {
     } = req.body;
 
     const files = req.files || {};
-    let addressInfo;
-    if (typeof address == "string") {
-      addressInfo = JSON.parse(address);
-    }
+    // let addressInfo;
+    // if (typeof address == "string") {
+    //   addressInfo = JSON.parse(address);
+    // }
 
     const hashPassword = await bcrypt.hash(password, 10);
 
