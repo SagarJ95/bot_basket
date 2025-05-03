@@ -8,7 +8,9 @@ import authenticate from "../middlewares/authenticate.js";
 import * as userManagementController from "../controllers/admin/userManagementController.js";
 import * as signInController from "../controllers/admin/signInController.js";
 // import * as adminController from "../controllers/admin/adminController.js";
-import * as masterController from "../controllers/admin/masterController.js";
+import * as productController from "../controllers/admin/productController.js";
+import * as categoryController from "../controllers/admin/categoriesController.js";
+
 import * as dashboardController from "../controllers/admin/dashbordController.js";
 
 import * as customerController from "../controllers/admin/customerController.js";
@@ -102,7 +104,7 @@ const compressImage = async (req, res, next) => {
 /* Auth API Routes -------------------------------------- */
 
 //countries
-router.post("/countries", masterController.countries);
+router.post("/countries", productController.countries);
 
 // POST user login
 router.post("/sign-in", signInController.userLogin);
@@ -145,35 +147,39 @@ router
 
 /* Category API Start ----------------------------------- */
 // POST add new category || GET get all categories
-router.post("/getCategories", authenticate, masterController.getCategories);
+router.post("/getCategories", authenticate, categoryController.getCategories);
 
 router.post(
   "/createCategory",
   authenticate,
   upload.fields([{ name: "icon", maxCount: 1 }]),
-  masterController.createCategory
+  categoryController.createCategory
 );
-router.post("/getCategoryById", authenticate, masterController.getCategoryById);
+router.post(
+  "/getCategoryById",
+  authenticate,
+  categoryController.getCategoryById
+);
 router.post(
   "/updateCategoryById",
   authenticate,
   upload.fields([{ name: "icon", maxCount: 1 }]),
-  masterController.updateCategoryById
+  categoryController.updateCategoryById
 );
 router.post(
   "/deleteCategoryById",
   authenticate,
-  masterController.deleteCategoryById
+  categoryController.deleteCategoryById
 );
 router.post(
   "/excelExportCategory",
   authenticate,
-  masterController.excelExportCategory
+  categoryController.excelExportCategory
 );
 router.post(
   "/updateCategoryStatusById",
   authenticate,
-  masterController.updateCategoryStatusById
+  categoryController.updateCategoryStatusById
 );
 
 /* Category API End ------------------------------------ */
@@ -181,58 +187,62 @@ router.post(
   "/createProduct",
   upload.fields([{ name: "product_images", maxCount: 5 }]),
   authenticate,
-  masterController.createProduct
+  productController.createProduct
 );
 router.post(
   "/updateProduct",
   upload.fields([{ name: "product_images", maxCount: 5 }]),
   authenticate,
-  masterController.updateProduct
+  productController.updateProduct
 );
-router.post("/getProductById", authenticate, masterController.getProductById);
+router.post("/getProductById", authenticate, productController.getProductById);
 router.post(
   "/deleteProductById",
   authenticate,
-  masterController.deleteProductById
+  productController.deleteProductById
 );
 router.post(
   "/updateProductStatusById",
   authenticate,
-  masterController.updateProductStatusById
+  productController.updateProductStatusById
 );
 router.post(
   "/excelExportProducts",
   authenticate,
-  masterController.excelExportProducts
+  productController.excelExportProducts
 );
 router.post(
   "/changeProductPrice",
   authenticate,
-  masterController.changeProductPrice
+  productController.changeProductPrice
 );
 router.post(
   "/getProductPriceLogs",
   authenticate,
-  masterController.getProductPriceLogs
+  productController.getProductPriceLogs
 );
 router.post(
   "/exportProductPriceLogs",
   authenticate,
-  masterController.exportProductPriceLogs
+  productController.exportProductPriceLogs
 );
-router.post("/ChangePricelist", authenticate, masterController.ChangePricelist);
+router.post(
+  "/ChangePricelist",
+  authenticate,
+  productController.ChangePricelist
+);
 router.post(
   "/changeProductStockStatus",
   authenticate,
-  masterController.changeProductStockStatus
+  productController.changeProductStockStatus
 );
-router.post("/getProductlist", authenticate, masterController.getProductlist);
+router.post("/getProductlist", authenticate, productController.getProductlist);
 
 //export product list for price change
 router.post(
   "/excelExportProductsInfo",
   authenticate,
-  masterController.excelExportProductsInfo
+  productController.excelExportProductsInfo
 );
 
 //import product list with update price and store update price in log table
@@ -240,7 +250,7 @@ router.post(
   "/importProductListwithPrice",
   authenticate,
   upload.fields([{ name: "csv_file", maxCount: 1 }]),
-  masterController.importProductListwithPrice
+  productController.importProductListwithPrice
 );
 
 /* Customers */

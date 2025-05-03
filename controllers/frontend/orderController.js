@@ -1,0 +1,359 @@
+import catchAsync from "../../utils/catchAsync.js";
+import db from "../../config/db.js";
+import AppError from "../../utils/appError.js";
+
+import Customer from "../../db/models/customers.js";
+import addToCart from "../../db/models/add_to_carts.js";
+import Orders from "../../db/models/orders.js";
+import OrderItem from "../../db/models/order_items.js";
+import bcrypt from "bcrypt";
+import { body, validationResult } from "express-validator";
+import { sendOrderConfirmation } from "../../helpers/orderconformation_mail.js";
+
+const project_name = process.env.APP_NAME;
+const BASE_URL = process.env.BASE_URL || "http://localhost:3848";
+
+
+
+/******************* Start Order creation Flow ************************ */
+//place order
+const create_order = catchAsync(async (req, res) => {
+    await Promise.all([
+      body("name").notEmpty().withMessage("Name is required").run(req),
+      body("whatsapp_number")
+        .notEmpty()
+        .withMessage("Whatsapp Number is required")
+        .run(req),
+      body("email").notEmpty().withMessage("Email is required").run(req),
+      body("perferred_delivery_date")
+        .notEmpty()
+        .withMessage("Perferred delivery date is required")
+        .run(req),
+      body("address").notEmpty().withMessage("Address is required").run(req),
+      body("order_item")
+        .isArray({ min: 1 })
+        .withMessage("At least one order item is required")
+        .run(req),
+    ]);
+  
+    // Handle validation result
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      const error_message = errors.array()[0].msg;
+      throw new AppError(error_message, 200, errors);
+    }
+  
+    try {
+      const customer_id = req.user.id;
+      const {
+        name,
+        whatsapp_number,
+        email,
+        perferred_delivery_date,
+        address,
+        instruction,
+        order_item,
+        delivery_option_id,
+      } = req.body;
+  
+      //get order id from order table
+      const getorderid = await db.query(`select id from orders order by id desc`);
+      const orderidInc = getorderid.rowCount > 0 ? getorderid.rows[0].id + 1 : 1;
+      const orderrefid = `Order_ID_${orderidInc}`;
+  
+      const order_id = await Orders.create({
+        customer_id: customer_id,
+        order_ref_id: orderrefid,
+        customer_name: name,
+        whatsapp_number: whatsapp_number,
+        email: email,
+        perferred_delivery_date: perferred_delivery_date,
+        address: address,
+        special_instruction: instruction,
+        delivery_option_id: delivery_option_id,
+        status: 1,
+        order_status: 1,
+        created_by: customer_id,
+      });
+  
+      if (order_id.id && order_item) {
+        for (let item of order_item) {
+          const order_item_id = await OrderItem.create({
+            order_id: order_id.id,
+            customer_id: customer_id,
+            cart_id: item.cart_id,
+            product_id: item.product_id,
+            product_name: item.product_name,
+            quantity: item.quantity,
+            price: item.price,
+            order_item_status: 1,
+            item_delivery_status: 1,
+            created_by: customer_id,
+          });
+  
+          //Deactive status in cart_list
+          const cart_id = item.cart_id;
+          const cart = await addToCart.update(
+            { status: 0 },
+            { where: { id: cart_id } }
+          );
+        }
+      }
+      let getaddres;
+      let final_address = "";
+  
+      if (delivery_option_id == 1) {
+        getaddres = await db.query(
+          `select CONCAT(address1,' ',address2) as address from customer_addresses where customer_id=$1 AND id=$2 AND status=$3 `,
+          [customer_id, address, "1"]
+        );
+        final_address = getaddres.rows[0]?.address || "";
+        console.log("final_address", final_address);
+      } else if (delivery_option_id == 2) {
+        getaddres = await db.query(
+          `select store_address from store_self_locations where status=$1 `,
+          ["1"]
+        );
+        final_address = getaddres.rows[0]?.store_address || "";
+        console.log("final_address", final_address);
+      }
+  
+      // send conformation mail with pdf attach invoice
+      await sendOrderConfirmation(
+        req,
+        email,
+        name,
+        final_address,
+        order_item.map((item) => ({
+          name: item.product_name,
+          quantity: item.quantity,
+          price: item.price,
+        })),
+        order_id.id
+      );
+  
+      return res.status(200).json({
+        status: true,
+        message: "Order Placed Successfully",
+      });
+    } catch (error) {
+      return res.status(200).json({
+        status: false,
+        message: "Failed to retrieve data",
+        errors: error.message,
+      });
+    }
+  });
+  
+  const order_history = catchAsync(async (req, res) => {
+    await Promise.all([
+      body("status").notEmpty().withMessage("Status is required").run(req),
+    ]);
+  
+    // Handle validation result
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      const error_message = errors.array()[0].msg;
+      throw new AppError(error_message, 200, errors);
+    }
+  
+    try {
+      const customer_id = req.user.id;
+      const { status } = req.body;
+  
+      const result = await db.query(
+        `
+          SELECT
+            o.id AS order_id,
+            TO_CHAR(o.perferred_delivery_date, 'FMDDth Month YYYY') AS delivery_date,
+            SUM(oi.quantity * oi.price::numeric) AS total_price,
+                  JSON_AGG(
+                    JSON_BUILD_OBJECT(
+                      'product_id', p.id,
+                      'product_name', p.name,
+                      'description', p.description,
+                      'product_images', (
+                        SELECT JSON_AGG(DISTINCT CONCAT('${BASE_URL}', pi.image_path))
+                        FROM product_images pi
+                        WHERE pi.product_id = p.id AND pi.image_path IS NOT NULL
+                      )
+                    )
+                  ) AS products
+                FROM orders o
+                LEFT JOIN order_items oi ON o.id = oi.order_id
+                LEFT JOIN products p ON oi.product_id = p.id
+                WHERE o.customer_id = $1
+                  AND o.order_status = $2
+                  AND oi.order_item_status = $3
+                  AND o.status = $4
+                GROUP BY o.id, o.perferred_delivery_date
+        `,
+        [customer_id, status, 1, 1]
+      );
+  
+      return res.status(200).json({
+        status: true,
+        message: "Fetch Order History Successfully",
+        data: result.rowCount > 0 ? result.rows : [],
+      });
+    } catch (error) {
+      return res.status(200).json({
+        status: false,
+        message: "Failed to retrieve data",
+        errors: error.message,
+      });
+    }
+  });
+  
+  const view_order = catchAsync(async (req, res) => {
+    await Promise.all([
+      body("order_id").notEmpty().withMessage("Order Id is required").run(req),
+    ]);
+  
+    // Handle validation result
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      const error_message = errors.array()[0].msg;
+      throw new AppError(error_message, 200, errors);
+    }
+  
+    try {
+      const customer_id = req.user.id;
+      const { order_id } = req.body;
+  
+      const result = await db.query(
+        `SELECT
+      o.id,
+      o.customer_id,
+      o.customer_name,
+      o.whatsapp_number,
+      o.email,
+      o.special_instruction,
+      TO_CHAR(o.perferred_delivery_date, 'FMDDth Month YYYY') AS delivery_date,
+      ca.address1 as address_1,
+      ca.address2 as address_2,
+      o.address as orders_address_id
+      FROM orders AS o
+      LEFT JOIN customer_addresses as ca ON o.address = ca.id
+      WHERE o.customer_id = $1`,
+        [customer_id]
+      );
+  
+      //fetch order_item table fetch order item list based on order_id
+      const order_item = await db.query(
+        `SELECT
+        oi.id,
+        oi.order_id,
+        oi.product_id,
+        oi.product_name AS product_name,
+        p.description,
+        oi.price AS product_price,
+        oi.quantity AS product_quantity,
+        SUM(oi.quantity * oi.price::numeric) As total_price,
+        (
+          SELECT JSON_AGG(DISTINCT CONCAT('${BASE_URL}', pi.image_path))
+          FROM product_images pi
+          WHERE pi.product_id = p.id AND pi.image_path IS NOT NULL
+        ) AS product_images
+        FROM order_items AS oi
+        LEFT JOIN products AS p ON oi.product_id = p.id
+        WHERE oi.order_id = $1 And oi.order_item_status = $2
+        GROUP BY oi.id,p.id,p.description`,
+        [order_id, 1]
+      );
+  
+      let Sumoflist;
+      if (order_item.rowCount > 0) {
+        Sumoflist = order_item.rows.reduce(
+          (acc, item) => {
+            acc.qty += parseFloat(item.product_quantity) || 0;
+            acc.price += parseFloat(item.total_price) || 0;
+            return acc;
+          },
+          { qty: 0, price: 0 }
+        );
+      }
+  
+      return res.status(200).json({
+        status: true,
+        message: "Fetch Order Details Successfully",
+        data:
+          result.rowCount > 0
+            ? [
+                {
+                  ...result.rows[0],
+                  order_items: order_item.rows,
+                  Sumoflist: Sumoflist ? Sumoflist : "",
+                },
+              ]
+            : [],
+      });
+    } catch (error) {
+      return res.status(200).json({
+        status: false,
+        message: "Failed to retrieve data",
+        errors: error.message,
+      });
+    }
+  });
+  
+  // repeat order
+  const repeat_order = catchAsync(async (req, res) => {
+    try {
+      const customer_id = req.user.id;
+      const { order_id } = req.body;
+  
+      const getoder = await db.query(
+        `select ot.order_id,ot.product_id,ot.quantity,ot.price as previous_price,p.price as current_price from order_items as ot
+          LEFT JOIN products as p ON ot.product_id = p.id
+         where ot.order_id=$1 AND ot.order_item_status=$2 AND p.product_stock_status=$3 AND p.status=$4 AND p.price != ${0}`,
+        [order_id, "1", "1", "1"]
+      );
+  
+      if (getoder.rowCount == 0) {
+        return res.status(200).json({
+          status: false,
+          message: "Product not available",
+        });
+      }
+  
+      const items = getoder.rows;
+  
+      for (const item of items) {
+        await db.query(
+          `INSERT INTO add_to_carts (product_id,qty,price,pervoius_price,created_at,updated_at,created_by,status)
+          VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+          [
+            item.product_id,
+            item.quantity,
+            item.current_price,
+            item.previous_price,
+            new Date(),
+            new Date(),
+            customer_id,
+  
+            "1",
+          ]
+        );
+      }
+      return res.status(200).json({
+        status: true,
+        message: "Order fetched and added to cart successfully!",
+      });
+    } catch (error) {
+      res.status(400).json({
+        status: false,
+        message: error.message,
+      });
+    }
+  });
+  
+  /******************* End Order creation Flow ************************ */
+
+  
+
+  export{  create_order,
+    order_history,
+    view_order,
+    repeat_order,
+  }

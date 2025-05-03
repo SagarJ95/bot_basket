@@ -5,7 +5,14 @@ import { existsSync, mkdirSync } from "fs";
 import { extname } from "path";
 import * as cutomerController from "../controllers/frontend/signInApiController.js";
 import * as profileController from "../controllers/frontend/ProfileApiController.js";
+import * as addressController from "../controllers/frontend/addressController.js";
+
 import * as productController from "../controllers/frontend/ProductApiController.js";
+import * as countryController from "../controllers/frontend/countylistController.js";
+import * as priceController from "../controllers/frontend/priceController.js";
+import * as categoryController from "../controllers/frontend/categoryController.js";
+import * as orderController from "../controllers/frontend/orderController.js";
+
 const project_name = process.env.APP_NAME;
 import customer_authenticate from "../middlewares/customer_authenticate.js";
 import staticApiKey from "../middlewares/static_api_key.js";
@@ -95,26 +102,26 @@ router.post(
 router.post(
   "/getAddressList",
   customer_authenticate,
-  profileController.getAddressList
+  addressController.getAddressList
 );
 
 router.post(
   "/addUpdateAddress",
   customer_authenticate,
-  profileController.addAddress
+  addressController.addAddress
 );
 router.post(
   "/deleteAddress",
   customer_authenticate,
-  profileController.deleteAddress
+  addressController.deleteAddress
 );
 
-router.post("/getLocationByZip", profileController.getLocationByZip);
+router.post("/getLocationByZip", addressController.getLocationByZip);
 
 //category list
-router.get("/category_list", staticApiKey, productController.category_list);
-router.get("/country_list", staticApiKey, productController.country_list);
-router.get("/price_list", staticApiKey, productController.get_price);
+router.get("/category_list", staticApiKey, categoryController.category_list);
+router.get("/country_list", staticApiKey, countryController.country_list);
+router.get("/price_list", staticApiKey, priceController.get_price);
 
 //product list
 router.post("/product_list", staticApiKey, productController.product_list);
@@ -140,18 +147,18 @@ router.post(
 router.post(
   "/place_order",
   customer_authenticate,
-  productController.create_order
+  orderController.create_order
 );
 
 //order_history
 router.post(
   "/order_history",
   customer_authenticate,
-  productController.order_history
+  orderController.order_history
 );
 
 //view_order
-router.post("/view_order", customer_authenticate, productController.view_order);
+router.post("/view_order", customer_authenticate, orderController.view_order);
 
 //recommended_products
 router.post(
@@ -164,7 +171,7 @@ router.post(
 router.post(
   "/repeat_order",
   customer_authenticate,
-  productController.repeat_order
+  orderController.repeat_order
 );
 
 /********************************** End Customer Section *********************************/

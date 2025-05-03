@@ -16,28 +16,50 @@ import nodemailer from "nodemailer";
 import moment from "moment";
 import customerOtpLog from "../../db/models/customer_otp_logs.js";
 import pkg from "jsonwebtoken";
+import { sendOrderOTP } from "../../helpers/sendEmailOtpHelper.js";
+
 const project_name = process.env.APP_NAME;
 const BASE_URL = process.env.BASE_URL || "http://localhost:3848";
 
 // POST Customer login
 const SignUp = catchAsync(async (req, res) => {
-
   // Apply validation rules
   await Promise.all([
-    body('first_name').notEmpty().withMessage('First Name is required').run(req),
-    body('last_name').notEmpty().withMessage('Last Name is required').run(req),
-    body('email').notEmpty().withMessage('Email is required').isEmail().withMessage("Invalid email format").custom(async (value) => {
-      // Check if the email already exists in the database
-      if (value) {
-        const existingEmail = await Customer.findOne({ where: { email: value } });
-        if (existingEmail) {
-          return res.status(200).json({ status: false, message: "Email Id already exists", errors: {} })
+    body("first_name")
+      .notEmpty()
+      .withMessage("First Name is required")
+      .run(req),
+    body("last_name").notEmpty().withMessage("Last Name is required").run(req),
+    body("email")
+      .notEmpty()
+      .withMessage("Email is required")
+      .isEmail()
+      .withMessage("Invalid email format")
+      .custom(async (value) => {
+        // Check if the email already exists in the database
+        if (value) {
+          const existingEmail = await Customer.findOne({
+            where: { email: value },
+          });
+          if (existingEmail) {
+            return res.status(200).json({
+              status: false,
+              message: "Email Id already exists",
+              errors: {},
+            });
+          }
         }
-      }
-    }).run(req),
-    body('phone_no').notEmpty().withMessage('Phone Number is required').isLength({ min: 10, max: 10 }).withMessage('Phone number must be exactly 10 digits.')
-      .isNumeric().withMessage('Phone number must contain only digits.').run(req),
-    body('password').notEmpty().withMessage('Password is required').run(req)
+      })
+      .run(req),
+    body("phone_no")
+      .notEmpty()
+      .withMessage("Phone Number is required")
+      .isLength({ min: 10, max: 10 })
+      .withMessage("Phone number must be exactly 10 digits.")
+      .isNumeric()
+      .withMessage("Phone number must contain only digits.")
+      .run(req),
+    body("password").notEmpty().withMessage("Password is required").run(req),
   ]);
 
   // Handle validation result
@@ -72,9 +94,8 @@ const SignUp = catchAsync(async (req, res) => {
       phone_no: phone_no,
       email: email.toLowerCase(),
       status: "1",
-      password: hashPassword
+      password: hashPassword,
     });
-
 
     if (creation) {
       const token = generateToken({
@@ -91,7 +112,7 @@ const SignUp = catchAsync(async (req, res) => {
             loginIn: new Date(),
             token: token,
             created_at: new Date(),
-            updated_at: new Date()
+            updated_at: new Date(),
           },
         }
       );
@@ -103,8 +124,8 @@ const SignUp = catchAsync(async (req, res) => {
           {
             token: token,
             name: `${first_name} ${last_name}`,
-            customer_id: (creation) ? creation.id : '',
-          }
+            customer_id: creation ? creation.id : "",
+          },
         ],
       });
     } else {
@@ -129,23 +150,25 @@ const Login = catchAsync(async (req, res) => {
       message: "Please provide email and password",
     });
   } else {
-    const result = await Customer.findOne({ where: { email: email.toLowerCase() } })
+    const result = await Customer.findOne({
+      where: { email: email.toLowerCase() },
+    });
 
     if (!result || !(await compare(password, result.password))) {
       return res.status(200).json({
         status: false,
-        message: "Invalid Credentials"
+        message: "Invalid Credentials",
       });
     } else {
       if (result.status != 1) {
         return res.status(200).json({
           status: false,
-          message: "Sorry, Customer is Inactivated"
+          message: "Sorry, Customer is Inactivated",
         });
       }
 
       const token = generateToken({
-        id: result.id
+        id: result.id,
       });
 
       //Log the user's login info
@@ -158,7 +181,7 @@ const Login = catchAsync(async (req, res) => {
             loginIn: new Date(),
             token: token,
             created_at: new Date(),
-            updated_at: new Date()
+            updated_at: new Date(),
           },
         }
       );
@@ -171,10 +194,9 @@ const Login = catchAsync(async (req, res) => {
             token: token,
             name: result ? `${result.first_name} ${result.last_name}` : "",
             customer_id: result ? result.id : "",
-          }
-        ]
+          },
+        ],
       });
-
     }
   }
 });
@@ -276,12 +298,10 @@ const resend_otp = catchAsync(async (req, res, next) => {
     body("email")
       .notEmpty()
       .withMessage("Email is required")
-      .isEmail().withMessage("Invalid email format")
+      .isEmail()
+      .withMessage("Invalid email format")
       .run(req),
-    body("status")
-      .notEmpty()
-      .withMessage("status is required")
-      .run(req),
+    body("status").notEmpty().withMessage("status is required").run(req),
   ]);
 
   // Handle validation result
@@ -292,7 +312,6 @@ const resend_otp = catchAsync(async (req, res, next) => {
   }
 
   try {
-
     const { first_name, last_name, email, status } = req.body;
     let customer_name;
 
@@ -311,15 +330,18 @@ const resend_otp = catchAsync(async (req, res, next) => {
       //check email in user table and get id of user
       const customerInfo = await Customer.findOne({
         where: {
-          email: email.toLowerCase()
-        }
+          email: email.toLowerCase(),
+        },
       });
       customer_name = `${customerInfo.first_name}  ${customerInfo.last_name}`;
     } else {
-      customer_name = `${(first_name) ? first_name : 'New'}  ${(last_name) ? last_name : 'Customer'}`;
+      customer_name = `${first_name ? first_name : "New"}  ${
+        last_name ? last_name : "Customer"
+      }`;
     }
 
-    const checkOtpResponse = await sendEmail(email, customer_name)
+    // const checkOtpResponse = await sendEmail(email, customer_name);
+    const checkOtpResponse = await sendOrderOTP(req, email, customer_name);
 
     if (!checkOtpResponse.status) {
       return res.status(200).json({
@@ -332,7 +354,6 @@ const resend_otp = catchAsync(async (req, res, next) => {
       status: true,
       message: checkOtpResponse.message,
     });
-
   } catch (error) {
     throw new AppError(error.message, 200);
   }
@@ -340,12 +361,8 @@ const resend_otp = catchAsync(async (req, res, next) => {
 
 //update password (Forget password)
 const updatePassword = catchAsync(async (req, res, next) => {
-
   await Promise.all([
-    body("email")
-      .notEmpty()
-      .withMessage("email is required")
-      .run(req),
+    body("email").notEmpty().withMessage("email is required").run(req),
   ]);
 
   // Handle validation result
@@ -356,10 +373,9 @@ const updatePassword = catchAsync(async (req, res, next) => {
   }
 
   try {
+    const { email, new_password, confirm_password } = req.body;
 
-    const { email,new_password, confirm_password } = req.body;
-
-    if (new_password != '') {
+    if (new_password != "") {
       const checkCutomerInfo = await Customer.findOne({
         where: {
           email: email.toLowerCase(),
@@ -370,12 +386,10 @@ const updatePassword = catchAsync(async (req, res, next) => {
         throw new AppError("Email doesn't exists", 200);
       }
       let customer_name = `${checkCutomerInfo.first_name}  ${checkCutomerInfo.last_name}`;
-
-
-    } else if (new_password != '' || confirm_password != '') {
+    } else if (new_password != "" || confirm_password != "") {
       return res.status(200).json({
         status: false,
-        message: "Please Fill all fields"
+        message: "Please Fill all fields",
       });
     }
 
@@ -410,30 +424,33 @@ const updatePassword = catchAsync(async (req, res, next) => {
     const hashPassword = await bcrypt.hash(confirm_password, 10);
     const updateInfo = {
       password: hashPassword,
-    }
+    };
 
     //update customer password in Customer Table
     const updateCustomerPassword = await Customer.update(updateInfo, {
       where: {
         //email: checkotpstatus.rows[0].email
-        email:email.toLowerCase()
+        email: email.toLowerCase(),
       },
     });
 
     if (updateCustomerPassword) {
-
       //update otp status in customer_otp_logs
       //const updateOtpStatus = await db.query(`update customer_otp_logs set status = "0" where id = ${checkotpstatus.rows[0].id} and status =1 and deleted_at IS NUll`);
-     // await db.query("DELETE FROM customer_otp_logs WHERE id = $1", [checkotpstatus.rows[0].id]);
+      // await db.query("DELETE FROM customer_otp_logs WHERE id = $1", [checkotpstatus.rows[0].id]);
 
-      return res
-        .status(200)
-        .json({ status: true, message: "Password Update successfully", data: [] });
-      } else {
-        return res
-          .status(200)
-          .json({ status: false, message: "Password Update Unsuccessfully", data: [] });
-      }
+      return res.status(200).json({
+        status: true,
+        message: "Password Update successfully",
+        data: [],
+      });
+    } else {
+      return res.status(200).json({
+        status: false,
+        message: "Password Update Unsuccessfully",
+        data: [],
+      });
+    }
   } catch (error) {
     throw new AppError(error.message, 200);
   }
@@ -462,7 +479,6 @@ async function otpexpire(email, otp, res) {
   }
 
   return { status: true, message: "", data: otpRecord.id };
-
 }
 
 //send email
@@ -480,19 +496,7 @@ async function sendEmail(email, customer_name) {
       pass: process.env.MAIL_PASSWORD,
     },
   });
-  // const transport = nodemailer.createTransport({
-  //   host: process.env.MAIL_HOST,
-  //   port: process.env.MAIL_PORT, // Use port 587 for STARTTLS
-  //   secure: false, // Set to false since STARTTLS is being used
-  //   auth: {
-  //     user: process.env.MAIL_USERNAME,
-  //     pass: process.env.MAIL_PASSWORD,
-  //   },
-  //   tls: {
-  //     // This is optional but can help avoid some TLS-related issues.
-  //     rejectUnauthorized: false,
-  //   },
-  // });
+
   const mailconfig = {
     from: `${process.env.MAIL_USERNAME}`,
     to: email.toLowerCase(),
@@ -789,7 +793,9 @@ async function sendEmail(email, customer_name) {
                                       </tr>
                                       <tr>
                                         <td class="submitted ">
-                                        <p>Hello ${(customer_name) ? customer_name : ''},</p>
+                                        <p>Hello ${
+                                          customer_name ? customer_name : ""
+                                        },</p>
                             <p>We received a request to verify your account. Use the following otp to complete your update Password process:</p>
                             <p class="otp-code" style="margin-bottom: 20px;"><b>${otpCode}</b></p>
                             <p>Please do not share this OTP with anyone. </p>
@@ -856,15 +862,16 @@ async function sendEmail(email, customer_name) {
       if (err) {
         return { status: false, message: "Email sent Unsuccessfully" };
       } else {
-
-        const expiresAt = moment().add(1, "minutes").format("YYYY-MM-DD HH:mm:ss");
+        const expiresAt = moment()
+          .add(1, "minutes")
+          .format("YYYY-MM-DD HH:mm:ss");
 
         //store otp in  customer_otp_log
         const StoreOtpCode = await customerOtpLog.create({
           otp: otpCode,
           email: email.toLowerCase(),
           expires_at: expiresAt,
-          status: 1
+          status: 1,
         });
       }
     });
@@ -873,16 +880,19 @@ async function sendEmail(email, customer_name) {
   } catch (e) {
     return { status: false, message: "Email sent Unsuccessfully" };
   }
-
 }
 
 //verify otp
 const verifyOtp = catchAsync(async (req, res) => {
-
   // Apply validation rules
   await Promise.all([
-    body('email').notEmpty().withMessage('Email is required').isEmail().withMessage("Invalid email format").run(req),
-    body('otp').notEmpty().withMessage('OTP is required').run(req)
+    body("email")
+      .notEmpty()
+      .withMessage("Email is required")
+      .isEmail()
+      .withMessage("Invalid email format")
+      .run(req),
+    body("otp").notEmpty().withMessage("OTP is required").run(req),
   ]);
 
   // Handle validation result
@@ -896,7 +906,7 @@ const verifyOtp = catchAsync(async (req, res) => {
 
   try {
     //check otp expire and invalid, incorrect functionlity
-    const getOtpexpireStatus = await otpexpire(email.toLowerCase(), otp)
+    const getOtpexpireStatus = await otpexpire(email.toLowerCase(), otp);
 
     if (!getOtpexpireStatus.status) {
       return res.status(200).json({
@@ -905,7 +915,10 @@ const verifyOtp = catchAsync(async (req, res) => {
       });
     }
 
-    const checkotpstatus = await db.query(`select * from customer_otp_logs where otp = ${otp} and status = $1 and deleted_at IS NULL`, ["1"])
+    const checkotpstatus = await db.query(
+      `select * from customer_otp_logs where otp = ${otp} and status = $1 and deleted_at IS NULL`,
+      ["1"]
+    );
 
     if (checkotpstatus.rowCount <= 0) {
       return res.status(200).json({
@@ -915,13 +928,14 @@ const verifyOtp = catchAsync(async (req, res) => {
     }
 
     // OTP is valid, delete it after verification
-    await db.query("DELETE FROM customer_otp_logs WHERE id = $1", [getOtpexpireStatus.id]);
+    await db.query("DELETE FROM customer_otp_logs WHERE id = $1", [
+      getOtpexpireStatus.id,
+    ]);
 
-      return res.status(200).json({
-        status: true,
-        message: "OTP verified successfully",
-      });
-
+    return res.status(200).json({
+      status: true,
+      message: "OTP verified successfully",
+    });
   } catch (err) {
     // Handle errors
     throw new AppError(err.message, 200, errors);
@@ -929,14 +943,4 @@ const verifyOtp = catchAsync(async (req, res) => {
 });
 /******************* End Forget password************************ */
 
-
-export {
-  SignUp,
-  Login,
-  resend_otp,
-  updatePassword,
-  resetpassword,
-  verifyOtp
-}
-
-
+export { SignUp, Login, resend_otp, updatePassword, resetpassword, verifyOtp };

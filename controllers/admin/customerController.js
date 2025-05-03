@@ -212,7 +212,7 @@ const getParticularCustomerInfo = catchAsync(async (req, res) => {
 
 //update customer info
 const update_customer_info = catchAsync(async (req, res) => {
-    console.log('inside ')
+  console.log("inside ");
   await Promise.all([
     body("customer_id")
       .notEmpty()
