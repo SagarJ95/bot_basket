@@ -6,6 +6,8 @@ import { extname } from "path";
 import * as cutomerController from "../controllers/frontend/signInApiController.js";
 import * as profileController from "../controllers/frontend/ProfileApiController.js";
 import * as productController from "../controllers/frontend/ProductApiController.js";
+import * as getselfController from "../controllers/frontend/get_self_location_api_controller.js";
+
 const project_name = process.env.APP_NAME;
 import customer_authenticate from "../middlewares/customer_authenticate.js";
 import staticApiKey from "../middlewares/static_api_key.js";
@@ -71,6 +73,13 @@ router.post(
   "/set_new_password",
   customer_authenticate,
   cutomerController.resetpassword
+);
+//delete account
+
+router.post(
+  "/delete_account",
+  customer_authenticate,
+  cutomerController.deleteCustomer
 );
 
 //send Email wwith OTP
@@ -167,6 +176,6 @@ router.post(
   productController.repeat_order
 );
 
-/********************************** End Customer Section *********************************/
+/******************************************* End Customer Section *********************************/
 
 export default router;

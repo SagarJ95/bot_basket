@@ -2,7 +2,6 @@
 import catchAsync from "../../utils/catchAsync.js";
 import db from "../../config/db.js";
 import AppError from "../../utils/appError.js";
-
 import Customer from "../../db/models/customers.js";
 import addToCart from "../../db/models/add_to_carts.js";
 import Orders from "../../db/models/orders.js";
@@ -10,7 +9,9 @@ import OrderItem from "../../db/models/order_items.js";
 import bcrypt from "bcrypt";
 import { body, validationResult } from "express-validator";
 import { sendOrderConfirmation } from "../../helpers/orderconformation_mail.js";
-
+import pkg from "jsonwebtoken";
+const { verify } = pkg;
+// import Customer from "../../db/models/customers.js";
 const project_name = process.env.APP_NAME;
 const BASE_URL = process.env.BASE_URL || "http://localhost:3848";
 
@@ -213,7 +214,14 @@ const recommended_products = catchAsync(async (req, res) => {
 
 const product_list = catchAsync(async (req, res) => {
   try {
-    const { category_id, search, country_id, price_ranges } = req.body;
+    const {
+      category_id,
+      search,
+      country_id,
+      price_ranges,
+      page = 1,
+      pageSize = 10,
+    } = req.body;
     let query_params = [1, 1];
     let searchQuery = "";
     let categories = "";
@@ -222,7 +230,7 @@ const product_list = catchAsync(async (req, res) => {
     let priceFilter = "";
 
     if (category_id) {
-      categories = `and p.category = ANY ($${query_params.length + 1})`;
+      categories = `AND p.category = ANY ($${query_params.length + 1})`;
       query_params.push(category_id);
     }
 
@@ -236,15 +244,14 @@ const product_list = catchAsync(async (req, res) => {
       countryFilter = `AND p.country_id = ANY ($${query_params.length + 1})`;
       query_params.push(country_id);
     }
+
     if (price_ranges && price_ranges.length > 0) {
       let priceRangeFilter = "";
       let priceParams = [];
-
       price_ranges.forEach((range) => {
         priceParams.push(range.min, range.max);
       });
 
-      // Get the starting index of price params in the final array
       const baseIndex = query_params.length + 1;
 
       price_ranges.forEach((range, i) => {
@@ -253,11 +260,52 @@ const product_list = catchAsync(async (req, res) => {
         priceRangeFilter += `(pl.price BETWEEN $${minIndex} AND $${maxIndex}) OR `;
       });
 
-      priceFilter = `AND (${priceRangeFilter.slice(0, -4)})`; // remove last OR
+      priceFilter = `AND (${priceRangeFilter.slice(0, -4)})`;
       query_params.push(...priceParams);
     }
 
-    // console.log("query_params", query_params);
+    // Soft Authentication
+    const authHeader = req.headers.authorization;
+    let customer;
+    if (authHeader?.startsWith("Bearer")) {
+      const token = authHeader.split(" ")[1];
+      try {
+        const decoded = verify(token, process.env.JWT_SECRET_KEY);
+        customer = await Customer.findByPk(decoded.id);
+      } catch (_) {
+        customer = null;
+      }
+    }
+    const customerId = customer ? customer.id : null;
+
+    let cartJoin = "";
+    let cartgroupjoin = "";
+    let cartqtyandid = "";
+    if (customerId) {
+      cartJoin = `
+        LEFT JOIN (
+          SELECT 
+            atc.id AS cart_id,
+            atc.product_id,
+            atc.qty,
+            atc.price
+          FROM add_to_carts atc
+          WHERE atc.created_by = $${query_params.length + 1}
+            AND atc.status = 1
+            AND atc.deleted_at IS NULL
+        ) AS cart ON cart.product_id = p.id
+      `;
+      query_params.push(customerId);
+      cartgroupjoin = ", cart.cart_id, cart.qty";
+      cartqtyandid = `, COALESCE(cart.cart_id, 0) AS cart_id, COALESCE(cart.qty, 0) AS cart_qty`;
+    }
+
+    // Pagination
+    const offset = (page - 1) * pageSize;
+    const limitQuery = ` LIMIT $${query_params.length + 1} OFFSET $${
+      query_params.length + 2
+    }`;
+    query_params.push(pageSize, offset);
 
     const productquery = `
       SELECT  
@@ -274,9 +322,9 @@ const product_list = catchAsync(async (req, res) => {
         c.cat_name AS category_name,
         cd.id AS country_id,
         cd.country_name,
-       
-        CONCAT('${BASE_URL}','/images/img-country-flag/', cd.flag) AS country_flag,
+        CONCAT('${BASE_URL}', '/images/img-country-flag/', cd.flag) AS country_flag,
         ARRAY[pi.image_path] AS product_images
+        ${cartqtyandid}
       FROM products AS p
       LEFT JOIN categories AS c ON p.category = c.id
       LEFT JOIN country_data AS cd ON p.country_id = cd.id 
@@ -304,21 +352,37 @@ const product_list = catchAsync(async (req, res) => {
         WHERE deleted_at IS NULL
         ORDER BY product_id, upload_date DESC
       ) AS pl ON pl.product_id = p.id
+      ${cartJoin}
       WHERE p.status = $1 AND p.deleted_at IS NULL
       ${categories} ${searchQuery} ${countryFilter} ${priceFilter}
-      GROUP BY p.id, c.cat_name, c.id, q.total_ordered_quantity_today, pi.image_path, pl.price, cd.id, cd.country_name
+      GROUP BY p.id, c.cat_name, c.id, q.total_ordered_quantity_today, pi.image_path, pl.price, cd.id, cd.country_name ${cartgroupjoin}
+      ${limitQuery}
     `;
 
     const getproductlist = await db.query(productquery, query_params);
 
+    let cartListLength = 0;
+    if (customerId) {
+      const cartCountResult = await db.query(
+        `SELECT COALESCE(SUM(qty), 0) AS cart_count
+         FROM add_to_carts
+         WHERE created_by = $1
+         AND status = 1
+         AND deleted_at IS NULL`,
+        [customerId]
+      );
+      cartListLength = parseInt(cartCountResult.rows[0].cart_count) || 0;
+    }
+
     return res.status(200).json({
       status: true,
-      total: getproductlist.rowCount > 0 ? getproductlist.rowCount : 0,
-      message: "fetch Product list sucessfully",
-      data: getproductlist.rowCount > 0 ? getproductlist.rows : [],
+      total: getproductlist.rowCount,
+      message: "fetch Product list successfully",
+      cartListLength: cartListLength,
+      data: getproductlist.rows,
     });
   } catch (e) {
-    return res.status(200).json({
+    return res.status(500).json({
       status: false,
       message: "Failed to retrieve data",
       errors: e.message,
@@ -346,9 +410,24 @@ const add_update_cart = catchAsync(async (req, res) => {
   try {
     const { id, product_id, qty } = req.body;
     if (qty <= 0) {
+      const [updated] = await addToCart.update(
+        {
+          status: 0,
+        },
+        {
+          where: {
+            id: parseInt(id),
+            product_id: product_id,
+            status: 1,
+            created_by: req.user.id,
+          },
+        }
+      );
+
       return res.status(200).json({
-        status: false,
-        message: "Quantity should be greater than 0",
+        status: updated > 0,
+        message:
+          updated > 0 ? "Item deactivated successfully" : "Deactivation failed",
       });
     }
 
@@ -356,7 +435,7 @@ const add_update_cart = catchAsync(async (req, res) => {
     let CartInfo;
 
     //if id is empty then product insert into cart otherwise update product qty in add_to_carts table
-    if (!id && id == 0) {
+    if (!id || id == 0) {
       const pervPrice = await db.query(
         `
           SELECT price
@@ -418,22 +497,33 @@ const cart_list = catchAsync(async (req, res) => {
 
     const cartlist = await db.query(
       `
-          SELECT DISTINCT ON (atc.id)
-            atc.id as cart_id,
-            atc.product_id,
-            p.name AS product_name,
-            p.description,
-            COALESCE(atc.pervoius_price::numeric,0) AS pervoius_price,
-            CONCAT('${BASE_URL}', pi.image_path) AS product_image,
-            atc.qty,
-            p.price
-          FROM add_to_carts AS atc
-          LEFT JOIN products AS p ON atc.product_id = p.id
-          LEFT JOIN product_images AS pi ON p.id = pi.product_id
-          WHERE atc.status = $1
-            AND atc.created_by = $2
-            AND atc.deleted_at IS NULL
-        `,
+        SELECT DISTINCT ON (atc.id)
+          atc.id as cart_id,
+          atc.product_id,
+          p.name AS product_name,
+          p.description,
+          COALESCE(atc.pervoius_price::numeric, 0) AS pervoius_price,
+         ARRAY[CONCAT('${BASE_URL}', pi.image_path)] AS product_image,
+          atc.qty,
+          p.price,
+        c.cat_name AS category_name,
+        cd.id AS country_id,
+        cd.country_name
+        FROM add_to_carts AS atc
+        LEFT JOIN products AS p ON atc.product_id = p.id
+        LEFT JOIN categories AS c ON p.category = c.id
+        LEFT JOIN country_data AS cd ON p.country_id = cd.id 
+        LEFT JOIN LATERAL (
+          SELECT image_path
+          FROM product_images
+          WHERE product_id = p.id
+          ORDER BY id DESC
+          LIMIT 1
+        ) pi ON true
+        WHERE atc.status = $1
+          AND atc.created_by = $2
+          AND atc.deleted_at IS NULL
+      `,
       [1, customer_id]
     );
 
@@ -647,7 +737,6 @@ const order_history = catchAsync(async (req, res) => {
     body("status").notEmpty().withMessage("Status is required").run(req),
   ]);
 
-  // Handle validation result
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     const error_message = errors.array()[0].msg;
@@ -658,34 +747,74 @@ const order_history = catchAsync(async (req, res) => {
     const customer_id = req.user.id;
     const { status } = req.body;
 
+    let queryParams = [customer_id, 1, 1]; 
+    let statusCondition = "";
+
+    if (parseInt(status) !== 0) {
+      statusCondition = `AND o.order_status = $4`;
+      queryParams.push(status);
+    }
+
     const result = await db.query(
       `
-        SELECT
-          o.id AS order_id,
-          TO_CHAR(o.perferred_delivery_date, 'FMDDth Month YYYY') AS delivery_date,
-          SUM(oi.quantity * oi.price::numeric) AS total_price,
-                JSON_AGG(
-                  JSON_BUILD_OBJECT(
-                    'product_id', p.id,
-                    'product_name', p.name,
-                    'description', p.description,
-                    'product_images', (
-                      SELECT JSON_AGG(DISTINCT CONCAT('${BASE_URL}', pi.image_path))
-                      FROM product_images pi
-                      WHERE pi.product_id = p.id AND pi.image_path IS NOT NULL
-                    )
-                  )
-                ) AS products
-              FROM orders o
-              LEFT JOIN order_items oi ON o.id = oi.order_id
-              LEFT JOIN products p ON oi.product_id = p.id
-              WHERE o.customer_id = $1
-                AND o.order_status = $2
-                AND oi.order_item_status = $3
-                AND o.status = $4
-              GROUP BY o.id, o.perferred_delivery_date
+      SELECT
+        o.id AS order_id,
+        o.order_ref_id AS order_number,
+        TO_CHAR(o.perferred_delivery_date, 'FMDDth FMMonth YYYY') AS delivery_date,
+        SUM(oi.quantity * oi.price::numeric) AS total_price,
+        SUM(oi.quantity) AS total_item,
+        TO_CHAR(o.cancelled_date, 'DD/MM/YYYY') AS cancelled_date,
+        o.order_status,
+        o.delivery_date,
+        CASE o.order_status
+          WHEN 1 THEN 'Pending'
+          WHEN 2 THEN 'Confirmed'
+          WHEN 3 THEN 'Shipped'
+          WHEN 4 THEN 'Delivered'
+          WHEN 5 THEN 'Cancelled'
+          ELSE 'Unknown'
+        END AS order_status_text,
+        CONCAT(ca.address1, ca.address2) AS address,
+        ca.address1 AS address_1,
+        ca.address2 AS address_2,
+        ca.full_name,
+        ca.mobile_number,
+        ca.zip_code,
+        ca.country,
+        ca.city,
+        ca.state,
+        JSON_AGG(
+          JSON_BUILD_OBJECT(
+            'product_id', p.id,
+            'product_name', p.name,
+            'description', p.description,
+            'category', c.cat_name,
+            'quantity', oi.quantity,
+            'price', oi.price,
+            'total_price', oi.quantity * oi.price,
+            'product_image', (
+              SELECT CONCAT('${BASE_URL}', pi.image_path)
+              FROM product_images pi
+              WHERE pi.product_id = p.id AND pi.image_path IS NOT NULL
+              ORDER BY pi.created_at DESC NULLS LAST
+              LIMIT 1
+            )
+          )
+        ) AS products
+      FROM orders o
+      LEFT JOIN customer_addresses ca ON o.address = ca.id
+      LEFT JOIN order_items oi ON o.id = oi.order_id
+      LEFT JOIN products p ON oi.product_id = p.id
+      LEFT JOIN categories c ON p.category = c.id
+      WHERE o.customer_id = $1
+        ${statusCondition}
+        AND oi.order_item_status = $2
+        AND o.status = $3
+      GROUP BY o.id, o.perferred_delivery_date, ca.address1, ca.address2,
+               ca.full_name, ca.mobile_number, ca.zip_code, ca.country,
+               ca.city, ca.state
       `,
-      [customer_id, status, 1, 1]
+      queryParams
     );
 
     return res.status(200).json({
@@ -726,14 +855,21 @@ const view_order = catchAsync(async (req, res) => {
     o.whatsapp_number,
     o.email,
     o.special_instruction,
-    TO_CHAR(o.perferred_delivery_date, 'FMDDth Month YYYY') AS delivery_date,
-    ca.address1 as address_1,
-    ca.address2 as address_2,
+    TO_CHAR(o.perferred_delivery_date, 'FMDDth FMMonth YYYY') AS delivery_date,
+      CONCAT(ca.address1,ca.address2) AS address,
+          ca.address1 as address_1,
+          ca.address2 as address_2,
+          ca.full_name,
+          ca.mobile_number,
+          ca.zip_code,
+          ca.country,
+          ca.city,
+          ca.state,
     o.address as orders_address_id
     FROM orders AS o
     LEFT JOIN customer_addresses as ca ON o.address = ca.id
-    WHERE o.customer_id = $1`,
-      [customer_id]
+    WHERE o.customer_id = $1 AND o.id=$2`,
+      [customer_id, order_id]
     );
 
     //fetch order_item table fetch order item list based on order_id
@@ -748,27 +884,35 @@ const view_order = catchAsync(async (req, res) => {
       oi.quantity AS product_quantity,
       SUM(oi.quantity * oi.price::numeric) As total_price,
       (
-        SELECT JSON_AGG(DISTINCT CONCAT('${BASE_URL}', pi.image_path))
-        FROM product_images pi
-        WHERE pi.product_id = p.id AND pi.image_path IS NOT NULL
-      ) AS product_images
+  SELECT CONCAT('${BASE_URL}', pi.image_path)
+  FROM product_images pi
+  WHERE pi.product_id = p.id AND pi.image_path IS NOT NULL
+  ORDER BY pi.id DESC
+  LIMIT 1
+) AS product_image
+
       FROM order_items AS oi
       LEFT JOIN products AS p ON oi.product_id = p.id
-      WHERE oi.order_id = $1 And oi.order_item_status = $2
+      WHERE oi.order_id = $1 And oi.order_item_status = $2 AND oi.customer_id=$3
       GROUP BY oi.id,p.id,p.description`,
-      [order_id, 1]
+      [order_id, 1, req.user.id]
     );
 
     let Sumoflist;
     if (order_item.rowCount > 0) {
-      Sumoflist = order_item.rows.reduce(
-        (acc, item) => {
-          acc.qty += parseFloat(item.product_quantity) || 0;
-          acc.price += parseFloat(item.total_price) || 0;
-          return acc;
-        },
-        { qty: 0, price: 0 }
-      );
+      if (order_item.rowCount > 0) {
+        Sumoflist = order_item.rows.reduce(
+          (acc, item) => {
+            acc.qty += parseFloat(item.product_quantity) || 0;
+            acc.price += parseFloat(item.total_price) || 0;
+            return acc;
+          },
+          { qty: 0, price: 0 }
+        );
+
+        // Keep 2 decimal places and convert back to number
+        Sumoflist.price = parseFloat(Sumoflist.price.toFixed(2));
+      }
     }
 
     return res.status(200).json({
@@ -845,7 +989,7 @@ const repeat_order = catchAsync(async (req, res) => {
   }
 });
 
-/******************* End Order creation Flow ************************ */
+/******************* End Order creation Flow *************************/
 
 export {
   category_list,

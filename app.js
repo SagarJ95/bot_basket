@@ -21,9 +21,13 @@ import multer from "multer";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import path from "path";
+import cors from "cors";
 
-app.use("/uploads/export", express.static(path.join(process.cwd(), "public/uploads/export")));
-
+app.use(
+  "/uploads/export",
+  express.static(path.join(process.cwd(), "public/uploads/export"))
+);
+app.use(cors());
 
 // Get the directory name
 const __filename = fileURLToPath(import.meta.url);
@@ -80,12 +84,11 @@ app.use(expressLayouts);
 
 app.use("/", front);
 app.use("/api", api);
-app.use("*",function(req,res){
-  return res.status(404).json({message:"Route not found"})
-})
+app.use("*", function (req, res) {
+  return res.status(404).json({ message: "Route not found" });
+});
 
 app.locals.baseUrl = APP_URL + ":" + PORT;
-
 
 app.use(
   "*",
@@ -103,11 +106,9 @@ app.use(
 
 app.use(globalErrorHandler);
 
-process.on("uncaughtException", (error) => {
-});
+process.on("uncaughtException", (error) => {});
 
-process.on("unhandledRejection", (reason, promise) => {
-});
+process.on("unhandledRejection", (reason, promise) => {});
 
 app.listen(PORT, () => {
   console.log("Server Running on " + APP_URL + ":" + PORT);

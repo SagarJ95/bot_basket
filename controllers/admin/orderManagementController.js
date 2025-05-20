@@ -82,10 +82,9 @@ const getOrderlist = catchAsync(async (req, res) => {
 const changeStatus = catchAsync(async (req, res) => {
   await Promise.all([
     body("order_id").notEmpty().withMessage("Order Id is required").run(req),
-    body("status").notEmpty().withMessage("status is required").run(req),
+    body("status").notEmpty().withMessage("Status is required").run(req),
   ]);
 
-  // Handle validation result
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     const error_message = errors.array()[0].msg;
@@ -94,14 +93,24 @@ const changeStatus = catchAsync(async (req, res) => {
 
   try {
     const { status, order_id } = req.body;
-    const query_params = [status, order_id];
+    let query = `UPDATE orders SET order_status = $1`;
+    const query_params = [status];
 
-    const query = `update orders SET order_status = $1 WHERE id = $2`;
-    const result = await db.query(query, query_params);
+    // Handle conditional fields
+    if (status == 4) {
+      query += `, preferred_delivery_date = NOW()`;
+    } else if (status == 5) {
+      query += `, cancelled_date = NOW()`;
+    }
+
+    query += ` WHERE id = $2`;
+    query_params.push(order_id);
+
+    await db.query(query, query_params);
 
     return res.status(200).json({
       status: true,
-      message: "update Order status Successfully",
+      message: "Updated order status successfully",
     });
   } catch (error) {
     throw new AppError(error.message, 400);
@@ -134,8 +143,7 @@ const orderViewDetails = catchAsync(async (req, res) => {
                             TO_CHAR(o.perferred_delivery_date, 'FMDDth Month YYYY') AS perferred_delivery_date,
                             TO_CHAR(o.created_at, 'FMDDth Month YYYY') AS order_date,
                             ca.address1 as address1,
-                            ca.address2 as address2,
-                            
+                            ca.address2 as address2,                          
                             o.address as address_id,
                             o.order_status as order_status
                             FROM orders AS o

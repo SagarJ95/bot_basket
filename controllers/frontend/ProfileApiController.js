@@ -25,6 +25,7 @@ const fetch_profile = catchAsync(async (req, res) => {
             c.phone_no,
             c.whatsapp_no,
             c.email,
+            TO_CHAR(c.created_at, 'DD/MM/YYYY') AS accoute_create,
             CASE
                 WHEN c.profile IS NULL OR c.profile = '' THEN ''
                 ELSE CONCAT('${BASE_URL}', c.profile)
@@ -376,28 +377,58 @@ const getLocationByZip = catchAsync(async (req, res) => {
   }
 
   try {
-    const apiUrl = `https://api.zippopotam.us/${country_code}/${zip_code}`;
+    if (country_code.toUpperCase() === "IN") {
+      const apiUrl = `https://api.postalpincode.in/pincode/${zip_code}`;
+      const response = await axios.get(apiUrl);
+      const data = response.data[0];
 
-    const response = await axios.get(apiUrl);
+      if (data.Status !== "Success") {
+        return res.status(404).json({
+          status: false,
+          message: "Invalid Indian PIN code",
+        });
+      }
 
-    const place = response.data.places[0];
+      const postOffice = data.PostOffice[0];
+      console.log(`postOffice`, postOffice);
 
-    res.status(200).json({
-      status: true,
-      message: "Location found",
-      data: {
-        country: response.data.country,
-        state: place["state"],
-        city: place["place name"],
-        zip_code: response.data["post code"],
-      },
-      place: place,
-    });
+      return res.status(200).json({
+        status: true,
+        message: "Location found",
+        data: {
+          country: "India",
+          state: postOffice.State,
+          district: postOffice.District,
+          city: postOffice.Block || postOffice.Name,
+          pin_code: zip_code,
+        },
+        place: postOffice,
+      });
+    } else {
+      // 🌍 Use Zippopotam.us for other countries
+      const apiUrl = `https://api.zippopotam.us/${country_code}/${zip_code}`;
+      const response = await axios.get(apiUrl);
+      const place = response.data;
+
+      const firstPlace = place.places?.[0];
+
+      return res.status(200).json({
+        status: true,
+        message: "Location found",
+        data: {
+          country: place.country,
+          state: firstPlace?.state,
+          city: firstPlace?.["place name"],
+          zip_code: place["post code"],
+        },
+        place: place,
+      });
+    }
   } catch (error) {
-    console.error("ZIP API error:", error.response?.data || error.message);
-    res.status(404).json({
+    console.error("Location API error:", error.response?.data || error.message);
+    return res.status(404).json({
       status: false,
-      message: "Location not found for this ZIP code",
+      message: "Location not found for this code",
     });
   }
 });
