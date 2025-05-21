@@ -38,10 +38,10 @@ const fetch_profile = catchAsync(async (req, res) => {
                     'zip_code',ca.zip_code,
                     'country',ca.country,
                     'city',ca.city,
-                    'state',ca.state,                 
+                    'state',ca.state,
                     'address_1', ca.address1,
                     'address_2', ca.address2
-                    
+
 
                 )
             ) FILTER (WHERE ca.id IS NOT NULL AND ca.status = $3),
@@ -175,8 +175,8 @@ const getAddressList = catchAsync(async (req, res) => {
       const customer_id = req.user.id;
 
     const result = await db.query(
-      `SELECT id, full_name, mobile_number, address1, address2, zip_code, country, city, state 
-       FROM customer_addresses 
+      `SELECT id, full_name, mobile_number, address1, address2, zip_code, country, city, state
+       FROM customer_addresses
        WHERE customer_id = $1`,
       [customer_id]
     );
@@ -235,9 +235,9 @@ const addAddress = catchAsync(async (req, res) => {
       }
 
       const update_address = await db.query(
-        `UPDATE customer_addresses 
-         SET customer_id=$1, full_name=$2, mobile_number=$3, address1=$4, 
-             address2=$5, zip_code=$6, country=$7, city=$8, state=$9 
+        `UPDATE customer_addresses
+         SET customer_id=$1, full_name=$2, mobile_number=$3, address1=$4,
+             address2=$5, zip_code=$6, country=$7, city=$8, state=$9
          WHERE id=$10`,
         [
           customer_id,
@@ -261,8 +261,8 @@ const addAddress = catchAsync(async (req, res) => {
       console.log("insert address");
 
       const add_address = await db.query(
-        `INSERT INTO customer_addresses 
-         (customer_id, full_name, mobile_number, address1, address2, zip_code, country, city, state) 
+        `INSERT INTO customer_addresses
+         (customer_id, full_name, mobile_number, address1, address2, zip_code, country, city, state)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
         [
           customer_id,

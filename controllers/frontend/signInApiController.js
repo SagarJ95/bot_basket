@@ -857,7 +857,7 @@ async function sendEmail(email, customer_name) {
       if (err) {
         return { status: false, message: "Email sent Unsuccessfully" };
       } else {
-
+        // 1 minutes expires
         const expiresAt = moment().add(1, "minutes").format("YYYY-MM-DD HH:mm:ss");
 
         //store otp in  customer_otp_log

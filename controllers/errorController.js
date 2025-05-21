@@ -13,7 +13,7 @@ const sendErrorDevHTML = (err, res) => {
     status,
     message,
     stack,
-    layout: false, // Don't use any layout for error pages
+    layout: false,
   });
 };
 
@@ -28,8 +28,8 @@ const sendErrorProdHTML = (err, res) => {
     statusCode,
     status,
     message,
-    stack: undefined, // Hide stack trace in production
-    layout: false, // Don't use any layout for error pages
+    stack: undefined,
+    layout: false,
   });
 };
 

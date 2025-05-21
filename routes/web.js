@@ -120,7 +120,6 @@ router.post('/cart_list', customer_authenticate, productController.cart_list)
 //delete product cart
 router.post('/delete_product_cart', customer_authenticate, productController.delete_product_cart)
 
-
 //create_order
 router.post('/place_order', customer_authenticate, productController.create_order)
 

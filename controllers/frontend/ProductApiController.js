@@ -252,29 +252,6 @@ const product_list = catchAsync(async (req, res) => {
       query_params.push(...priceParams);
     }
 
-    console.log("query_params", query_params);
-
-    // const productquery = `select
-    //     p.id,p.name as product_name,p.slug,p.description,p.price,p.minimum_order_place,p.maximum_order_place,
-    //     COALESCE(q.total_ordered_quantity_today, 0) AS total_ordered_quantity_today,
-    //     (p.maximum_order_place - COALESCE(q.total_ordered_quantity_today, 0)) AS available_quantity,c.id as categoryId,c.cat_name as category_name,
-    //      JSON_AGG(
-    //         CONCAT('${BASE_URL}', pi.image_path)
-    //     ) FILTER (WHERE pi.image_path IS NOT NULL) AS product_images
-    //      from products as p
-    //     left join categories as c ON p.category = c.id
-    //     left join product_images as pi ON p.id = pi.product_id
-    //     LEFT JOIN (
-    //     SELECT
-    //       product_id,
-    //       SUM(quantity) AS total_ordered_quantity_today
-    //     FROM order_items
-    //     WHERE order_item_status = $2 AND DATE(created_at) = CURRENT_DATE
-    //     GROUP BY product_id
-    //   ) AS q ON p.id = q.product_id
-    //     where p.status = $1 and p.deleted_at IS NULL ${categories} ${searchQuery}
-    //     GROUP BY p.id,c.cat_name,c.id,q.total_ordered_quantity_today`;
-
     const productquery = `
       SELECT
         p.id,
@@ -357,19 +334,19 @@ const add_update_cart = catchAsync(async (req, res) => {
 
   try {
     const { id, product_id, qty } = req.body;
-    if (qty <= 0) {
-      return res.status(200).json({
-        status: false,
-        message: "Quantity should be greater than 0",
-      });
-    }
+    // if (qty <= 0) {
+    //   return res.status(200).json({
+    //     status: false,
+    //     message: "Quantity should be greater than 0",
+    //   });
+    // }
 
     let infoUpdate;
     let CartInfo;
 
     //if id is empty then product insert into cart otherwise update product qty in add_to_carts table
-    if (!id && id == 0) {
-
+    if (!id) {
+      //insert into cart
       const pervPrice = await db.query(`
           SELECT price
           FROM products_price_logs
@@ -389,8 +366,20 @@ const add_update_cart = catchAsync(async (req, res) => {
       });
 
       infoUpdate = 'Add';
-    } else {
-
+    } else if(id == 0){
+      //remove from cart
+      CartInfo = await addToCart.update({
+        status: 0
+      }, {
+        where: {
+          id: parseInt(id),
+          product_id: product_id,
+          status: 1,
+          created_by: req.user.id
+        }
+      })
+    }else {
+      //update into cart
       CartInfo = await addToCart.update({
         qty: qty
       }, {
