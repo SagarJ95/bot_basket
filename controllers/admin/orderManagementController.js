@@ -193,7 +193,7 @@ const orderEditDetails = catchAsync(async (req, res) => {
         body('order_id').notEmpty().withMessage('order Id is required').run(req),
         body('payment_mode').notEmpty().withMessage('Payment mode is required').run(req),
         body('payment_status').notEmpty().withMessage('Payment status is required').run(req),
-        body('order_status').notEmpty().withMessage('order_status is required').run(req)
+        body('order_status').notEmpty().withMessage('order status is required').run(req)
     ]);
 
     // Handle validation result

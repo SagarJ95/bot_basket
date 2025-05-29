@@ -126,13 +126,13 @@ const exportCustomers = catchAsync(async (req, res) => {
 
         // Return response
         return res.status(200).json({
-            success: true,
+            status: true,
             filePath: `${BASE_URL}/uploads/exports/${fileName}`
         });
 
     } catch (error) {
         return res.status(500).json({
-            success: false,
+            status: false,
             message: "Internal Server Error",
             error: error.message
         });
@@ -170,15 +170,8 @@ const getParticularCustomerInfo = catchAsync(async (req, res) => {
             COALESCE(
             json_agg(
                 json_build_object(
-                   'id', ca.id,
-                    'full_name',ca.full_name,
-                    'mobile_number',ca.mobile_number,
-                    'zip_code',ca.zip_code,
-                    'country',ca.country,
-                    'city',ca.city,
-                    'state',ca.state,                 
-                    'address_1', ca.address1,
-                    'address_2', ca.address2
+                    'id', ca.id,
+                    'address', ca.address
                 )
             ) FILTER (WHERE ca.id IS NOT NULL AND ca.status = $3),
             '[]'
@@ -227,10 +220,10 @@ const update_customer_info = catchAsync(async (req, res) => {
         const { first_name, last_name, contact_number, whatsapp_number, email, password, enable_email_notification, address, customer_id } = req.body;
         const files = req.files || {};
 
-        //let addressInfo;
-        //if (typeof address == 'string') {
-        //    addressInfo = JSON.parse(address);
-        //}
+        let addressInfo;
+        if (typeof address == 'string') {
+            addressInfo = JSON.parse(address);
+        }
 
 
         const getCustomerInfo = await db.query(`
@@ -241,17 +234,17 @@ const update_customer_info = catchAsync(async (req, res) => {
 
         const hashPassword = (password) ? await bcrypt.hash(password, 10) : getCustomerInfo.rows[0].password;
 
-        //if (Array.isArray(addressInfo)) {
-          //  for (const val of addressInfo) {
-           //     if (val.id == '') {
-            //        const Insertquery = `INSERT INTO customer_addresses (customer_id, address, tag,status,created_by) values ($1, $2, $3,$4,$5)`;
-             //       await db.query(Insertquery, [customer_id, val.address, val.tag, 1, customer_id])
-              //  } else {
-               //     const updatequery = `Update customer_addresses SET address = $1, tag = $2 Where customer_id = $3 and id = $4 and status = $5`;
-                //    await db.query(updatequery, [val.address, val.tag, customer_id, val.id, 1])
-                //}
-            //}
-        //}
+        if (Array.isArray(addressInfo)) {
+            for (const val of addressInfo) {
+                if (val.id == '') {
+                    const Insertquery = `INSERT INTO customer_addresses (customer_id, address, tag,status,created_by) values ($1, $2, $3,$4,$5)`;
+                    await db.query(Insertquery, [customer_id, val.address, val.tag, 1, customer_id])
+                } else {
+                    const updatequery = `Update customer_addresses SET address = $1, tag = $2 Where customer_id = $3 and id = $4 and status = $5`;
+                    await db.query(updatequery, [val.address, val.tag, customer_id, val.id, 1])
+                }
+            }
+        }
 
         const updateInfo = {
             first_name: first_name,
@@ -361,12 +354,12 @@ const add_customer = catchAsync(async (req, res) => {
         if (profile_pic) updateInfo.profile = profile_pic;
         const customerInfo = await Customer.create(createInfo);
 
-       // if (Array.isArray(addressInfo)) {
-       //     for (const val of addressInfo) {
-       //         const Insertquery = `INSERT INTO customer_addresses (customer_id, address, tag,status,created_by) values ($1, $2, $3,$4,$5)`;
-       //         await db.query(Insertquery, [customerInfo.id, val.address, val.tag, 1, customerInfo.id])
-       //     }
-       // }
+        if (Array.isArray(addressInfo)) {
+            for (const val of addressInfo) {
+                const Insertquery = `INSERT INTO customer_addresses (customer_id, address, tag,status,created_by) values ($1, $2, $3,$4,$5)`;
+                await db.query(Insertquery, [customerInfo.id, val.address, val.tag, 1, customerInfo.id])
+            }
+        }
 
 
         const data = {

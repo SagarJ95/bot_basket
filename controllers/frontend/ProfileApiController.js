@@ -1,4 +1,3 @@
-
 // Defaults
 import catchAsync from "../../utils/catchAsync.js";
 import AppError from "../../utils/appError.js";
@@ -9,15 +8,16 @@ import bcrypt from "bcrypt";
 import { body, validationResult } from "express-validator";
 import axios from "axios";
 const project_name = process.env.APP_NAME;
-const BASE_URL = process.env.BASE_URL || 'http://localhost:3848';
+const BASE_URL = process.env.BASE_URL || "http://localhost:3848";
 
-  /*******************  Profile Info ************************ */
+/*******************  Profile Info ************************ */
 
 const fetch_profile = catchAsync(async (req, res) => {
-    try{
-      const customer_id = req.user.id;
+  try {
+    const customer_id = req.user.id;
 
-      const getCustomerInfo = await db.query(`
+    const getCustomerInfo = await db.query(
+      `
         SELECT
             c.id,
             c.first_name,
@@ -25,6 +25,7 @@ const fetch_profile = catchAsync(async (req, res) => {
             c.phone_no,
             c.whatsapp_no,
             c.email,
+            TO_CHAR(c.created_at, 'DD/MM/YYYY') AS accoute_create,
             CASE
                 WHEN c.profile IS NULL OR c.profile = '' THEN ''
                 ELSE CONCAT('${BASE_URL}', c.profile)
@@ -38,10 +39,10 @@ const fetch_profile = catchAsync(async (req, res) => {
                     'zip_code',ca.zip_code,
                     'country',ca.country,
                     'city',ca.city,
-                    'state',ca.state,
+                    'state',ca.state,                 
                     'address_1', ca.address1,
                     'address_2', ca.address2
-
+                    
 
                 )
             ) FILTER (WHERE ca.id IS NOT NULL AND ca.status = $3),
@@ -54,7 +55,9 @@ const fetch_profile = catchAsync(async (req, res) => {
           AND c.status = $2
           AND c.deleted_at IS NULL
         GROUP BY c.id
-    `, [customer_id, "1", 1]);
+    `,
+      [customer_id, "1", 1]
+    );
 
     return res.status(200).json({
       status: true,
@@ -72,39 +75,64 @@ const fetch_profile = catchAsync(async (req, res) => {
 
 const update_customer_profile = catchAsync(async (req, res) => {
   await Promise.all([
-        body('customer_id').notEmpty().withMessage('Customer Id is required').run(req),
-        body('first_name').notEmpty().withMessage('first name is required').run(req),
-        body('last_name').notEmpty().withMessage('Last Name is required').run(req),
-        body('contact_number').notEmpty().withMessage('Contact Number is required').run(req),
-        body('whatsapp_number').notEmpty().withMessage('Whatsapp Number is required').run(req),
-        body('email').notEmpty().withMessage('Email is required').run(req)
-    ]);
+    body("customer_id")
+      .notEmpty()
+      .withMessage("Customer Id is required")
+      .run(req),
+    body("first_name")
+      .notEmpty()
+      .withMessage("first name is required")
+      .run(req),
+    body("last_name").notEmpty().withMessage("Last Name is required").run(req),
+    body("contact_number")
+      .notEmpty()
+      .withMessage("Contact Number is required")
+      .run(req),
+    body("whatsapp_number")
+      .notEmpty()
+      .withMessage("Whatsapp Number is required")
+      .run(req),
+    body("email").notEmpty().withMessage("Email is required").run(req),
+  ]);
 
-    // Handle validation result
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-        const error_message = errors.array()[0].msg;
-        throw new AppError(error_message, 200, errors);
-    }
+  // Handle validation result
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    const error_message = errors.array()[0].msg;
+    throw new AppError(error_message, 200, errors);
+  }
 
-    try{
+  try {
+    const {
+      first_name,
+      last_name,
+      contact_number,
+      whatsapp_number,
+      email,
+      password,
+      enable_email_notification,
+      address,
+    } = req.body;
+    const files = req.files || {};
+    //let addressInfo;
+    //if (typeof address == 'string') {
+    //  addressInfo = JSON.parse(address);
+    //}
 
-        const {first_name,last_name,contact_number,whatsapp_no,email,password,enable_email_notification,address} = req.body;
-        const files = req.files || {};
-        //let addressInfo;
-        //if (typeof address == 'string') {
-        //  addressInfo = JSON.parse(address);
-        //}
+    const customer_id = req.user.id;
 
-        const customer_id = req.user.id;
-
-        const getCustomerInfo = await db.query(`
+    const getCustomerInfo = await db.query(
+      `
                 SELECT password
                 FROM customers
                 WHERE id = $1 AND status = $2 AND deleted_at IS NULL
-            `, [customer_id, "1"]);
+            `,
+      [customer_id, "1"]
+    );
 
-        const hashPassword = (password) ? await bcrypt.hash(password, 10) : getCustomerInfo.rows[0].password;
+    const hashPassword = password
+      ? await bcrypt.hash(password, 10)
+      : getCustomerInfo.rows[0].password;
 
     // if (Array.isArray(addressInfo)) {
     //   for (const val of addressInfo) {
@@ -140,43 +168,47 @@ const update_customer_profile = catchAsync(async (req, res) => {
       enable_email_notification: enable_email_notification,
     };
 
+    const formatPath = (filePath) => {
+      return filePath
+        ? filePath.replace(/^public[\\/]/, "/").replace(/\\/g, "/")
+        : null;
+    };
 
-          const formatPath = (filePath) => {
-            return filePath ? filePath.replace(/^public[\\/]/, '/').replace(/\\/g, '/') : null;
-        };
+    const profile_pic =
+      files.profile && files.profile.length > 0
+        ? formatPath(files.profile[0].path)
+        : null;
 
-        const profile_pic = files.profile && files.profile.length > 0
-            ? formatPath(files.profile[0].path)
-            : null;
+    if (profile_pic) updateInfo.profile = profile_pic;
+    const updateCustomerPassword = await Customer.update(updateInfo, {
+      where: {
+        id: customer_id,
+      },
+    });
 
-        if (profile_pic) updateInfo.profile = profile_pic;
-        const updateCustomerPassword = await Customer.update(updateInfo,{
-            where:{
-              id:customer_id
-              }
-          });
-
-          return res.status(200).json({
-            status: true,
-            message: (updateCustomerPassword.length > 0) ? "update customer info sucessfully" : "update customer info Unsucessfully",
-          });
-
-      }catch(e){
-        return res.status(200).json({
-            status: false,
-            message: "Failed to data",
-            errors: error.message
-        });
-      }
-  });
+    return res.status(200).json({
+      status: true,
+      message:
+        updateCustomerPassword.length > 0
+          ? "update customer info sucessfully"
+          : "update customer info Unsucessfully",
+    });
+  } catch (e) {
+    return res.status(200).json({
+      status: false,
+      message: "Failed to data",
+      errors: e.message,
+    });
+  }
+});
 
 const getAddressList = catchAsync(async (req, res) => {
-    try{
-      const customer_id = req.user.id;
+  try {
+    const customer_id = req.user.id;
 
     const result = await db.query(
-      `SELECT id, full_name, mobile_number, address1, address2, zip_code, country, city, state
-       FROM customer_addresses
+      `SELECT id, full_name, mobile_number, address1, address2, zip_code, country, city, state 
+       FROM customer_addresses 
        WHERE customer_id = $1`,
       [customer_id]
     );
@@ -235,9 +267,9 @@ const addAddress = catchAsync(async (req, res) => {
       }
 
       const update_address = await db.query(
-        `UPDATE customer_addresses
-         SET customer_id=$1, full_name=$2, mobile_number=$3, address1=$4,
-             address2=$5, zip_code=$6, country=$7, city=$8, state=$9
+        `UPDATE customer_addresses 
+         SET customer_id=$1, full_name=$2, mobile_number=$3, address1=$4, 
+             address2=$5, zip_code=$6, country=$7, city=$8, state=$9 
          WHERE id=$10`,
         [
           customer_id,
@@ -261,8 +293,8 @@ const addAddress = catchAsync(async (req, res) => {
       console.log("insert address");
 
       const add_address = await db.query(
-        `INSERT INTO customer_addresses
-         (customer_id, full_name, mobile_number, address1, address2, zip_code, country, city, state)
+        `INSERT INTO customer_addresses 
+         (customer_id, full_name, mobile_number, address1, address2, zip_code, country, city, state) 
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
         [
           customer_id,
@@ -342,28 +374,58 @@ const getLocationByZip = catchAsync(async (req, res) => {
   }
 
   try {
-    const apiUrl = `https://api.zippopotam.us/${country_code}/${zip_code}`;
+    if (country_code.toUpperCase() === "IN") {
+      const apiUrl = `https://api.postalpincode.in/pincode/${zip_code}`;
+      const response = await axios.get(apiUrl);
+      const data = response.data[0];
 
-    const response = await axios.get(apiUrl);
+      if (data.Status !== "Success") {
+        return res.status(404).json({
+          status: false,
+          message: "Invalid Indian PIN code",
+        });
+      }
 
-    const place = response.data.places[0];
+      const postOffice = data.PostOffice[0];
+      console.log(`postOffice`, postOffice);
 
-    res.status(200).json({
-      status: true,
-      message: "Location found",
-      data: {
-        country: response.data.country,
-        state: place["state"],
-        city: place["place name"],
-        zip_code: response.data["post code"],
-      },
-      place: place,
-    });
+      return res.status(200).json({
+        status: true,
+        message: "Location found",
+        data: {
+          country: "India",
+          state: postOffice.State,
+          district: postOffice.District,
+          city: postOffice.Block || postOffice.Name,
+          pin_code: zip_code,
+        },
+        place: postOffice,
+      });
+    } else {
+      // 🌍 Use Zippopotam.us for other countries
+      const apiUrl = `https://api.zippopotam.us/${country_code}/${zip_code}`;
+      const response = await axios.get(apiUrl);
+      const place = response.data;
+
+      const firstPlace = place.places?.[0];
+
+      return res.status(200).json({
+        status: true,
+        message: "Location found",
+        data: {
+          country: place.country,
+          state: firstPlace?.state,
+          city: firstPlace?.["place name"],
+          zip_code: place["post code"],
+        },
+        place: place,
+      });
+    }
   } catch (error) {
-    console.error("ZIP API error:", error.response?.data || error.message);
-    res.status(404).json({
+    console.error("Location API error:", error.response?.data || error.message);
+    return res.status(404).json({
       status: false,
-      message: "Location not found for this ZIP code",
+      message: "Location not found for this code",
     });
   }
 });

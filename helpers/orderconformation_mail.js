@@ -18,7 +18,7 @@ export async function sendOrderConfirmation(
   const totalPrice = products.reduce((sum, p) => sum + p.price * p.quantity, 0);
   const orderId = `BOT${order_id}`;
   const orderDate = moment().format("YYYY-MM-DD HH:mm");
-  const pdfPath = `./order_${Date.now()}.pdf`;
+  const pdfPath = `./public/uploads/order_pdf/order_${Date.now()}.pdf`;
 
   // Prepare data for the EjS template
   const emailData = {
@@ -55,10 +55,13 @@ export async function sendOrderConfirmation(
 
   // Generate PDF from the detailed invoice template
   const browser = await puppeteer.launch({
-    executablePath:
-      "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe", // Adjust if needed
-    headless: "new",
-    args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    executablePath: "/usr/bin/google-chrome",
+    headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--enable-logging", // Enable detailed logs
+      ],
   });
 
   const page = await browser.newPage();
