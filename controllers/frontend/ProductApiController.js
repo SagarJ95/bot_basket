@@ -219,7 +219,7 @@ const product_list = catchAsync(async (req, res) => {
       search,
       country_id,
       price_ranges,
-      page = 1,
+      page,
       pageSize = 10,
     } = req.body;
     let query_params = [1, 1];
@@ -228,8 +228,9 @@ const product_list = catchAsync(async (req, res) => {
     let wildcardSearch = "";
     let countryFilter = "";
     let priceFilter = "";
+    let limitQuery = "";
 
-    if (category_id) {
+    if (category_id && category_id.length > 0) {
       categories = `AND p.category = ANY ($${query_params.length + 1})`;
       query_params.push(category_id);
     }
@@ -240,7 +241,7 @@ const product_list = catchAsync(async (req, res) => {
       query_params.push(wildcardSearch);
     }
 
-    if (country_id) {
+    if (country_id && country_id.length > 0) {
       countryFilter = `AND p.country_id = ANY ($${query_params.length + 1})`;
       query_params.push(country_id);
     }
@@ -301,11 +302,14 @@ const product_list = catchAsync(async (req, res) => {
     }
 
     // Pagination
-    const offset = (page - 1) * pageSize;
-    const limitQuery = ` LIMIT $${query_params.length + 1} OFFSET $${
-      query_params.length + 2
-    }`;
-    query_params.push(pageSize, offset);
+
+    if (page && page != 0) {
+      const offset = (page - 1) * pageSize;
+      limitQuery = ` LIMIT $${query_params.length + 1} OFFSET $${
+        query_params.length + 2
+      }`;
+      query_params.push(pageSize, offset);
+    }
 
     const productquery = `
       SELECT  
@@ -409,6 +413,22 @@ const add_update_cart = catchAsync(async (req, res) => {
 
   try {
     const { id, product_id, qty } = req.body;
+
+    const existingCartItem = await addToCart.findOne({
+      where: {
+        product_id: product_id,
+        created_by: req.user.id,
+        status: 1,
+      },
+    });
+
+    if (id == 0 && existingCartItem) {
+      return res.status(200).json({
+        status: false,
+        message: "Product already exists in cart",
+      });
+    }
+
     if (qty <= 0) {
       const [updated] = await addToCart.update(
         {
@@ -508,7 +528,8 @@ const cart_list = catchAsync(async (req, res) => {
           p.price,
         c.cat_name AS category_name,
         cd.id AS country_id,
-        cd.country_name
+        cd.country_name,
+        CONCAT('${BASE_URL}', '/images/img-country-flag/', cd.flag) AS country_flag
         FROM add_to_carts AS atc
         LEFT JOIN products AS p ON atc.product_id = p.id
         LEFT JOIN categories AS c ON p.category = c.id
@@ -533,7 +554,7 @@ const cart_list = catchAsync(async (req, res) => {
       cartSum = cartlist.rows.reduce(
         (acc, item) => {
           acc.qty += parseInt(item.qty);
-          acc.price += parseInt(item.price) * parseInt(item.qty);
+          acc.price += parseFloat(item.price) * parseInt(item.qty);
           return acc;
         },
         { qty: 0, price: 0 }
@@ -552,7 +573,7 @@ const cart_list = catchAsync(async (req, res) => {
     return res.status(200).json({
       status: false,
       message: "Failed to retrieve data",
-      errors: error.message,
+      errors: e.message,
     });
   }
 });
@@ -617,10 +638,10 @@ const create_order = catchAsync(async (req, res) => {
       .withMessage("Perferred delivery date is required")
       .run(req),
     body("address").notEmpty().withMessage("Address is required").run(req),
-    body("order_item")
-      .isArray({ min: 1 })
-      .withMessage("At least one order item is required")
-      .run(req),
+    // body("order_item")
+    //   .isArray({ min: 1 })
+    //   .withMessage("At least one order item is required")
+    //   .run(req),
   ]);
 
   // Handle validation result
@@ -648,6 +669,38 @@ const create_order = catchAsync(async (req, res) => {
     const orderidInc = getorderid.rowCount > 0 ? getorderid.rows[0].id + 1 : 1;
     const orderrefid = `Order_ID_${orderidInc}`;
 
+    let order_items = await db.query(
+      `SELECT DISTINCT ON (atc.id)
+                  atc.id as cart_id,
+                  atc.product_id,
+                  p.name AS product_name,
+                  atc.qty,
+                  p.price
+                FROM add_to_carts AS atc
+                LEFT JOIN products AS p ON atc.product_id = p.id
+                LEFT JOIN categories AS c ON p.category = c.id
+                LEFT JOIN country_data AS cd ON p.country_id = cd.id
+                LEFT JOIN LATERAL (
+                  SELECT image_path
+                  FROM product_images
+                  WHERE product_id = p.id
+                  ORDER BY id DESC
+                  LIMIT 1
+                ) pi ON true
+                WHERE atc.status = $1
+                  AND atc.created_by = $2
+                  AND atc.deleted_at IS NULL
+              `,
+      [1, customer_id]
+    );
+
+    if (order_items.rowCount == 0) {
+      return res.status(200).json({
+        status: false,
+        message: "There are no items in your cart yet.",
+      });
+    }
+
     const order_id = await Orders.create({
       customer_id: customer_id,
       order_ref_id: orderrefid,
@@ -663,15 +716,15 @@ const create_order = catchAsync(async (req, res) => {
       created_by: customer_id,
     });
 
-    if (order_id.id && order_item) {
-      for (let item of order_item) {
+    if (order_id.id) {
+      for (let item of order_items.rows) {
         const order_item_id = await OrderItem.create({
           order_id: order_id.id,
           customer_id: customer_id,
           cart_id: item.cart_id,
           product_id: item.product_id,
           product_name: item.product_name,
-          quantity: item.quantity,
+          quantity: item.qty,
           price: item.price,
           order_item_status: 1,
           item_delivery_status: 1,
@@ -695,14 +748,14 @@ const create_order = catchAsync(async (req, res) => {
         [customer_id, address, "1"]
       );
       final_address = getaddres.rows[0]?.address || "";
-      console.log("final_address", final_address);
+      // console.log("final_address", final_address);
     } else if (delivery_option_id == 2) {
       getaddres = await db.query(
         `select store_address from store_self_locations where status=$1 `,
         ["1"]
       );
       final_address = getaddres.rows[0]?.store_address || "";
-      console.log("final_address", final_address);
+      // console.log("final_address", final_address);
     }
 
     // send conformation mail with pdf attach invoice
@@ -711,9 +764,9 @@ const create_order = catchAsync(async (req, res) => {
       email,
       name,
       final_address,
-      order_item.map((item) => ({
+      order_items.rows.map((item) => ({
         name: item.product_name,
-        quantity: item.quantity,
+        quantity: item.qty,
         price: item.price,
       })),
       order_id.id
@@ -721,7 +774,7 @@ const create_order = catchAsync(async (req, res) => {
 
     return res.status(200).json({
       status: true,
-      message: "Order Placed Successfully",
+      message: "Order Place Successfully",
     });
   } catch (error) {
     return res.status(200).json({
@@ -745,14 +798,62 @@ const order_history = catchAsync(async (req, res) => {
 
   try {
     const customer_id = req.user.id;
-    const { status } = req.body;
+    const { status, filter_date, sort_by_price, page, search } = req.body;
 
-    let queryParams = [customer_id, 1, 1]; 
+    let queryParams = [customer_id, 1, 1];
+    let countParams = [...queryParams];
     let statusCondition = "";
+    let dateCondition = "";
+    let orderByClause = "";
+    let paginationClause = "";
+    let wildcardSearch = "";
+    let searchQuery = "";
 
     if (parseInt(status) !== 0) {
-      statusCondition = `AND o.order_status = $4`;
+      statusCondition = `AND o.order_status = $${queryParams.length + 1}`;
       queryParams.push(status);
+      countParams.push(status);
+    }
+
+    if (filter_date) {
+      const [monthStr, yearStr] = filter_date.split(" ");
+      const month = new Date(`${monthStr} 1, 2000`).getMonth() + 1;
+      const year = parseInt(yearStr);
+
+      if (!isNaN(month) && !isNaN(year)) {
+        dateCondition = `AND EXTRACT(MONTH FROM o.perferred_delivery_date) = $${
+          queryParams.length + 1
+        }
+                         AND EXTRACT(YEAR FROM o.perferred_delivery_date) = $${
+                           queryParams.length + 2
+                         }`;
+        queryParams.push(month, year);
+        countParams.push(month, year);
+      }
+    }
+
+    if (sort_by_price === "low_to_high") {
+      orderByClause = `ORDER BY SUM(oi.quantity * oi.price::numeric) ASC`;
+    } else if (sort_by_price === "high_to_low") {
+      orderByClause = `ORDER BY SUM(oi.quantity * oi.price::numeric) DESC`;
+    }
+
+    const pageNum = parseInt(page);
+    const isPaginationEnabled = pageNum && pageNum > 0;
+    const limit = 10;
+    const offset = (pageNum - 1) * limit;
+
+    if (isPaginationEnabled) {
+      paginationClause = `LIMIT $${queryParams.length + 1} OFFSET $${
+        queryParams.length + 2
+      }`;
+      queryParams.push(limit, offset);
+    }
+
+    if (search) {
+      wildcardSearch = `%${search.toLowerCase()}%`;
+      searchQuery = `AND lower(p.name) LIKE $${queryParams.length + 1}`;
+      queryParams.push(wildcardSearch);
     }
 
     const result = await db.query(
@@ -760,12 +861,13 @@ const order_history = catchAsync(async (req, res) => {
       SELECT
         o.id AS order_id,
         o.order_ref_id AS order_number,
-        TO_CHAR(o.perferred_delivery_date, 'FMDDth FMMonth YYYY') AS delivery_date,
+        TO_CHAR(o.perferred_delivery_date, 'FMDDth FMMonth YYYY') AS expected_date,
         SUM(oi.quantity * oi.price::numeric) AS total_price,
+        TO_CHAR(o.created_at, 'FMDDth FMMonth YYYY') AS order_placed,
         SUM(oi.quantity) AS total_item,
         TO_CHAR(o.cancelled_date, 'DD/MM/YYYY') AS cancelled_date,
         o.order_status,
-        o.delivery_date,
+        o.delivery_date AS delivery_date,
         CASE o.order_status
           WHEN 1 THEN 'Pending'
           WHEN 2 THEN 'Confirmed'
@@ -810,17 +912,51 @@ const order_history = catchAsync(async (req, res) => {
         ${statusCondition}
         AND oi.order_item_status = $2
         AND o.status = $3
+        ${dateCondition}
+        
+        ${searchQuery}
       GROUP BY o.id, o.perferred_delivery_date, ca.address1, ca.address2,
                ca.full_name, ca.mobile_number, ca.zip_code, ca.country,
                ca.city, ca.state
+      ${orderByClause}
+      ${paginationClause}
       `,
       queryParams
     );
+
+    // Get total count for pagination
+    const countResult = isPaginationEnabled
+      ? await db.query(
+          `
+          SELECT COUNT(DISTINCT o.id) AS total_count
+          FROM orders o
+          LEFT JOIN order_items oi ON o.id = oi.order_id
+          WHERE o.customer_id = $1
+            ${statusCondition}
+            AND oi.order_item_status = $2
+            AND o.status = $3
+            ${dateCondition}
+          `,
+          countParams
+        )
+      : { rows: [{ total_count: result.rowCount }] };
+
+    const totalCount = parseInt(countResult.rows[0]?.total_count || 0);
+    const totalPages = isPaginationEnabled ? Math.ceil(totalCount / limit) : 1;
+    const hasNextPage = isPaginationEnabled ? pageNum < totalPages : false;
 
     return res.status(200).json({
       status: true,
       message: "Fetch Order History Successfully",
       data: result.rowCount > 0 ? result.rows : [],
+      pagination: isPaginationEnabled
+        ? {
+            total_count: totalCount,
+            total_pages: totalPages,
+            current_page: pageNum,
+            has_next_page: hasNextPage,
+          }
+        : null,
     });
   } catch (error) {
     return res.status(200).json({
@@ -961,21 +1097,28 @@ const repeat_order = catchAsync(async (req, res) => {
     const items = getoder.rows;
 
     for (const item of items) {
-      await db.query(
-        `INSERT INTO add_to_carts (product_id,qty,price,pervoius_price,created_at,updated_at,created_by,status)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [
-          item.product_id,
-          item.quantity,
-          item.current_price,
-          item.previous_price,
-          new Date(),
-          new Date(),
-          customer_id,
-
-          "1",
-        ]
+      const existingOder = await db.query(
+        `Select * from add_to_carts where product_id=$1 AND status=$2 AND created_by=$3`,
+        [item.product_id, "1", customer_id]
       );
+
+      if (existingOder.rowCount == 0) {
+        await db.query(
+          `INSERT INTO add_to_carts (product_id,qty,price,pervoius_price,created_at,updated_at,created_by,status)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+          [
+            item.product_id,
+            1,
+            item.current_price,
+            item.previous_price,
+            new Date(),
+            new Date(),
+            customer_id,
+
+            "1",
+          ]
+        );
+      }
     }
     return res.status(200).json({
       status: true,

@@ -57,6 +57,8 @@ const StorageFile = multer.diskStorage({
       uploadPath = "./public/uploads/invoice";
     } else if (file.fieldname === "csv_file") {
       uploadPath = "./public/uploads/import_product_update_price";
+    } else if (file.fieldname === "file") {
+      uploadPath = "./public/uploads/import_category_excel";
     } else {
       return cb(new Error("Invalid fieldname"), null);
     }
@@ -170,6 +172,14 @@ router.post(
   authenticate,
   masterController.excelExportCategory
 );
+
+router.post(
+  "/excelImportCategory",
+  authenticate,
+  upload.single("file"),
+  masterController.excelImportCategory
+);
+
 router.post(
   "/updateCategoryStatusById",
   authenticate,

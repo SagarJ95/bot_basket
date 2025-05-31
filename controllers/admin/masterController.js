@@ -41,7 +41,7 @@ const getCategories = catchAsync(async (req, res) => {
     const { page, search } = req.body;
     let pageCountQuery = "";
     let searchQuery = ``;
-    const query_params = [1];
+    const query_params = [];
 
     if (page) {
       let pageCount = (page - 1) * 10;
@@ -58,16 +58,16 @@ const getCategories = catchAsync(async (req, res) => {
 
     //get total number of categories
     const totalCategories = await db.query(
-      `select COUNT(c.id) FROM categories as c where c.status =$1 and c.deleted_at IS NULL ${searchQuery}
+      `select COUNT(c.id) FROM categories as c where  c.deleted_at IS NULL ${searchQuery}
             ${pageCountQuery}`,
       query_params
     );
 
     //get get catgories list
     const query = `select c.id as cat_id,c.cat_name as category_name,c.slug,COALESCE(c.description,'') as description,
-        COALESCE(COUNT(p.id),0) as No_of_products from categories as c
+        COALESCE(COUNT(p.id),0) as No_of_products,c.status AS visibility_status  from categories as c
         LEFT JOIN products as p ON c.id = p.category
-        where c.status = $1 and c.deleted_at IS NULL ${searchQuery}
+        where  c.deleted_at IS NULL ${searchQuery}
         GROUP BY c.cat_name,c.id Order BY c.id desc ${pageCountQuery}`;
 
     const getCategorieslist = await db.query(query, query_params);
@@ -424,7 +424,7 @@ const excelExportCategory = catchAsync(async (req, res) => {
                     c.status
                 FROM categories c
                 LEFT JOIN products p ON p.category = c.id
-                WHERE c.deleted_at IS NULL And c.status = '1'
+                WHERE c.deleted_at IS NULL
                 GROUP BY c.id, c.cat_name
                 ORDER BY c.id`;
 
@@ -450,6 +450,7 @@ const excelExportCategory = catchAsync(async (req, res) => {
       worksheet.addRow({
         id: row.id,
         cat_name: row.cat_name,
+        description: row.description,
         product_count: row.product_count,
         status: row.status == 1 ? "Active" : "Inactive",
       });
@@ -484,9 +485,122 @@ const excelExportCategory = catchAsync(async (req, res) => {
     });
   }
 });
+/******************************************** Import Category            *************************************************************88/
+
+
+
+
 /* Category API End ------------------------------- */
 
 /* Product API Start ------------------------------- */
+
+const excelImportCategory = catchAsync(async (req, res) => {
+  
+  try {
+    if (!req.file) {
+      return res
+        .status(400)
+        .json({ status: false, message: "No file uploaded" });
+    }
+
+    const filePath = path.join(process.cwd(), req.file.path);
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(filePath);
+    const worksheet = workbook.getWorksheet(1);
+
+    // Validate headers at A and B columns
+    const headerRow = worksheet.getRow(1);
+    if (
+      headerRow.getCell("A").value !== "Category Name" ||
+      headerRow.getCell("B").value !== "Description"
+    ) {
+      fs.unlinkSync(filePath);
+      return res
+        .status(400)
+        .json({ status: false, message: "Invalid Excel header format" });
+    }
+
+    const insertedCategories = [];
+    const skippedCategories = [];
+
+    for (let i = 2; i <= worksheet.rowCount; i++) {
+      const row = worksheet.getRow(i);
+      const cat_name = row.getCell("A").value;
+      const description = row.getCell("B").value || "";
+
+      if (!cat_name) continue; // skip empty category name rows
+
+      const checkQuery = `SELECT id FROM categories WHERE cat_name = $1 AND deleted_at IS NULL`;
+      const existing = await db.query(checkQuery, [cat_name]);
+
+      if (existing.rows.length === 0) {
+        const insertQuery = `
+          INSERT INTO categories (cat_name, description, status, created_at, updated_at)
+          VALUES ($1, $2, '1', NOW(), NOW())
+          RETURNING id
+        `;
+        await db.query(insertQuery, [cat_name, description]);
+
+        insertedCategories.push({ cat_name, description });
+      } else {
+        skippedCategories.push({ cat_name, description });
+      }
+    }
+
+    fs.unlinkSync(filePath);
+
+    // Generate report Excel
+    const reportWorkbook = new ExcelJS.Workbook();
+
+    const insertedSheet = reportWorkbook.addWorksheet("Inserted Categories");
+    insertedSheet.columns = [
+      { header: "Category Name", key: "cat_name", width: 30 },
+      { header: "Description", key: "description", width: 40 },
+    ];
+    insertedCategories.forEach((item) => insertedSheet.addRow(item));
+
+    const skippedSheet = reportWorkbook.addWorksheet("Skipped Categories");
+    skippedSheet.columns = [
+      { header: "Category Name", key: "cat_name", width: 30 },
+      { header: "Description", key: "description", width: 40 },
+    ];
+    skippedCategories.forEach((item) => skippedSheet.addRow(item));
+
+    const dateTime = moment().tz("Asia/Kolkata").format("YYYY-MM-DD_HH-mm-ss");
+    const reportFileName = `category_import_report_${dateTime}.xlsx`;
+    const reportPath = path.join(
+      process.cwd(),
+      "public/uploads/reports",
+      reportFileName
+    );
+
+    if (!fs.existsSync(path.dirname(reportPath))) {
+      fs.mkdirSync(path.dirname(reportPath), { recursive: true });
+    }
+
+    await reportWorkbook.xlsx.writeFile(reportPath);
+
+    return res.status(200).json({
+      status: true,
+      message: "Import completed",
+      inserted: insertedCategories.length,
+      skipped: skippedCategories.length,
+      report_url: BASE_URL + `/uploads/reports/${reportFileName}`,
+      // details: {
+      //   insertedCategories,
+      //   skippedCategories,
+      // },
+    });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({
+      status: false,
+      message: "Internal Server Error",
+      error: error.message,
+    });
+  }
+});
+
 const getProductlist = catchAsync(async (req, res) => {
   try {
     const { category_id, page, search } = req.body;
@@ -1666,4 +1780,5 @@ export {
   excelExportProductsInfo,
   importProductListwithPrice,
   ChangePricelist,
+  excelImportCategory,
 };
