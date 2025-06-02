@@ -224,6 +224,7 @@ const product_list = catchAsync(async (req, res) => {
       pageSize = 10,
     } = req.body;
     let query_params = [1, 1];
+    let query_params_count = [1, 1];
     let searchQuery = "";
     let categories = "";
     let wildcardSearch = "";
@@ -235,17 +236,20 @@ const product_list = catchAsync(async (req, res) => {
     if (category_id && category_id.length > 0) {
       categories = `AND p.category = ANY ($${query_params.length + 1})`;
       query_params.push(category_id);
+      query_params_count.push(category_id)
     }
 
     if (search) {
       wildcardSearch = `%${search.toLowerCase()}%`;
       searchQuery = `AND lower(p.name) LIKE $${query_params.length + 1}`;
       query_params.push(wildcardSearch);
+      query_params_count.push(wildcardSearch)
     }
 
     if (country_id && country_id.length > 0) {
       countryFilter = `AND p.country_id = ANY ($${query_params.length + 1})`;
       query_params.push(country_id);
+      query_params_count.push(country_id)
     }
 
     if (price_ranges && price_ranges.length > 0) {
@@ -253,6 +257,7 @@ const product_list = catchAsync(async (req, res) => {
       let priceParams = [];
       price_ranges.forEach((range) => {
         priceParams.push(range.min, range.max);
+
       });
 
       const baseIndex = query_params.length + 1;
@@ -265,6 +270,7 @@ const product_list = catchAsync(async (req, res) => {
 
       priceFilter = `AND (${priceRangeFilter.slice(0, -4)})`;
       query_params.push(...priceParams);
+      query_params_count.push(...priceParams)
     }
 
     if (sort_by_price === "low_to_high") {
@@ -305,6 +311,7 @@ const product_list = catchAsync(async (req, res) => {
         ) AS cart ON cart.product_id = p.id
       `;
       query_params.push(customerId);
+      query_params_count.push(customerId)
       cartgroupjoin = ", cart.cart_id, cart.qty";
       cartqtyandid = `, COALESCE(cart.cart_id, 0) AS cart_id, COALESCE(cart.qty, 0) AS cart_qty`;
     }
@@ -374,6 +381,62 @@ const product_list = catchAsync(async (req, res) => {
 
     const getproductlist = await db.query(productquery, query_params);
 
+    const overallproductcountquery = `
+      SELECT
+        p.id,
+        p.name AS product_name,
+        p.slug,
+        p.description,
+        pl.price,
+        p.minimum_order_place,
+        p.maximum_order_place,
+        COALESCE(q.total_ordered_quantity_today, 0) AS total_ordered_quantity_today,
+        (p.maximum_order_place - COALESCE(q.total_ordered_quantity_today, 0)) AS available_quantity,
+        c.id AS categoryId,
+        c.cat_name AS category_name,
+        cd.id AS country_id,
+        cd.country_name,
+        CONCAT('${BASE_URL}', '/images/img-country-flag/', cd.flag) AS country_flag,
+        ARRAY[pi.image_path] AS product_images
+        ${cartqtyandid}
+      FROM products AS p
+      LEFT JOIN categories AS c ON p.category = c.id
+      LEFT JOIN country_data AS cd ON p.country_id = cd.id
+      LEFT JOIN LATERAL (
+        SELECT CONCAT('${BASE_URL}', pi.image_path) AS image_path
+        FROM product_images pi
+        WHERE pi.product_id = p.id
+        ORDER BY pi.id DESC
+        LIMIT 1
+      ) AS pi ON true
+      LEFT JOIN (
+        SELECT
+          product_id,
+          SUM(quantity) AS total_ordered_quantity_today
+        FROM order_items
+        WHERE order_item_status = $2 AND DATE(created_at) = CURRENT_DATE
+        GROUP BY product_id
+      ) AS q ON p.id = q.product_id
+      LEFT JOIN (
+        SELECT DISTINCT ON (product_id)
+          product_id,
+          price,
+          upload_date
+        FROM products_price_logs
+        WHERE deleted_at IS NULL
+        ORDER BY product_id, upload_date DESC
+      ) AS pl ON pl.product_id = p.id
+      ${cartJoin}
+      WHERE p.status = $1 AND p.deleted_at IS NULL
+      ${categories} ${searchQuery} ${countryFilter} ${priceFilter}
+      GROUP BY p.id, c.cat_name, c.id, q.total_ordered_quantity_today, pi.image_path, pl.price, cd.id, cd.country_name ${cartgroupjoin}
+      ${orderByClause}
+    `;
+
+
+    const getoverallproductlistCount = await db.query(overallproductcountquery, query_params_count);
+
+
     let cartListLength = 0;
     if (customerId) {
       const cartCountResult = await db.query(
@@ -387,12 +450,25 @@ const product_list = catchAsync(async (req, res) => {
       cartListLength = parseInt(cartCountResult.rows[0].cart_count) || 0;
     }
 
+   const totalCount = parseInt(getproductlist.rowCount || 0);
+    const totalPages = page ? Math.ceil(getoverallproductlistCount.rowCount / 10) : 1;
+    const hasNextPage = page ? page < totalPages : false;
+
     return res.status(200).json({
       status: true,
       total: getproductlist.rowCount,
       message: "fetch Product list successfully",
       cartListLength: cartListLength,
+      overallProductCount:getoverallproductlistCount.rowCount,
       data: getproductlist.rows,
+      pagination: page
+        ? {
+            total_count: totalCount,
+            total_pages: totalPages,
+            current_page: parseInt(page),
+            has_next_page: hasNextPage,
+          }
+        : null,
     });
   } catch (e) {
     return res.status(500).json({
@@ -634,6 +710,166 @@ const delete_product_cart = catchAsync(async (req, res) => {
 
 /******************* Start Order creation Flow ************************ */
 //place order
+const create_order_bkp = catchAsync(async (req, res) => {
+  await Promise.all([
+    body("name").notEmpty().withMessage("Name is required").run(req),
+    body("whatsapp_number")
+      .notEmpty()
+      .withMessage("Whatsapp Number is required")
+      .run(req),
+    body("email").notEmpty().withMessage("Email is required").run(req),
+    body("perferred_delivery_date")
+      .notEmpty()
+      .withMessage("Perferred delivery date is required")
+      .run(req),
+    body("address").notEmpty().withMessage("Address is required").run(req),
+    // body("order_item")
+    //   .isArray({ min: 1 })
+    //   .withMessage("At least one order item is required")
+    //   .run(req),
+  ]);
+
+  // Handle validation result
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    const error_message = errors.array()[0].msg;
+    throw new AppError(error_message, 200, errors);
+  }
+
+  try {
+    const customer_id = req.user.id;
+    const {
+      name,
+      whatsapp_number,
+      email,
+      perferred_delivery_date,
+      address,
+      instruction,
+      order_item,
+      delivery_option_id,
+    } = req.body;
+
+    //get order id from order table
+    const getorderid = await db.query(`select id from orders order by id desc`);
+    const orderidInc = getorderid.rowCount > 0 ? getorderid.rows[0].id + 1 : 1;
+    const orderrefid = `Order_ID_${orderidInc}`;
+
+    let order_items = await db.query(
+              `SELECT DISTINCT ON (atc.id)
+                  atc.id as cart_id,
+                  atc.product_id,
+                  p.name AS product_name,
+                  atc.qty,
+                  p.price
+                FROM add_to_carts AS atc
+                LEFT JOIN products AS p ON atc.product_id = p.id
+                LEFT JOIN categories AS c ON p.category = c.id
+                LEFT JOIN country_data AS cd ON p.country_id = cd.id
+                LEFT JOIN LATERAL (
+                  SELECT image_path
+                  FROM product_images
+                  WHERE product_id = p.id
+                  ORDER BY id DESC
+                  LIMIT 1
+                ) pi ON true
+                WHERE atc.status = $1
+                  AND atc.created_by = $2
+                  AND atc.deleted_at IS NULL
+              `,
+          [1, customer_id]
+        );
+
+    if(order_items.rowCount == 0){
+        return res.status(200).json({
+        status: false,
+        message: "There are no items in your cart yet.",
+      });
+    }
+
+    const order_id = await Orders.create({
+      customer_id: customer_id,
+      order_ref_id: orderrefid,
+      customer_name: name,
+      whatsapp_number: whatsapp_number,
+      email: email,
+      perferred_delivery_date: perferred_delivery_date,
+      address: address,
+      special_instruction: instruction,
+      delivery_option_id: delivery_option_id,
+      status: 1,
+      order_status: 1,
+      created_by: customer_id,
+    });
+
+    if (order_id.id) {
+      for (let item of order_items.rows) {
+        const order_item_id = await OrderItem.create({
+          order_id: order_id.id,
+          customer_id: customer_id,
+          cart_id: item.cart_id,
+          product_id: item.product_id,
+          product_name: item.product_name,
+          quantity: item.quantity,
+          price: item.price,
+          order_item_status: 1,
+          item_delivery_status: 1,
+          created_by: customer_id,
+        });
+
+        //Deactive status in cart_list
+        const cart_id = item.cart_id;
+        const cart = await addToCart.update(
+          { status: 0 },
+          { where: { id: cart_id } }
+        );
+      }
+    }
+    let getaddres;
+    let final_address = "";
+
+    if (delivery_option_id == 1) {
+      getaddres = await db.query(
+        `select CONCAT(address1,' ',address2) as address from customer_addresses where customer_id=$1 AND id=$2 AND status=$3 `,
+        [customer_id, address, "1"]
+      );
+      final_address = getaddres.rows[0]?.address || "";
+      // console.log("final_address", final_address);
+    } else if (delivery_option_id == 2) {
+      getaddres = await db.query(
+        `select store_address from store_self_locations where status=$1 `,
+        ["1"]
+      );
+      final_address = getaddres.rows[0]?.store_address || "";
+      // console.log("final_address", final_address);
+    }
+
+    // send conformation mail with pdf attach invoice
+    await sendOrderConfirmation(
+      req,
+      email,
+      name,
+      final_address,
+      order_items.rows.map((item) => ({
+        name: item.product_name,
+        quantity: item.qty,
+        price: item.price,
+      })),
+      order_id.id
+    );
+
+    return res.status(200).json({
+      status: true,
+      message: "Order Place Successfully",
+    });
+  } catch (error) {
+    return res.status(200).json({
+      status: false,
+      message: "Failed to retrieve data",
+      errors: error.message,
+    });
+  }
+});
+
 const create_order = catchAsync(async (req, res) => {
   await Promise.all([
     body("name").notEmpty().withMessage("Name is required").run(req),
@@ -647,10 +883,10 @@ const create_order = catchAsync(async (req, res) => {
       .withMessage("Perferred delivery date is required")
       .run(req),
     body("address").notEmpty().withMessage("Address is required").run(req),
-    body("order_item")
-      .isArray({ min: 1 })
-      .withMessage("At least one order item is required")
-      .run(req),
+    // body("order_item")
+    //   .isArray({ min: 1 })
+    //   .withMessage("At least one order item is required")
+    //   .run(req),
   ]);
 
   // Handle validation result
@@ -716,6 +952,8 @@ const create_order = catchAsync(async (req, res) => {
         );
       }
     }
+
+
     let getaddres;
     let final_address = "";
 
@@ -792,23 +1030,6 @@ const order_history = catchAsync(async (req, res) => {
       countParams.push(status);
     }
 
-    // if (filter_date) {
-    //   const [monthStr, yearStr] = filter_date.split(" ");
-    //   const month = new Date(`${monthStr} 1, 2000`).getMonth() + 1;
-    //   const year = parseInt(yearStr);
-
-    //   if (!isNaN(month) && !isNaN(year)) {
-    //     dateCondition = `AND EXTRACT(MONTH FROM o.perferred_delivery_date) = $${
-    //       queryParams.length + 1
-    //     }
-    //                      AND EXTRACT(YEAR FROM o.perferred_delivery_date) = $${
-    //                        queryParams.length + 2
-    //                      }`;
-    //     queryParams.push(month, year);
-    //     countParams.push(month, year);
-    //   }
-    // }
-
     if (filter_date && filter_date.includes(" - ")) {
       const [startDateStr, endDateStr] = filter_date.split(" - ");
       const startDate = new Date(startDateStr.split("-").reverse().join("-"));
@@ -824,9 +1045,9 @@ const order_history = catchAsync(async (req, res) => {
     }
 
     if (sort_by_price === "low_to_high") {
-      orderByClause = `ORDER BY SUM(oi.quantity * oi.price::numeric) ASC`;
+      orderByClause = `SUM(oi.quantity * oi.price::numeric) ASC`;
     } else if (sort_by_price === "high_to_low") {
-      orderByClause = `ORDER BY SUM(oi.quantity * oi.price::numeric) DESC`;
+      orderByClause = `SUM(oi.quantity * oi.price::numeric) DESC`;
     }
 
     const pageNum = parseInt(page);
@@ -867,15 +1088,30 @@ const order_history = catchAsync(async (req, res) => {
           WHEN 5 THEN 'Cancelled'
           ELSE 'Unknown'
         END AS order_status_text,
-        CONCAT(ca.address1, ca.address2) AS address,
-        ca.address1 AS address_1,
-        ca.address2 AS address_2,
-        ca.full_name,
-        ca.mobile_number,
-        ca.zip_code,
-        ca.country,
-        ca.city,
-        ca.state,
+        CASE o.delivery_option_id
+          WHEN 1 THEN CONCAT(ca.address1, ca.address2)
+          WHEN 2 THEN sl.store_address
+        END AS address,
+    CASE o.delivery_option_id WHEN 1 THEN ca.address1 ELSE sl.store_address END AS address_1,
+    CASE o.delivery_option_id WHEN 1 THEN ca.address2 ELSE NULL END AS address_2,
+    CASE o.delivery_option_id WHEN 1 THEN ca.full_name ELSE sl.store_name END AS full_name,
+    CASE o.delivery_option_id WHEN 1 THEN ca.mobile_number ELSE '988765533' END AS mobile_number,
+    CASE o.delivery_option_id
+      WHEN 1 THEN ca.zip_code
+      WHEN 2 THEN sl.store_pincode
+    END AS zip_code,
+    CASE o.delivery_option_id
+      WHEN 1 THEN ca.country
+      WHEN 2 THEN 'India'
+    END AS country,
+    CASE o.delivery_option_id
+      WHEN 1 THEN ca.city
+      WHEN 2 THEN 'Mumbai'
+    END AS city,
+    CASE o.delivery_option_id
+      WHEN 1 THEN ca.state
+      WHEN 2 THEN 'Maharashtra'
+    END AS state,
         JSON_AGG(
           JSON_BUILD_OBJECT(
             'product_id', p.id,
@@ -896,6 +1132,7 @@ const order_history = catchAsync(async (req, res) => {
         ) AS products
       FROM orders o
       LEFT JOIN customer_addresses ca ON o.address = ca.id
+      LEFT JOIN store_self_locations sl ON o.address = sl.id
       LEFT JOIN order_items oi ON o.id = oi.order_id
       LEFT JOIN products p ON oi.product_id = p.id
       LEFT JOIN categories c ON p.category = c.id
@@ -904,12 +1141,12 @@ const order_history = catchAsync(async (req, res) => {
         AND oi.order_item_status = $2
         AND o.status = $3
         ${dateCondition}
-
         ${searchQuery}
       GROUP BY o.id, o.perferred_delivery_date, ca.address1, ca.address2,
                ca.full_name, ca.mobile_number, ca.zip_code, ca.country,
-               ca.city, ca.state
-      ${orderByClause}
+               ca.city, ca.state,
+               sl.store_address, sl.store_pincode,sl.store_name
+      ORDER BY ${orderByClause ? ` ${orderByClause}` : 'o.id DESC'}
       ${paginationClause}
       `,
       queryParams
@@ -983,18 +1220,34 @@ const view_order = catchAsync(async (req, res) => {
     o.email,
     o.special_instruction,
     TO_CHAR(o.perferred_delivery_date, 'FMDDth FMMonth YYYY') AS delivery_date,
-      CONCAT(ca.address1,ca.address2) AS address,
-          ca.address1 as address_1,
-          ca.address2 as address_2,
-          ca.full_name,
-          ca.mobile_number,
-          ca.zip_code,
-          ca.country,
-          ca.city,
-          ca.state,
+     CASE o.delivery_option_id
+          WHEN 1 THEN CONCAT(ca.address1,' ', ca.address2)
+          WHEN 2 THEN sl.store_address
+        END AS address,
+    CASE o.delivery_option_id WHEN 1 THEN ca.address1 ELSE sl.store_address END AS address_1,
+    CASE o.delivery_option_id WHEN 1 THEN ca.address2 ELSE NULL END AS address_2,
+    CASE o.delivery_option_id WHEN 1 THEN ca.full_name ELSE sl.store_name END AS full_name,
+    CASE o.delivery_option_id WHEN 1 THEN ca.mobile_number ELSE '988765533' END AS mobile_number,
+    CASE o.delivery_option_id
+      WHEN 1 THEN ca.zip_code
+      WHEN 2 THEN sl.store_pincode
+    END AS zip_code,
+    CASE o.delivery_option_id
+      WHEN 1 THEN ca.country
+      WHEN 2 THEN 'India'
+    END AS country,
+    CASE o.delivery_option_id
+      WHEN 1 THEN ca.city
+      WHEN 2 THEN 'Mumbai'
+    END AS city,
+    CASE o.delivery_option_id
+      WHEN 1 THEN ca.state
+      WHEN 2 THEN 'Maharashtra'
+    END AS state,
     o.address as orders_address_id
     FROM orders AS o
     LEFT JOIN customer_addresses as ca ON o.address = ca.id
+    LEFT JOIN store_self_locations sl ON o.address = sl.id
     WHERE o.customer_id = $1 AND o.id=$2`,
       [customer_id, order_id]
     );
@@ -1118,6 +1371,69 @@ const repeat_order = catchAsync(async (req, res) => {
 
 /******************* End Order creation Flow ************************ */
 
+const get_categories_based_product = catchAsync(async (req, res) => {
+
+  try {
+    const result = await db.query(
+      `SELECT
+    c.id AS cat_id,
+        c.cat_name AS category_name,
+        c.slug,
+        COALESCE(c.description, '') AS description,
+        COUNT(p.id) AS no_of_products
+    FROM categories AS c
+    LEFT JOIN products AS p ON c.id = p.category
+    WHERE c.status = $1 AND c.deleted_at IS NULL
+    GROUP BY c.id, c.cat_name, c.slug, c.description
+    ORDER BY no_of_products DESC LIMIT 4
+    `,[1]
+    );
+
+    return res.status(200).json({
+      status: true,
+      message: "Fetch category based product Details Successfully",
+      data:(result.rowCount) > 0 ? result.rows : [],
+    });
+  } catch (error) {
+    return res.status(200).json({
+      status: false,
+      message: "Failed to retrieve data",
+      errors: error.message,
+    });
+  }
+});
+
+const get_country_based_product = catchAsync(async (req, res) => {
+
+  try {
+    const result = await db.query(
+      `SELECT
+        c.id AS country_id,
+        c.country_name AS country_name,
+        COUNT(p.id) AS no_of_products
+    FROM country_data AS c
+    LEFT JOIN products AS p ON c.id = p.country_id
+    WHERE c.status = $1 AND c.deleted_at IS NULL
+    GROUP BY c.id, c.country_name
+    ORDER BY no_of_products DESC
+      LIMIT 4
+  `,[1]
+    );
+
+     return res.status(200).json({
+      status: true,
+      message: "Fetch country based product Details Successfully",
+      data:(result.rowCount) > 0 ? result.rows : [],
+    });
+  } catch (error) {
+    return res.status(200).json({
+      status: false,
+      message: "Failed to retrieve data",
+      errors: error.message,
+    });
+  }
+});
+
 export {
   category_list,
   product_list,
@@ -1133,4 +1449,7 @@ export {
   repeat_order,
   country_list,
   get_price,
+//  footer
+  get_categories_based_product,
+  get_country_based_product
 };

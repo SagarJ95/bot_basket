@@ -55,7 +55,7 @@ export async function sendOrderConfirmation(
 
   // Generate PDF from the detailed invoice template
   const browser = await puppeteer.launch({
-    executablePath: "/usr/bin/google-chrome",
+    executablePath: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
     headless: true,
       args: [
         "--no-sandbox",

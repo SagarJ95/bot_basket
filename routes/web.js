@@ -184,4 +184,12 @@ router.post(
 
 /********************************** End Customer Section *********************************/
 
+/********************************** Footer Section *********************************/
+
+router.post('/get_categories_based_product',staticApiKey,productController.get_categories_based_product)
+
+router.post('/get_country_based_product',staticApiKey,productController.get_country_based_product)
+
+/********************************** Footer Section *********************************/
+
 export default router;

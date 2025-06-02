@@ -38,6 +38,7 @@ const getCategories = catchAsync(async (req, res) => {
         let pageCountQuery = '';
         let searchQuery = ``;
         const query_params = [1];
+        const total_query_params = [1];
 
         if (page) {
             let pageCount = (page - 1) * 10;
@@ -48,13 +49,18 @@ const getCategories = catchAsync(async (req, res) => {
         if (search) {
             searchQuery = `AND c.cat_name ILIKE $${query_params.length + 1}`;
             query_params.push(`%${search}%`);
+            total_query_params.push(`%${search}%`)
         }
 
         //get total number of categories
-        const totalCategories = await db.query(`select COUNT(c.id) FROM categories as c where c.status =$1 and c.deleted_at IS NULL ${searchQuery}
-            ${pageCountQuery}`,
-            query_params
+        const totalCategories = await db.query(`
+            select c.id as cat_id,c.cat_name as category_name,c.slug,COALESCE(c.description,'') as description,
+        COALESCE(COUNT(p.id),0) as No_of_products from categories as c
+        LEFT JOIN products as p ON c.id = p.category
+        where c.status = $1 and c.deleted_at IS NULL AND c.cat_name ILIKE $2
+        GROUP BY c.cat_name,c.id Order BY c.id desc`,[1,`%${search}%`]
         );
+
 
         //get get catgories list
         const query = `select c.id as cat_id,c.cat_name as category_name,c.slug,COALESCE(c.description,'') as description,
@@ -67,7 +73,7 @@ const getCategories = catchAsync(async (req, res) => {
 
         return res.status(200).json({
             status: true,
-            total: (totalCategories.rowCount > 0) ? parseInt(totalCategories.rows[0].count) : 0,
+            total: (totalCategories.rowCount > 0) ? parseInt(totalCategories.rowCount) : 0,
             message: 'Fetch Categories successfully',
             data: (getCategorieslist.rowCount > 0) ? getCategorieslist.rows : []
         });
@@ -490,7 +496,7 @@ const getProductlist = catchAsync(async (req, res) => {
 const countries = catchAsync(async (req, res) => {
     try {
 
-        const query = `select c.id,c.country_name,c.code1 as code,CONCAT('${BASE_URL}/images/img-country-flag/',c.flag) from country_data as c`;
+        const query = `select c.id,c.country_name,c.code1 as code,CONCAT('${BASE_URL}/images/img-country-flag/',c.flag) from country_data as c where c.status = 1`;
 
         const getCountrylist = await db.query(query, [])
 
@@ -513,7 +519,11 @@ const createProduct = catchAsync(async (req, res) => {
             .notEmpty().withMessage('Name is required'),
         body('description').notEmpty().withMessage('Description is required'),
         body('category').notEmpty().withMessage('Category is required'),
-        body('countryId').notEmpty().withMessage('Country is required')
+        body('countryId').notEmpty().withMessage('Country is required'),
+        body('minimum_order_place').notEmpty().withMessage('minimum order is required'),
+        body('maximum_order_place').notEmpty().withMessage('maximum order is required'),
+        body('price').notEmpty().withMessage('Price is required'),
+        body('thumbnail_product_image').notEmpty().withMessage('Thumbnail image is required')
     ]);
 
 
@@ -522,6 +532,10 @@ const createProduct = catchAsync(async (req, res) => {
     try {
         const body = req.body;
         const files = req.files;
+
+        if (!files || !files.thumbnail_product_image || files.thumbnail_product_image.length === 0) {
+            errors.errors.push({ msg: "Please upload thumbnail product image", path: "thumbnail_product_image" });
+        }
 
         if (!files || !files.product_images || files.product_images.length === 0) {
             errors.errors.push({ msg: "Please upload product image", path: "product_images" });
@@ -555,14 +569,18 @@ const createProduct = catchAsync(async (req, res) => {
             OrderingId = getCountOrdering.rows[0].ordering;
         }
 
+        //insert thumbnail product image
+        const thumbnail_images = files && files.thumbnail_product_image ? files.thumbnail_product_image : [];
+
         const product = await Product.create({
             name: body.name,
             slug: generateSlug(body.name),
             description: body.description,
-            minimum_order_place: 1,
-            maximum_order_place: 10,
-            price: 0,
+            minimum_order_place: body.minimum_order_place,
+            maximum_order_place: body.maximum_order_place,
+            price: body.price,
             country_id: body.countryId,
+            thumbnail_product_image:(thumbnail_images.length > 0) ? media_url(thumbnail_images[0]?.path) : null,
             category: body.category,
             created_by: req.user.id,
             ordering: (OrderingId) ? parseInt(OrderingId) + 1 : 1,
@@ -586,13 +604,15 @@ const createProduct = catchAsync(async (req, res) => {
             }
         }
 
+        //get country name
+        const countryName = await db.query(`select id from country_data where id = ${body.countryId}`);
 
-        // const price_log = await Products_price_logs.create({
-        //     product_id: product_id,
-        //     price: body.price,
-        //     created_by: req.user.id,
-        //     updated_by: req.user.id
-        // });
+        //product price list log
+        await db.query(
+            `INSERT INTO products_price_logs (product_id,price,country_id,country_name,upload_date,maximum_quantity
+        ,created_by,created_at,updated_by,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [product_id, body.price, body.countryId, countryName?.rows[0].id, moment(new Date()).format('YYYY-MM-DD'), body.maximum_order_place, req
+            .user.id, new Date(),req.user.id,new Date()]
+        );
 
         const data = {
             user_id: req.user.id,
@@ -616,6 +636,9 @@ const updateProduct = catchAsync(async (req, res) => {
         body('name').notEmpty().withMessage('Name is required').run(req),
         body('category').notEmpty().withMessage('Category is required').run(req),
         body('countryId').notEmpty().withMessage('Country is required'),
+        body('minimum_order_place').notEmpty().withMessage('minimum order is required'),
+        body('maximum_order_place').notEmpty().withMessage('maximum order is required'),
+        body('thumbnail_product_image').notEmpty().withMessage('Thumbnail image is required')
     ]);
 
     const errors = validationResult(req);
@@ -627,6 +650,10 @@ const updateProduct = catchAsync(async (req, res) => {
         const files = req.files;
 
         const product = await Product.findOne({ where: { id: productId, deleted_at: null } });
+
+        if (!files || !files.thumbnail_product_image || files.thumbnail_product_image.length === 0) {
+            errors.errors.push({ msg: "Please upload thumbnail product image", path: "thumbnail_product_image" });
+        }
 
         if (!product) {
             return res.status(404).json({ status: false, message: "Product not found" });
@@ -653,12 +680,18 @@ const updateProduct = catchAsync(async (req, res) => {
             return res.status(200).json({ status: false, errors: formattedErrors });
         }
 
+        const thumbnail_images = files && files.thumbnail_product_image ? files.thumbnail_product_image : [];
+
         // Update product fields
         await Product.update({
             name: body.name,
             slug: generateSlug(body.name),
+            minimum_order_place: body.minimum_order_place,
+            maximum_order_place: body.maximum_order_place,
+            price:body.price,
             description: body.description,
             country_id: body.countryId,
+            thumbnail_product_image:(thumbnail_images.length > 0) ? media_url(thumbnail_images[0]?.path) : null,
             category: body.category,
             updated_by: req.user.id,
         },
@@ -683,15 +716,21 @@ const updateProduct = catchAsync(async (req, res) => {
             }
         }
 
+        //update log price change
+        await db.query(
+            `UPDATE products_price_logs SET maximum_quantity = $1 , price = $2, updated_by = $3 , updated_at = $4
+            WHERE product_id = $5 AND upload_date = $6`, [body.maximum_order_place, body.price, req.user.id, new Date(), productId, moment(new Date()).format('YYYY-MM-DD')]
+        );
+
         // Optional: log price change
-        if (product.price != body.price) {
-            await Products_price_logs.create({
-                product_id: productId,
-                price: body.price,
-                created_by: req.user.id,
-                updated_by: req.user.id
-            });
-        }
+        // if (product.price != body.price) {
+        //     await Products_price_logs.create({
+        //         product_id: productId,
+        //         price: body.price,
+        //         created_by: req.user.id,
+        //         updated_by: req.user.id
+        //     });
+        // }
         // Log admin action
         const data = {
             user_id: req.user.id,
@@ -747,7 +786,8 @@ const getProductById = catchAsync(async (req, res) => {
                         END
                     ) FILTER (WHERE pi.image_path IS NOT NULL),
                     '[]'
-                ) AS product_images
+                ) AS product_images,
+                 p.thumbnail_product_image
             FROM products p
             LEFT JOIN product_images pi ON pi.product_id = p.id
             WHERE p.deleted_at IS NULL AND p.id = $1
@@ -1163,6 +1203,120 @@ const importProductListwithPrice = catchAsync(async (req, res) => {
 
 /***************************************** End  Export product for change price *********************/
 
+const getChangePriceProductlist = catchAsync(async (req, res) => {
+    try {
+        const { category_id, page, search,country_id } = req.body;
+        const query_params = [1];
+        const total_query_params = [1];
+        let categories = '';
+        let countries = '';
+        let pageCountQuery = '';
+        let searchQuery = ``;
+
+        if (category_id) {
+            categories = `and p.category = $${query_params.length + 1}`;
+            query_params.push(category_id)
+            total_query_params.push(category_id)
+        }
+
+        if (country_id) {
+            countries = `and p.country_id = $${query_params.length + 1}`;
+            query_params.push(country_id)
+            total_query_params.push(country_id)
+        }
+
+        if (page) {
+            let pageCount = (page - 1) * 10;
+            pageCountQuery = `LIMIT $${query_params.length + 1} OFFSET $${query_params.length + 2}`
+            query_params.push(10, pageCount)
+        }
+
+        if (search) {
+            searchQuery = `and p.name ILIKE $${query_params.length + 1}`;
+            query_params.push(`%${search}%`);
+            total_query_params.push(`%${search}%`)
+        }
+
+         const totalCountQuery = `
+            SELECT
+                            p.id,
+                            p.name AS product_name,
+                            c.id AS category_id,
+                            c.cat_name AS category_name,
+                            p.price AS current_price,
+                            COALESCE(pp.price, 0) AS previous_price,
+                            CONCAT('${BASE_URL}',p.thumbnail_product_image) as product_image,
+                            CONCAT('${BASE_URL}/images/img-country-flag/',ca.flag) as country_flag,
+                            CONCAT(ca.country_name,' (',ca.code1,') ') as country_name
+                        FROM
+                            products AS p
+                        LEFT JOIN
+                            categories AS c ON p.category = c.id
+                        LEFT JOIN
+                        country_data AS ca ON p.country_id = ca.id
+                        LEFT JOIN LATERAL (
+                            SELECT price
+                            FROM products_price_logs
+                            WHERE product_id = p.id
+                            AND upload_date < CURRENT_DATE
+                            ORDER BY upload_date DESC
+                            LIMIT 1
+                        ) AS pp ON true
+                        WHERE
+                            p.status = $1 ${categories} ${countries} ${searchQuery}
+                        ORDER BY
+                            p.id ASC
+        `;
+
+        const totalProducts = await db.query(totalCountQuery, total_query_params);
+
+
+        const query = `
+                    SELECT
+                            p.id,
+                            p.name AS product_name,
+                            c.id AS category_id,
+                            c.cat_name AS category_name,
+                            p.price AS current_price,
+                            COALESCE(pp.price, 0) AS previous_price,
+                            CONCAT('${BASE_URL}',p.thumbnail_product_image) as product_image,
+                            CONCAT('${BASE_URL}/images/img-country-flag/',ca.flag) as country_flag,
+                            CONCAT(ca.country_name,' (',ca.code1,') ') as country_name
+                        FROM
+                            products AS p
+                        LEFT JOIN
+                            categories AS c ON p.category = c.id
+                        LEFT JOIN
+                        country_data AS ca ON p.country_id = ca.id
+                        LEFT JOIN LATERAL (
+                            SELECT price
+                            FROM products_price_logs
+                            WHERE product_id = p.id
+                            AND upload_date < CURRENT_DATE
+                            ORDER BY upload_date DESC
+                            LIMIT 1
+                        ) AS pp ON true
+                        WHERE
+                            p.status = $1 ${categories} ${countries} ${searchQuery}
+                        ORDER BY
+                            p.id ASC ${pageCountQuery}
+            `;
+
+        const result = await db.query(query, query_params);
+
+
+        return res.status(200).json({
+            status: true,
+            total: (totalProducts.rowCount > 0) ? parseInt(totalProducts.rowCount) : 0,
+            message: "Fetch Change Price details successfully",
+            data: (result.rowCount > 0) ? result.rows : []
+        });
+    }
+    catch (error) {
+        return res.status(200).json({ status: false, message: "Internal Server Error", error: error.message });
+    }
+});
+
 const changeProductPrice = catchAsync(async (req, res) => {
     await Promise.all([
       body("product_id")
@@ -1184,7 +1338,7 @@ const changeProductPrice = catchAsync(async (req, res) => {
 
       //convert into array
       const arrayProductId = productId.split(",").map((id) => parseInt(id));
-      console.log(arrayProductId);
+
 
       const update_product = await db.query(
         `UPDATE products SET price= $1,updated_by=$2
@@ -1210,9 +1364,6 @@ const changeProductPrice = catchAsync(async (req, res) => {
               LEFT JOIN country_data as cd ON p.country_id=cd.id WHERE p.id=$1`,
             [id]
           );
-
-          console.log(id);
-
           await db.query(
             `INSERT INTO products_price_logs
             (product_id,price,created_by,updated_by,created_at,updated_at,
@@ -1386,27 +1537,6 @@ const ChangePricelist = catchAsync(async (req, res) => {
             query_params.push(`%${search}%`);
         }
 
-        // const query = `
-        //         SELECT
-        //             p.id,
-        //             p.name AS product_name,
-        //             c.id as category_id,
-        //             c.cat_name AS category_name,
-        //             p.price AS current_price,
-        //             COALESCE(pp.price, 0) AS price_yesterday
-        //         FROM
-        //             products AS p
-        //         LEFT JOIN
-        //             categories AS c ON p.category = c.id
-        //         LEFT JOIN
-        //             products_price_logs AS pp ON p.id = pp.product_id
-        //             AND pp.upload_date = CURRENT_DATE - INTERVAL '1 day'
-        //         WHERE
-        //             p.status = $1 ${categories} ${searchQuery}
-        //         ORDER BY
-        //         p.id ASC ${pageCountQuery}
-        //         `;
-
         const query = `
                     SELECT
                             p.id,
@@ -1450,6 +1580,351 @@ const ChangePricelist = catchAsync(async (req, res) => {
 
 /* Product API END ------------------------------- */
 
+/* Country API Start -------------------------------*/
+const getcountrylist = catchAsync(async (req, res) => {
+    try {
+
+         const { page } = req.body
+        const query_params = [1];
+        let pageCountQuery = ``;
+
+        if (page) {
+            let pageCount = (page - 1) * 10;
+            pageCountQuery = `LIMIT $${query_params.length + 1} OFFSET $${query_params.length + 2}`
+            query_params.push(10, pageCount)
+        }
+
+        //total number of country
+        const totalquery = `select c.id,c.country_name,c.code1 as code,CONCAT('${BASE_URL}/images/img-country-flag/',c.flag),status from country_data as c where c.status = 1`;
+        const getTotalCountrylist = await db.query(totalquery, [])
+
+        const query = `select c.id,c.country_name,c.code1 as code,CONCAT('${BASE_URL}/images/img-country-flag/',c.flag) as country_flag,status from country_data as c where c.status = $1 order by c.id asc ${pageCountQuery} `;
+        const getCountrylist = await db.query(query, query_params)
+
+        return res.status(200).json({
+            status: true,
+            total:(getTotalCountrylist.rowCount > 0) ? getTotalCountrylist.rowCount : 0,
+            message: 'Fetch Countries Successfully',
+            data: (getCountrylist.rowCount > 0) ? getCountrylist.rows : []
+        });
+    } catch (error) {
+        throw new AppError(error.message, 400);
+    }
+
+});
+
+// POST create Country
+const createCountry = catchAsync(async (req, res) => {
+
+    // Apply validation rules
+    await Promise.all([
+        body('country_name')
+            .notEmpty().withMessage('Country Name is required')
+            .bail() // stops further validation if empty
+            .custom(async (value) => {
+                const existingCategory = await db.query(`select * from country_data where country_name = ${value}`);
+                if (existingCategory) {
+                    throw new Error('Country Name already exists');
+                }
+            })
+            .run(req),
+        body("country_code").notEmpty().withMessage("Country Code is required").run(req),
+        body('country_flag').notEmpty().withMessage('Country Flag is required').run(req)
+    ]);
+
+    // Handle validation result
+    const errors = validationResult(req);
+
+    try {
+        const { country_name, country_code } = req.body;
+        const files = req.files;
+        const countryImage = files && files.country_flag ? files.country_flag : [];
+        const countryFlag = countryImage[0].originalname;
+
+        const result = await db.query(
+            `INSERT INTO country_data (country_name, code1, code2, flag,status)
+            VALUES ($1, $2, $3, $4,1) RETURNING id`,
+            [country_name, country_code, country_code,countryFlag]
+        );
+
+        if (result.rowCount === 0) {
+            return res.status(200).json({ status: false, message: 'Country not created' });
+        }
+
+        const countryId = result.rows[0].id;
+
+
+        const data = {
+            user_id: req.user.id,
+            table_id: countryId,
+            table_name: 'country_data',
+            action: 'insert',
+        };
+
+        adminLog(data);
+
+        return res.status(200).json({ status: true, message: 'Country created successfully' });
+
+    } catch (error) {
+        return res.status(200).json({ status: false, message: 'Country not created', error: error.message });
+    }
+});
+
+// PATCH update Country by ID
+const updateCountryById = catchAsync(async (req, res) => {
+
+    // Apply validation rules
+    await Promise.all([
+        body('country_id')
+            .notEmpty().withMessage('country id is required')
+            .run(req),
+        body('country_name')
+            .notEmpty().withMessage('country name is required')
+            .run(req),
+        body('country_code')
+            .notEmpty().withMessage('country code is required')
+            .run(req),
+    ]);
+
+    // Handle validation result
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const formattedErrors = await formatValidationArray(errors);
+        return res.status(200).json({ status: false, errors: formattedErrors });
+    }
+
+    try {
+
+        const { country_id, country_name,country_code } = req.body;
+        const files = req.files;
+        let countryFlag;
+
+        // Check if country exists
+        const existing = await db.query(`SELECT * FROM country_data WHERE id = $1`, [country_id]);
+        if (existing.rowCount === 0) {
+            return res.status(404).json({ status: false, message: 'Country not found' });
+        }
+
+        // Get old flag if no new file uploaded
+        if (files && files.country_flag && files.country_flag.length > 0) {
+            countryFlag = files.country_flag[0].originalname;
+        } else {
+            countryFlag = existing.rows[0].flag;
+        }
+
+        // Update country
+        const result = await db.query(`
+            UPDATE country_data
+            SET country_name = $1, flag = $2 , code1 =  $3
+            WHERE id = $4
+        `, [country_name, countryFlag, country_code,country_id]);
+
+        if (result.rowCount === 0) {
+            return res.status(200).json({ status: false, message: 'Country not updated' });
+        }
+
+        const data = {
+            user_id: req.user.id,
+            table_id: country_id,
+            table_name: 'country_data',
+            action: 'update',
+        };
+
+        adminLog(data);
+
+        return res.status(200).json({ status: true, message: 'Country updated successfully' });
+
+    } catch (error) {
+        return res.status(200).json({ status: false, message: 'Country Not Updated', error: error.message });
+    }
+});
+
+const getAllCountry =catchAsync(async (req, res) => {
+    try {
+
+         const { page } = req.body
+        const query_params = [1];
+        let pageCountQuery = ``;
+
+        if (page) {
+            let pageCount = (page - 1) * 10;
+            pageCountQuery = `LIMIT $${query_params.length + 1} OFFSET $${query_params.length + 2}`
+            query_params.push(10, pageCount)
+        }
+
+        //total number of country
+        const totalquery = `select c.id,c.country_name,c.code1 as code,CONCAT('${BASE_URL}/images/img-country-flag/',c.flag),status from country_data as c where c.status = 1`;
+        const getTotalCountrylist = await db.query(totalquery, [])
+
+        const query = `select c.id,c.country_name,c.code1 as code,CONCAT('${BASE_URL}/images/img-country-flag/',c.flag),status from country_data as c where c.status = $1 order by c.id asc ${pageCountQuery} `;
+        const getCountrylist = await db.query(query, query_params)
+
+        return res.status(200).json({
+            status: true,
+            total:(getTotalCountrylist.rowCount > 0) ? getTotalCountrylist.rowCount : 0,
+            message: 'Fetch Countries Successfully',
+            data: (getCountrylist.rowCount > 0) ? getCountrylist.rows : []
+        });
+    } catch (error) {
+        throw new AppError(error.message, 400);
+    }
+
+});
+
+// GET Country by ID
+const getCountryById = catchAsync(async (req, res) => {
+    try {
+        await Promise.all([
+            body('country_id')
+                .notEmpty().withMessage('country id is required')
+                .run(req)
+        ]);
+
+        const errors = validationResult(req);
+        if (!errors.isEmpty()) {
+            const formattedErrors = await formatValidationArray(errors);
+            return res.status(200).json({ status: false, errors: formattedErrors });
+        }
+        const countryId = parseInt(req.body.country_id);
+
+        if (isNaN(countryId)) {
+            return res.status(200).json({ status: false, message: 'Invalid Country ID', error: '' });
+        }
+
+        // Fetch data from the database
+        const query = `SELECT id,country_name,code1 as country_code,CONCAT('${BASE_URL}', '/images/img-country-flag/', flag) AS country_flag FROM country_data WHERE deleted_at IS NULL AND id = ${countryId}`;
+
+        const result = await db.query(query);
+
+        if (result.rowCount <= 0) {
+            return res.status(200).json({ status: false, message: 'Data Not Found', error: '' });
+        }
+
+        return res.status(200).json({ status: true, message: 'Data Found', data: result.rows[0] });
+    } catch (error) {
+        return res.status(200).json({ status: false, message: 'Data Not Found', error: error.message });
+    }
+});
+
+
+// DELETE Country by ID
+const deleteCountryById = catchAsync(async (req, res) => {
+    await Promise.all([
+        body('country_id')
+            .notEmpty().withMessage('country id is required')
+            .run(req) // THIS is important
+    ]);
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const formattedErrors = await formatValidationArray(errors);
+        return res.status(200).json({ status: false, errors: formattedErrors });
+    }
+
+    try {
+
+        const countryId = parseInt(req.body.country_id);
+
+        if (isNaN(countryId)) {
+            return res.status(200).json({ status: false, message: 'Invalid Country ID', error: '' });
+        }
+
+         const result = await db.query(`SELECT * FROM country_data WHERE id = $1`, [countryId]);
+
+            if (result.rowCount === 0) {
+                return res.status(200).json({ status: false, message: 'Country not found', error: '' });
+            }
+
+        await db.query(
+            `UPDATE country_data SET status = $1, deleted_at = $2 where id = $3`,
+            ["0", new Date(), countryId]
+        );
+
+        const data = {
+            user_id: req.user.id,
+            table_id: countryId,
+            table_name: 'country_data',
+            action: 'delete',
+        };
+
+        adminLog(data);
+
+        return res.status(200).json({ status: true, message: 'Data Deleted sucessfully' });
+
+    } catch (error) {
+        return res.status(200).json({ status: false, message: 'Country not found', error: error.message });
+    }
+});
+
+// PATCH update country status by ID
+const updateCountryStatusById = catchAsync(async (req, res) => {
+    await Promise.all([
+        body('country_id')
+            .notEmpty().withMessage('country id is required')
+            .run(req),
+        body('status')
+            .notEmpty().withMessage('status is required')
+            .run(req)
+    ]);
+
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const formattedErrors = await formatValidationArray(errors);
+        return res.status(200).json({ status: false, errors: formattedErrors });
+    }
+
+    try {
+
+        let { country_id, status } = req.body;
+
+        if (isNaN(country_id) || isNaN(status)) {
+            return res.status(200).json({ status: false, message: 'Invalid Country ID or Status', error: '' });
+        }
+
+        //check no of product for particular country
+        const count = await db.query(`select c.id as cat_id,c.cat_name as category_name,c.slug,COALESCE(c.description,'') as description,
+        COALESCE(COUNT(p.id),0) as no_of_products from categories as c
+        LEFT JOIN country_data as ca ON p.country_id = ca.id
+        LEFT JOIN products as p ON c.id = p.category
+        where ca.id = $1 and c.status = $2 and c.deleted_at IS NULL
+        GROUP BY c.cat_name,c.id Order BY c.id desc`, [country_id, 1]);
+
+        if (count.rowCount > 0 && count.rows.no_of_products > 0) {
+            return res.status(200).json({
+                status: false,
+                message: `Country has products cannot be deleted`
+            });
+        } else {
+
+            const updateCountry = await db.query(
+                `UPDATE country_data SET status = $1, updated_by = $2 where id = $3`,
+                [status, req.user.id, country_id]
+            );
+
+            if (!updateCountry) {
+                return res.status(200).json({ status: false, message: 'Country Status Not Updated', error: '' });
+            }
+
+            const data = {
+                user_id: req.user.id,
+                table_id: country_id,
+                table_name: 'country_data',
+                action: 'status to ' + status,
+            };
+
+            adminLog(data);
+        }
+
+        return res.status(200).json({ status: true, message: 'Country status updated successfully' });
+
+    } catch (error) {
+
+        return res.status(200).json({ status: false, message: 'Country Status Not Updated', error: error.message });
+    }
+});
+
+/* End Country Api ---------------------------------*/
+
 export {
     /* Category API */
     getCategories,
@@ -1475,5 +1950,15 @@ export {
     getProductlist,
     excelExportProductsInfo,
     importProductListwithPrice,
-    ChangePricelist
+    ChangePricelist,
+    getChangePriceProductlist,
+
+    /* country master */
+    getcountrylist,
+    createCountry,
+    getAllCountry,
+    getCountryById,
+    updateCountryById,
+    deleteCountryById,
+    updateCountryStatusById
 }

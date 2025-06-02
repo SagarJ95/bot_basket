@@ -54,11 +54,14 @@ const StorageFile = multer.diskStorage({
     }
     else if (file.fieldname === 'product_images') {
       uploadPath = './public/uploads/product_images';
-    } else if (file.fieldname === 'invoice') {
+    } else if(file.fieldname === 'thumbnail_product_image'){
+      uploadPath = './public/uploads/thumbnail_product_image';
+    }else if (file.fieldname === 'invoice') {
       uploadPath = './public/uploads/invoice';
-
     } else if (file.fieldname === 'csv_file') {
       uploadPath = './public/uploads/import_product_update_price';
+    } else if(file.fieldname === 'country_flag'){
+      uploadPath = './public/images/img-country-flag';
     }
     else {
       return cb(new Error('Invalid fieldname'), null);
@@ -150,9 +153,9 @@ router.post('/updateCategoryStatusById', authenticate, masterController.updateCa
 
 /* Category API End ------------------------------------ */
 router.post("/createProduct", upload.fields([
-  { name: 'product_images', maxCount: 5 }]), authenticate, masterController.createProduct)
+  { name: 'product_images', maxCount: 5 },{ name: 'thumbnail_product_image', maxCount: 1 }]), authenticate, masterController.createProduct)
 router.post("/updateProduct", upload.fields([
-  { name: 'product_images', maxCount: 5 }]), authenticate, masterController.updateProduct)
+  { name: 'product_images', maxCount: 5 },{ name: 'thumbnail_product_image', maxCount: 1 }]), authenticate, masterController.updateProduct)
 router.post("/getProductById", authenticate, masterController.getProductById);
 router.post("/deleteProductById", authenticate, masterController.deleteProductById);
 router.post("/updateProductStatusById", authenticate, masterController.updateProductStatusById);
@@ -163,6 +166,9 @@ router.post("/exportProductPriceLogs", authenticate, masterController.exportProd
 router.post("/ChangePricelist", authenticate, masterController.ChangePricelist)
 router.post("/changeProductStockStatus", authenticate, masterController.changeProductStockStatus);
 router.post('/getProductlist', authenticate, masterController.getProductlist)
+
+//change price product list
+router.post('/getChangePriceProductlist', authenticate, masterController.getChangePriceProductlist)
 
 //export product list for price change
 router.post("/excelExportProductsInfo", authenticate, masterController.excelExportProductsInfo)
@@ -268,5 +274,22 @@ router.get(
   authenticate,
   deliveryOptionController.getDeliveryOption
 );
+
+/* Country API Start ----------------------------------- */
+
+// POST get country (datatables)
+router.post("/getcountrylist", authenticate, masterController.getcountrylist);
+
+// POST add new country || GET get all country
+router
+  .post('/createCountry',authenticate, upload.fields([{ name: "country_flag", maxCount: 1 }]),masterController.createCountry);
+
+// GET country by id || PATCH update country by id || DELETE delete country by id
+  router.post('/getCountryById',authenticate, masterController.getCountryById)
+  router.post('/updateCountryById',authenticate,upload.fields([{ name: "country_flag", maxCount: 1 }]), masterController.updateCountryById)
+  router.post('/deleteCountryById',authenticate, masterController.deleteCountryById);
+
+/* Country API End ------------------------------------ */
+
 
 export default router;
