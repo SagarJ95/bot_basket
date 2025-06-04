@@ -156,7 +156,7 @@ const Login = catchAsync(async (req, res) => {
       if (result.status != 1) {
         return res.status(200).json({
           status: false,
-          message: "Sorry, Customer is Inactivated",
+          message: "Customer account is deactivated.",
         });
       }
 

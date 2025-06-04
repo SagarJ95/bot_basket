@@ -3,6 +3,7 @@ const { verify } = pkg;
 import Customer from '../db/models/customers.js';
 import catchAsync from '../utils/catchAsync.js';
 import AppError from '../utils/appError.js';
+import db from "../config/db.js";
 
 const customer_authenticate = catchAsync(async (req, res, next) => {
     // Get the token from headers
@@ -34,6 +35,18 @@ const customer_authenticate = catchAsync(async (req, res, next) => {
     if (!freshCustomer) {
         throw new AppError('Customer does not exist', 201);
     }
+
+    //check customer is active or inactive
+     const result = await Customer.findOne({
+        where: { id: freshCustomer.id },
+        });
+
+     if (result.status != 1) {
+        return res.status(403).json({
+          status: false,
+          message: "Sorry, Customer is Deactivated",
+        });
+      }
 
     // Attach customer details to request
     req.user = freshCustomer;

@@ -16,17 +16,24 @@ import customer_address from "../../db/models/customer_address.js";
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3848';
 
-/* Category API Start ------------------------------- */
+/* Customer API Start ------------------------------- */
 
 // GET all customer (datatables)
 const getCustomers = catchAsync(async (req, res) => {
     try {
         const { page, search } = req.body
 
-        const query_params = [1, 1, 1];
+        const query_params = [1, 1];
+        const total_query_params = [1,1];
 
         let pageCountQuery = '';
         let searchQuery = ``;
+
+         if (search) {
+            searchQuery = `AND CONCAT(c.first_name, ' ', c.last_name) ILIKE $${query_params.length + 1}`;
+            query_params.push(`%${search}%`);
+            total_query_params.push(`%${search}%`)
+        }
 
         if (page) {
             let pageCount = (page - 1) * 10;
@@ -34,19 +41,31 @@ const getCustomers = catchAsync(async (req, res) => {
             query_params.push(10, pageCount)
         }
 
-        if (search) {
-            searchQuery = `AND CONCAT(c.first_name, ' ', c.last_name) ILIKE $${query_params.length + 1}`;
-            query_params.push(`%${search}%`);
-        }
+        //get total number of products
+        const totalCountQuery = `select c.id,CONCAT(c.first_name,' ',c.last_name) as customer_name,
+                    c.phone_no as contact_no,c.whatsapp_no,COUNT(DISTINCT o.id) as total_order,
+                    COALESCE(SUM(oi.quantity * oi.price::numeric), 0) AS total_revenue,
+                    TO_CHAR(MAX(o.created_at), 'FMDDth FMMonth YYYY') AS last_order_date,
+                    c.status as visibilty_status
+                    from customers as c
+                    LEFT JOIN orders as o ON c.id = o.customer_id AND o.status = $1
+                    LEFT JOIN order_items as oi ON o.id = oi.order_id AND o.status = $2
+                    where c.deleted_at IS NULL ${searchQuery}
+                    GROUP BY c.first_name,c.last_name,c.phone_no,c.whatsapp_no,c.id
+                    order By c.id desc
+        `;
+
+        const totalCustomer = await db.query(totalCountQuery, total_query_params);
 
         const query = `select c.id,CONCAT(c.first_name,' ',c.last_name) as customer_name,
         c.phone_no as contact_no,c.whatsapp_no,COUNT(DISTINCT o.id) as total_order,
         COALESCE(SUM(oi.quantity * oi.price::numeric), 0) AS total_revenue,
-        TO_CHAR(MAX(o.created_at), 'FMDDth Month YYYY') AS last_order_date
+        TO_CHAR(MAX(o.created_at), 'FMDDth FMMonth YYYY') AS last_order_date,
+        c.status as visibilty_status
         from customers as c
-        LEFT JOIN orders as o ON c.id = o.customer_id AND o.status = $2
-        LEFT JOIN order_items as oi ON o.id = oi.order_id AND o.status = $3
-        where c.status = $1 ${searchQuery}
+        LEFT JOIN orders as o ON c.id = o.customer_id AND o.status = $1
+        LEFT JOIN order_items as oi ON o.id = oi.order_id AND o.status = $2
+        where c.deleted_at IS NULL ${searchQuery}
         GROUP BY c.first_name,c.last_name,c.phone_no,c.whatsapp_no,c.id
         order By c.id desc ${pageCountQuery}`;
 
@@ -54,7 +73,7 @@ const getCustomers = catchAsync(async (req, res) => {
 
         return res.status(200).json({
             status: true,
-            total: (result.rowCount > 0) ? result.rowCount : 0,
+            total: (totalCustomer.rowCount > 0) ? totalCustomer.rowCount : 0,
             message: 'Fetch customer details Successfully',
             data: (result.rowCount > 0) ? result.rows : []
         });
@@ -170,8 +189,14 @@ const getParticularCustomerInfo = catchAsync(async (req, res) => {
             COALESCE(
             json_agg(
                 json_build_object(
-                    'id', ca.id,
-                    'address', ca.address
+                    'address_id', ca.id,
+                    'full_name', ca.full_name,
+                    'mobile_no', ca.mobile_number,
+                    'address', ca.address1,
+                    'zipcode', ca.zip_code,
+                    'country', ca.country,
+                    'state', ca.state,
+                    'city', ca.city
                 )
             ) FILTER (WHERE ca.id IS NOT NULL AND ca.status = $3),
             '[]'
@@ -195,6 +220,97 @@ const getParticularCustomerInfo = catchAsync(async (req, res) => {
     }
 
 });
+//Add Customer
+const add_customer = catchAsync(async (req, res) => {
+
+    await Promise.all([
+        body('first_name').notEmpty().withMessage('first name is required').run(req),
+        body('last_name').notEmpty().withMessage('Last Name is required').run(req),
+        body('contact_number').notEmpty().withMessage('Contact Number is required').run(req),
+        body('whatsapp_number').notEmpty().withMessage('Whatsapp Number is required').run(req),
+        body('email').notEmpty().withMessage('Email is required').isEmail().withMessage("Invalid email format").custom(async (value) => {
+            // Check if the email already exists in the database
+            if (value) {
+                const existingEmail = await Customer.findOne({ where: { email: value } });
+                if (existingEmail) {
+                    //return res.status(200).json({ status: false, message: "Email Id already exists", errors: {} })
+                    throw new Error('Email Id already exists');
+                }
+            }
+        }).run(req),
+        body('address').notEmpty().withMessage('Address is required').run(req),
+        body('password').notEmpty().withMessage('Pasword is required').run(req),
+        body('zipcode').notEmpty().withMessage('ZipCode is required').run(req),
+        body('country').notEmpty().withMessage('Country is required').run(req),
+        body('state').notEmpty().withMessage('state is required').run(req),
+        body('city').notEmpty().withMessage('city is required').run(req),
+    ]);
+
+    // Handle validation result
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const error_message = errors.array()[0].msg;
+        throw new AppError(error_message, 200, errors);
+    }
+
+    try {
+        const { first_name, last_name, contact_number, whatsapp_number, email, password,address,zipcode,country,state,city } = req.body;
+
+        const files = req.files || {};
+
+        const hashPassword = await bcrypt.hash(password, 10)
+
+        const createInfo = {
+            first_name: first_name,
+            last_name: last_name,
+            phone_no: contact_number,
+            whatsapp_no: whatsapp_number,
+            email: email,
+            password: hashPassword,
+            enable_email_notification: 1,
+            status: 1
+        };
+
+        const formatPath = (filePath) => {
+            return filePath ? filePath.replace(/^public[\\/]/, '/').replace(/\\/g, '/') : null;
+        };
+
+        const profile_pic = files.profile && files.profile.length > 0
+            ? formatPath(files.profile[0].path)
+            : null;
+
+        if (profile_pic) createInfo.profile = profile_pic;
+        const customerInfo = await Customer.create(createInfo);
+
+        if (customerInfo.id) {
+                const full_name = `${first_name} ${last_name}`
+                const Insertquery = `INSERT INTO customer_addresses (customer_id, full_name,mobile_number,address1, zip_code,country,state,city,status,created_by) values ($1, $2, $3,$4,$5,$6,$7,$8,$9,$10)`;
+                await db.query(Insertquery, [customerInfo.id, full_name,contact_number,address,zipcode,country,state,city ,1, customerInfo.id])
+        }
+
+
+        const data = {
+            user_id: req.user.id,
+            table_id: customerInfo.id,
+            table_name: 'customer',
+            action: 'insert',
+        };
+
+        adminLog(data);
+
+        return res.status(200).json({
+            status: true,
+            message: (customerInfo) ? "Customer create sucessfully" : "Customer create Unsucessfully",
+        });
+
+    } catch (e) {
+        return res.status(200).json({
+            status: false,
+            message: "Failed to data",
+            errors: e.message
+        });
+    }
+});
 
 //update customer info
 const update_customer_info = catchAsync(async (req, res) => {
@@ -205,7 +321,7 @@ const update_customer_info = catchAsync(async (req, res) => {
         body('last_name').notEmpty().withMessage('Last Name is required').run(req),
         body('contact_number').notEmpty().withMessage('Contact Number is required').run(req),
         body('whatsapp_number').notEmpty().withMessage('Whatsapp Number is required').run(req),
-        body('email').notEmpty().withMessage('Email is required').run(req)
+       // body('email').notEmpty().withMessage('Email is required').run(req)
     ]);
 
     // Handle validation result
@@ -217,54 +333,36 @@ const update_customer_info = catchAsync(async (req, res) => {
 
     try {
 
-        const { first_name, last_name, contact_number, whatsapp_number, email, password, enable_email_notification, address, customer_id } = req.body;
+        const { first_name, last_name, contact_number, whatsapp_number,customer_id } = req.body;
         const files = req.files || {};
 
-        let addressInfo;
-        if (typeof address == 'string') {
-            addressInfo = JSON.parse(address);
-        }
+        // const getCustomerInfo = await db.query(`
+        //         SELECT password
+        //         FROM customers
+        //         WHERE id = $1 AND status = $2 AND deleted_at IS NULL
+        //     `, [customer_id, "1"]);
 
-
-        const getCustomerInfo = await db.query(`
-                SELECT password
-                FROM customers
-                WHERE id = $1 AND status = $2 AND deleted_at IS NULL
-            `, [customer_id, "1"]);
-
-        const hashPassword = (password) ? await bcrypt.hash(password, 10) : getCustomerInfo.rows[0].password;
-
-        if (Array.isArray(addressInfo)) {
-            for (const val of addressInfo) {
-                if (val.id == '') {
-                    const Insertquery = `INSERT INTO customer_addresses (customer_id, address, tag,status,created_by) values ($1, $2, $3,$4,$5)`;
-                    await db.query(Insertquery, [customer_id, val.address, val.tag, 1, customer_id])
-                } else {
-                    const updatequery = `Update customer_addresses SET address = $1, tag = $2 Where customer_id = $3 and id = $4 and status = $5`;
-                    await db.query(updatequery, [val.address, val.tag, customer_id, val.id, 1])
-                }
-            }
-        }
+        // const hashPassword = (password) ? await bcrypt.hash(password, 10) : getCustomerInfo.rows[0].password;
 
         const updateInfo = {
             first_name: first_name,
             last_name: last_name,
             phone_no: contact_number,
             whatsapp_no: whatsapp_number,
-            email: email,
-            password: hashPassword,
-            enable_email_notification: enable_email_notification
+           // email: email,
+           // password: hashPassword,
+           // enable_email_notification: enable_email_notification
         };
 
-        const formatPath = (filePath) => {
-            return filePath ? filePath.replace(/^public[\\/]/, '/').replace(/\\/g, '/') : null;
-        };
+        // const formatPath = (filePath) => {
+        //     return filePath ? filePath.replace(/^public[\\/]/, '/').replace(/\\/g, '/') : null;
+        // };
 
-        const profile_pic = files.profile && files.profile.length > 0
-            ? formatPath(files.profile[0].path)
-            : null;
+        // const profile_pic = files.profile && files.profile.length > 0
+        //     ? formatPath(files.profile[0].path)
+        //     : null;
 
-        if (profile_pic) updateInfo.profile = profile_pic;
+        // if (profile_pic) updateInfo.profile = profile_pic;
         const updateCustomerPassword = await Customer.update(updateInfo, {
             where: {
                 id: customer_id
@@ -294,24 +392,19 @@ const update_customer_info = catchAsync(async (req, res) => {
     }
 });
 
-//Add Customer
-const add_customer = catchAsync(async (req, res) => {
+//update customer address
+const update_customer_address = catchAsync(async (req, res) => {
 
     await Promise.all([
-        body('first_name').notEmpty().withMessage('first name is required').run(req),
-        body('last_name').notEmpty().withMessage('Last Name is required').run(req),
-        body('contact_number').notEmpty().withMessage('Contact Number is required').run(req),
-        body('whatsapp_number').notEmpty().withMessage('Whatsapp Number is required').run(req),
-        body('email').notEmpty().withMessage('Email is required').isEmail().withMessage("Invalid email format").custom(async (value) => {
-            // Check if the email already exists in the database
-            if (value) {
-                const existingEmail = await Customer.findOne({ where: { email: value } });
-                if (existingEmail) {
-                    return res.status(200).json({ status: false, message: "Email Id already exists", errors: {} })
-                }
-            }
-        }).run(req),
-        body('password').notEmpty().withMessage('Pasword is required').run(req)
+        body('customer_id').notEmpty().withMessage('Customer Id is required').run(req),
+        body('address_id').notEmpty().withMessage('Address Id is required').run(req),
+        body('full_name').notEmpty().withMessage('first name is required').run(req),
+        body('mobile_no').notEmpty().withMessage('Mobile Number is required').run(req),
+        body('address').notEmpty().withMessage('address is required').run(req),
+        body('zipcode').notEmpty().withMessage('zipcode is required').run(req),
+        body('country').notEmpty().withMessage('country is required').run(req),
+        body('state').notEmpty().withMessage('state is required').run(req),
+        body('city').notEmpty().withMessage('City is required').run(req),
     ]);
 
     // Handle validation result
@@ -322,58 +415,53 @@ const add_customer = catchAsync(async (req, res) => {
     }
 
     try {
-        const { first_name, last_name, contact_number, whatsapp_number, email, password, address } = req.body;
 
-        const files = req.files || {};
-        let addressInfo;
-        if (typeof address == 'string') {
-            addressInfo = JSON.parse(address);
-        }
+        const { address_id,full_name, mobile_no, address, zipcode,country,state,city,customer_id } = req.body;
 
-        const hashPassword = await bcrypt.hash(password, 10)
 
-        const createInfo = {
-            first_name: first_name,
-            last_name: last_name,
-            phone_no: contact_number,
-            whatsapp_no: whatsapp_number,
-            email: email,
-            password: hashPassword,
-            enable_email_notification: 1,
-            status: 1
-        };
+        const getCustomerInfo = await db.query(`
+                SELECT *
+                FROM customer_addresses
+                WHERE id = $1 AND customer_id= $2 and status = $3 AND deleted_at IS NULL
+            `, [address_id,customer_id, "1"]);
 
-        const formatPath = (filePath) => {
-            return filePath ? filePath.replace(/^public[\\/]/, '/').replace(/\\/g, '/') : null;
-        };
 
-        const profile_pic = files.profile && files.profile.length > 0
-            ? formatPath(files.profile[0].path)
-            : null;
-
-        if (profile_pic) updateInfo.profile = profile_pic;
-        const customerInfo = await Customer.create(createInfo);
-
-        if (Array.isArray(addressInfo)) {
-            for (const val of addressInfo) {
-                const Insertquery = `INSERT INTO customer_addresses (customer_id, address, tag,status,created_by) values ($1, $2, $3,$4,$5)`;
-                await db.query(Insertquery, [customerInfo.id, val.address, val.tag, 1, customerInfo.id])
+            if(getCustomerInfo.rowCount == 0){
+                return res.status(200).json({
+                    status: true,
+                    message: "address Not Found"
+                });
             }
-        }
 
+            const updateInfo = {
+                full_name: full_name,
+                mobile_number: mobile_no,
+                address1: address,
+                zip_code: zipcode,
+                country:country,
+                state:state,
+                city:city
+            };
 
-        const data = {
-            user_id: req.user.id,
-            table_id: customerInfo.id,
-            table_name: 'customer',
-            action: 'insert',
-        };
+            const updateCustomerPassword = await customer_address.update(updateInfo, {
+                where: {
+                    customer_id: customer_id,
+                    id:address_id
+                }
+            });
 
-        adminLog(data);
+            const data = {
+                user_id: req.user.id,
+                table_id: customer_id,
+                table_name: 'customer_address',
+                action: 'update',
+            };
+
+            adminLog(data);
 
         return res.status(200).json({
             status: true,
-            message: (customerInfo) ? "Customer create sucessfully" : "Customer create Unsucessfully",
+            message: (updateCustomerPassword.length > 0) ? "update customer address info sucessfully" : "update customer address Unsucessfully",
         });
 
     } catch (e) {
@@ -430,11 +518,57 @@ const activationStatus = catchAsync(async (req, res) => {
     }
 });
 
+//delete customer address
+const delete_customer_address = catchAsync(async (req, res) => {
+
+    await Promise.all([
+        body('customer_id').notEmpty().withMessage('customer Id is required').run(req),
+        body('address_id').notEmpty().withMessage('address Id is required').run(req),
+    ]);
+
+    // Handle validation result
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        const error_message = errors.array()[0].msg;
+        throw new AppError(error_message, 200, errors);
+    }
+
+    try {
+
+        const { address_id,customer_id } = req.body;
+
+        const updateStatus = await db.query(`update customer_addresses SET status = $1 , updated_by = $2, deleted_at = NOW() Where customer_id = $3 and id = $4`, [0, req.user.id,customer_id,address_id])
+        const updatedId = updateStatus.rows[0]?.id;
+        const data = {
+            user_id: customer_id,
+            table_id: updateStatus.id,
+            table_name: 'customers_address',
+            action: 'delete customer',
+        };
+
+        adminLog(data);
+
+        return res.status(200).json({
+            status: true,
+            message: (updatedId) ? "delete customer successfully" : "delete customer Unsuccessfully"
+        });
+
+    } catch (e) {
+        return res.status(200).json({
+            status: false,
+            message: "Failed to data",
+            errors: e.message
+        });
+    }
+});
+
 export {
     getCustomers,
     exportCustomers,
     getParticularCustomerInfo,
     update_customer_info,
     add_customer,
-    activationStatus
+    activationStatus,
+    update_customer_address,
+    delete_customer_address
 }

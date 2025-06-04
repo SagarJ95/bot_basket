@@ -184,6 +184,8 @@ router.post('/getParticularCustomerInfo', authenticate, customerController.getPa
 router.post('/update_customer_info', authenticate, upload_profile.fields([
   { name: "profile", maxCount: 1 }
 ]), customerController.update_customer_info)
+router.post('/update_customer_address', authenticate,customerController.update_customer_address)
+router.post('/delete_customer_address', authenticate,customerController.delete_customer_address)
 router.post('/add_customer', authenticate, upload_profile.fields([
   { name: "profile", maxCount: 1 }
 ]), customerController.add_customer)
@@ -288,6 +290,7 @@ router
   router.post('/getCountryById',authenticate, masterController.getCountryById)
   router.post('/updateCountryById',authenticate,upload.fields([{ name: "country_flag", maxCount: 1 }]), masterController.updateCountryById)
   router.post('/deleteCountryById',authenticate, masterController.deleteCountryById);
+    router.post('/updateCountryStatusById',authenticate, masterController.updateCountryStatusById);
 
 /* Country API End ------------------------------------ */
 

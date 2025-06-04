@@ -1121,6 +1121,8 @@ const order_history = catchAsync(async (req, res) => {
             'quantity', oi.quantity,
             'price', oi.price,
             'total_price', oi.quantity * oi.price,
+            'country_flag', CONCAT('${BASE_URL}', '/images/img-country-flag/', cd.flag),
+             'country_name', cd.country_name,
             'product_image', (
               SELECT CONCAT('${BASE_URL}', pi.image_path)
               FROM product_images pi
@@ -1135,6 +1137,7 @@ const order_history = catchAsync(async (req, res) => {
       LEFT JOIN store_self_locations sl ON o.address = sl.id
       LEFT JOIN order_items oi ON o.id = oi.order_id
       LEFT JOIN products p ON oi.product_id = p.id
+      LEFT JOIN country_data cd ON p.country_id = cd.id
       LEFT JOIN categories c ON p.category = c.id
       WHERE o.customer_id = $1
         ${statusCondition}

@@ -429,8 +429,8 @@ const getProductlist = catchAsync(async (req, res) => {
 
     try {
         const { category_id, page, search } = req.body;
-        const query_params = [1];
-        const total_query_params = [1];
+        const query_params = [];
+        const total_query_params = [];
 
         let categories = '';
         let pageCountQuery = '';
@@ -442,17 +442,19 @@ const getProductlist = catchAsync(async (req, res) => {
             total_query_params.push(category_id)
         }
 
+         if (search) {
+            searchQuery = `and p.name ILIKE $${query_params.length + 1}`;
+            query_params.push(`%${search}%`);
+            total_query_params.push(`%${search}%`)
+        }
+
         if (page) {
             let pageCount = (page - 1) * 10;
             pageCountQuery = `LIMIT $${query_params.length + 1} OFFSET $${query_params.length + 2}`
             query_params.push(10, pageCount)
         }
 
-        if (search) {
-            searchQuery = `and p.name ILIKE $${query_params.length + 1}`;
-            query_params.push(`%${search}%`);
-            total_query_params.push(`%${search}%`)
-        }
+
 
         //get total number of products
         const totalCountQuery = `
@@ -460,7 +462,7 @@ const getProductlist = catchAsync(async (req, res) => {
             FROM products AS p
             LEFT JOIN categories AS c ON p.category = c.id
             LEFT JOIN country_data AS ca ON p.country_id = ca.id
-            WHERE p.status = $1 AND p.deleted_at IS NULL
+            WHERE  p.deleted_at IS NULL
             ${categories}
             ${searchQuery}
         `;
@@ -477,7 +479,7 @@ const getProductlist = catchAsync(async (req, res) => {
         p.product_stock_status,p.status
          from products as p LEFT JOIN categories as c ON p.category = c.id
          LEFT JOIN country_data as ca ON p.country_id = ca.id
-         WHERE p.status = $1 AND p.deleted_at IS NULL ${categories} ${searchQuery} ORDER BY p.id desc ${pageCountQuery}`;
+         WHERE p.deleted_at IS NULL ${categories} ${searchQuery} ORDER BY p.id desc ${pageCountQuery}`;
 
         const getProductslist = await db.query(query, query_params)
 
@@ -605,23 +607,23 @@ const createProduct = catchAsync(async (req, res) => {
         }
 
         //get country name
-        const countryName = await db.query(`select id from country_data where id = ${body.countryId}`);
+        // const countryName = await db.query(`select id from country_data where id = ${body.countryId}`);
 
-        //product price list log
-        await db.query(
-            `INSERT INTO products_price_logs (product_id,price,country_id,country_name,upload_date,maximum_quantity
-        ,created_by,created_at,updated_by,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [product_id, body.price, body.countryId, countryName?.rows[0].id, moment(new Date()).format('YYYY-MM-DD'), body.maximum_order_place, req
-            .user.id, new Date(),req.user.id,new Date()]
-        );
+        // //product price list log
+        // await db.query(
+        //     `INSERT INTO products_price_logs (product_id,price,country_id,country_name,upload_date,maximum_quantity
+        // ,created_by,created_at,updated_by,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [product_id, body.price, body.countryId, countryName?.rows[0].id, moment(new Date()).format('YYYY-MM-DD'), body.maximum_order_place, req
+        //     .user.id, new Date(),req.user.id,new Date()]
+        // );
 
-        const data = {
-            user_id: req.user.id,
-            table_id: product.id,
-            table_name: 'products',
-            action: 'insert',
-        };
+        // const data = {
+        //     user_id: req.user.id,
+        //     table_id: product.id,
+        //     table_name: 'products',
+        //     action: 'insert',
+        // };
 
-        adminLog(data);
+        // adminLog(data);
 
         return res.status(200).json({ status: true, message: 'Product created successfully' });
 
@@ -779,6 +781,9 @@ const getProductById = catchAsync(async (req, res) => {
                 p.category,
                 p.status,
                 p.country_id,
+                p.minimum_order_place,
+                p.maximum_order_place,
+                p.price,
                 COALESCE(
                     JSON_AGG(
                         CASE
@@ -787,7 +792,7 @@ const getProductById = catchAsync(async (req, res) => {
                     ) FILTER (WHERE pi.image_path IS NOT NULL),
                     '[]'
                 ) AS product_images,
-                 p.thumbnail_product_image
+                 CONCAT('${BASE_URL}', p.thumbnail_product_image) as thumbnail_product_image
             FROM products p
             LEFT JOIN product_images pi ON pi.product_id = p.id
             WHERE p.deleted_at IS NULL AND p.id = $1
@@ -1225,17 +1230,19 @@ const getChangePriceProductlist = catchAsync(async (req, res) => {
             total_query_params.push(country_id)
         }
 
+        if (search) {
+            searchQuery = `and p.name ILIKE $${query_params.length + 1}`;
+            query_params.push(`%${search}%`);
+            total_query_params.push(`%${search}%`)
+        }
+
         if (page) {
             let pageCount = (page - 1) * 10;
             pageCountQuery = `LIMIT $${query_params.length + 1} OFFSET $${query_params.length + 2}`
             query_params.push(10, pageCount)
         }
 
-        if (search) {
-            searchQuery = `and p.name ILIKE $${query_params.length + 1}`;
-            query_params.push(`%${search}%`);
-            total_query_params.push(`%${search}%`)
-        }
+
 
          const totalCountQuery = `
             SELECT
@@ -1584,9 +1591,17 @@ const ChangePricelist = catchAsync(async (req, res) => {
 const getcountrylist = catchAsync(async (req, res) => {
     try {
 
-         const { page } = req.body
+         const { page,search } = req.body
+         const total_query_params = [1];
         const query_params = [1];
         let pageCountQuery = ``;
+        let searchQuery = ``;
+
+         if (search) {
+            searchQuery = `AND CONCAT(c.country_name) ILIKE $${query_params.length + 1}`;
+            query_params.push(`%${search}%`);
+            total_query_params.push(`%${search}%`)
+        }
 
         if (page) {
             let pageCount = (page - 1) * 10;
@@ -1595,10 +1610,10 @@ const getcountrylist = catchAsync(async (req, res) => {
         }
 
         //total number of country
-        const totalquery = `select c.id,c.country_name,c.code1 as code,CONCAT('${BASE_URL}/images/img-country-flag/',c.flag),status from country_data as c where c.status = 1`;
-        const getTotalCountrylist = await db.query(totalquery, [])
+        const totalquery = `select c.id,c.country_name,c.code1 as code,CONCAT('${BASE_URL}/images/img-country-flag/',c.flag),status from country_data as c where c.status = $1 ${searchQuery}`;
+        const getTotalCountrylist = await db.query(totalquery, total_query_params)
 
-        const query = `select c.id,c.country_name,c.code1 as code,CONCAT('${BASE_URL}/images/img-country-flag/',c.flag) as country_flag,status from country_data as c where c.status = $1 order by c.id asc ${pageCountQuery} `;
+        const query = `select c.id,c.country_name,c.code1 as code,CONCAT('${BASE_URL}/images/img-country-flag/',c.flag) as country_flag,status from country_data as c where c.status = $1 ${searchQuery} order by c.id asc  ${pageCountQuery} `;
         const getCountrylist = await db.query(query, query_params)
 
         return res.status(200).json({
@@ -1882,17 +1897,27 @@ const updateCountryStatusById = catchAsync(async (req, res) => {
         }
 
         //check no of product for particular country
-        const count = await db.query(`select c.id as cat_id,c.cat_name as category_name,c.slug,COALESCE(c.description,'') as description,
-        COALESCE(COUNT(p.id),0) as no_of_products from categories as c
-        LEFT JOIN country_data as ca ON p.country_id = ca.id
-        LEFT JOIN products as p ON c.id = p.category
-        where ca.id = $1 and c.status = $2 and c.deleted_at IS NULL
-        GROUP BY c.cat_name,c.id Order BY c.id desc`, [country_id, 1]);
+       const count = await db.query(`
+                SELECT
+                    c.id AS cat_id,
+                    c.cat_name AS category_name,
+                    c.slug,
+                    COALESCE(c.description, '') AS description,
+                    COALESCE(COUNT(p.id), 0) AS no_of_products
+                FROM categories AS c
+                LEFT JOIN products AS p ON c.id = p.category
+                LEFT JOIN country_data AS ca ON p.country_id = ca.id
+                WHERE ca.id = $1 AND c.status = $2 AND c.deleted_at IS NULL
+                GROUP BY c.cat_name, c.id
+                ORDER BY c.id DESC
+            `, [country_id, 1]);
+            const totalProducts = count.rows.reduce((sum, row) => sum + parseInt(row.no_of_products || 0), 0);
 
-        if (count.rowCount > 0 && count.rows.no_of_products > 0) {
+
+        if (count.rowCount > 0 && totalProducts > 0) {
             return res.status(200).json({
                 status: false,
-                message: `Country has products cannot be deleted`
+                message: `Country has products, cannot be deleted`
             });
         } else {
 
