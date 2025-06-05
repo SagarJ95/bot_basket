@@ -190,6 +190,7 @@ router.post('/add_customer', authenticate, upload_profile.fields([
   { name: "profile", maxCount: 1 }
 ]), customerController.add_customer)
 router.post('/activationStatus', authenticate, customerController.activationStatus)
+router.post('/addCustomerAddress',authenticate, customerController.addCustomerAddress);
 
 /* Permission API Start ----------------------------------- */
 
@@ -290,7 +291,7 @@ router
   router.post('/getCountryById',authenticate, masterController.getCountryById)
   router.post('/updateCountryById',authenticate,upload.fields([{ name: "country_flag", maxCount: 1 }]), masterController.updateCountryById)
   router.post('/deleteCountryById',authenticate, masterController.deleteCountryById);
-    router.post('/updateCountryStatusById',authenticate, masterController.updateCountryStatusById);
+  router.post('/updateCountryStatusById',authenticate, masterController.updateCountryStatusById);
 
 /* Country API End ------------------------------------ */
 

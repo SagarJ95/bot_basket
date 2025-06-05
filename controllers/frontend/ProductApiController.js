@@ -1247,7 +1247,8 @@ const view_order = catchAsync(async (req, res) => {
       WHEN 1 THEN ca.state
       WHEN 2 THEN 'Maharashtra'
     END AS state,
-    o.address as orders_address_id
+    o.address as orders_address_id,
+    o.delivery_option_id
     FROM orders AS o
     LEFT JOIN customer_addresses as ca ON o.address = ca.id
     LEFT JOIN store_self_locations sl ON o.address = sl.id

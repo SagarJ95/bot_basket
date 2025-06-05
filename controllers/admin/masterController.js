@@ -963,16 +963,21 @@ const changeProductStockStatus = catchAsync(async (req, res) => {
 //excel export products
 const excelExportProducts = catchAsync(async (req, res) => {
     try {
+        const {category_id } = req.body;
 
         // Query database
-        const query = `SELECT
+        let query = `SELECT
                 p.id,
                 p.name,
                 p.slug,
                 p.description,
+                p.minimum_order_place,
+                p.maximum_order_place,
+                p.price,
                 ci.cat_name as category,
                 p.status,
                 c.country_name,
+                CONCAT('${BASE_URL}',p.thumbnail_product_image) as thumbnail_product_image,
                 COALESCE(
                     JSON_AGG(
                         CASE
@@ -985,10 +990,20 @@ const excelExportProducts = catchAsync(async (req, res) => {
             LEFT JOIN product_images pi ON pi.product_id = p.id
             LEFT JOIN categories ci ON p.category = ci.id
             LEFT JOIN country_data as c ON p.country_id = c.id
-            WHERE p.deleted_at IS NULL group by p.id,ci.cat_name,c.country_name
+            WHERE p.deleted_at IS NULL
         `;
 
-        const result = await db.query(query, []);
+        const values = [];
+
+        // Add category filter if category_id is provided and not empty
+        if (category_id) {
+            query += ` AND p.category = $1`;
+            values.push(category_id);
+        }
+
+        query += ` GROUP BY p.id, ci.cat_name, c.country_name`;
+
+        const result = await db.query(query, values);
         let list = result.rows;
 
         // Create Excel file
@@ -1000,10 +1015,14 @@ const excelExportProducts = catchAsync(async (req, res) => {
             { header: "Product Name", key: "name", width: 25 },
             { header: "Slug", key: "slug", width: 25 },
             { header: "Description", key: "description", width: 40 },
+            { header: "Minimum_order", key: "minimum_order_place", width: 40 },
+            { header: "Maximum_order", key: "maximum_order_place", width: 40 },
+            { header: "Price", key: "price", width: 40 },
+            { header: "Thumbnail Image", key: "thumbnail_product_image", width: 40 },
+            { header: "Images", key: "product_images", width: 40 },
             { header: "Category", key: "category", width: 15 },
             { header: "Country Name", key: "country_name", width: 20 },
             { header: "Status", key: "status", width: 10 },
-            { header: "Images", key: "product_images", width: 40 }
         ];
 
         list.forEach((row) => {
@@ -1011,6 +1030,11 @@ const excelExportProducts = catchAsync(async (req, res) => {
                 id: row.id,
                 name: row.name,
                 slug: row.slug,
+                description: row.description,
+                minimum_order_place: row.minimum_order_place,
+                maximum_order_place:row.maximum_order_place,
+                price:row.price,
+                thumbnail_product_image: row.thumbnail_product_image,
                 description: row.description,
                 country_name: row.country_name,
                 category: row.category,
@@ -1592,8 +1616,8 @@ const getcountrylist = catchAsync(async (req, res) => {
     try {
 
          const { page,search } = req.body
-         const total_query_params = [1];
-        const query_params = [1];
+         const total_query_params = [];
+        const query_params = [];
         let pageCountQuery = ``;
         let searchQuery = ``;
 
@@ -1610,10 +1634,10 @@ const getcountrylist = catchAsync(async (req, res) => {
         }
 
         //total number of country
-        const totalquery = `select c.id,c.country_name,c.code1 as code,CONCAT('${BASE_URL}/images/img-country-flag/',c.flag),status from country_data as c where c.status = $1 ${searchQuery}`;
+        const totalquery = `select c.id,c.country_name,c.code1 as code,CONCAT('${BASE_URL}/images/img-country-flag/',c.flag),status from country_data as c where c.deleted_at IS NULL ${searchQuery}`;
         const getTotalCountrylist = await db.query(totalquery, total_query_params)
 
-        const query = `select c.id,c.country_name,c.code1 as code,CONCAT('${BASE_URL}/images/img-country-flag/',c.flag) as country_flag,status from country_data as c where c.status = $1 ${searchQuery} order by c.id asc  ${pageCountQuery} `;
+        const query = `select c.id,c.country_name,c.code1 as code,CONCAT('${BASE_URL}/images/img-country-flag/',c.flag) as country_flag,status from country_data as c where c.deleted_at IS NULL ${searchQuery} order by c.id asc  ${pageCountQuery} `;
         const getCountrylist = await db.query(query, query_params)
 
         return res.status(200).json({
@@ -1637,10 +1661,13 @@ const createCountry = catchAsync(async (req, res) => {
             .notEmpty().withMessage('Country Name is required')
             .bail() // stops further validation if empty
             .custom(async (value) => {
-                const existingCategory = await db.query(`select * from country_data where country_name = ${value}`);
-                if (existingCategory) {
-                    throw new Error('Country Name already exists');
-                }
+                const existingCountry = await db.query(
+                        `SELECT * FROM country_data WHERE country_name = $1`,
+                        [value]
+                    );
+                    if (existingCountry.rowCount > 0) {
+                        return res.status(200).json({status: false, message: 'Country Name already exists'})
+                    }
             })
             .run(req),
         body("country_code").notEmpty().withMessage("Country Code is required").run(req),
@@ -1654,7 +1681,7 @@ const createCountry = catchAsync(async (req, res) => {
         const { country_name, country_code } = req.body;
         const files = req.files;
         const countryImage = files && files.country_flag ? files.country_flag : [];
-        const countryFlag = countryImage[0].originalname;
+        const countryFlag = countryImage[0].filename;
 
         const result = await db.query(
             `INSERT INTO country_data (country_name, code1, code2, flag,status)
@@ -1722,7 +1749,7 @@ const updateCountryById = catchAsync(async (req, res) => {
 
         // Get old flag if no new file uploaded
         if (files && files.country_flag && files.country_flag.length > 0) {
-            countryFlag = files.country_flag[0].originalname;
+            countryFlag = files.country_flag[0].filename;
         } else {
             countryFlag = existing.rows[0].flag;
         }

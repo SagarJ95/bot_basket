@@ -47,7 +47,7 @@ const getOrderlist = catchAsync(async (req, res) => {
             query_params.push(`%${search}%`);
          }
 
-        const query = `select o.id as order_id,o.order_ref_id,o.customer_name,TO_CHAR(o.created_at,'FMDDth Month YYYY') as order_date,
+        const query = `select o.id as order_id,o.order_ref_id,o.customer_name,TO_CHAR(o.created_at,'FMDDth FMMonth YYYY') as order_date,
         o.order_status,SUM(oi.quantity * oi.price::numeric) as total_price,
         CASE
             WHEN o.status = 1 THEN 'Pending'
@@ -57,7 +57,7 @@ const getOrderlist = catchAsync(async (req, res) => {
             WHEN o.status = 5 THEN 'Cancelled'
             ELSE ''
         END AS status_name,
-        TO_CHAR(o.delivery_date,'FMDDth Month YYYY') as delivery_date
+        TO_CHAR(o.delivery_date,'FMDDth FMMonth YYYY') as delivery_date
         from orders AS o
         LEFT JOIN order_items as oi ON o.id = oi.order_id AND oi.order_item_status = $2
         where o.order_status = $1 and o.status = $3 ${searchQuery}

@@ -285,10 +285,8 @@ const add_customer = catchAsync(async (req, res) => {
         if (customerInfo.id) {
                 const full_name = `${first_name} ${last_name}`
                 const Insertquery = `INSERT INTO customer_addresses (customer_id, full_name,mobile_number,address1, zip_code,country,state,city,status,created_by) values ($1, $2, $3,$4,$5,$6,$7,$8,$9,$10)`;
-                await db.query(Insertquery, [customerInfo.id, full_name,contact_number,address,zipcode,country,state,city ,1, customerInfo.id])
+                await db.query(Insertquery, [customerInfo.id, full_name,contact_number,address,zipcode,country,state,city ,1, req.user.id])
         }
-
-
         const data = {
             user_id: req.user.id,
             table_id: customerInfo.id,
@@ -333,36 +331,46 @@ const update_customer_info = catchAsync(async (req, res) => {
 
     try {
 
-        const { first_name, last_name, contact_number, whatsapp_number,customer_id } = req.body;
+        const { first_name, last_name, contact_number, whatsapp_number,customer_id,email,password } = req.body;
         const files = req.files || {};
+        let customerProfile;
+        let updatePassword;
 
-        // const getCustomerInfo = await db.query(`
-        //         SELECT password
-        //         FROM customers
-        //         WHERE id = $1 AND status = $2 AND deleted_at IS NULL
-        //     `, [customer_id, "1"]);
+        // Check if customer exists
+        const existing = await db.query(`SELECT * FROM customers WHERE id = $1`, [customer_id]);
 
-        // const hashPassword = (password) ? await bcrypt.hash(password, 10) : getCustomerInfo.rows[0].password;
+        // Get old flag if no new file uploaded
+        if (files && files.profile && files.profile.length > 0) {
+            const formatPath = (filePath) => {
+                    return filePath ? filePath.replace(/^public[\\/]/, '/').replace(/\\/g, '/') : null;
+                };
+
+            const profile_pic = files.profile && files.profile.length > 0
+                ? formatPath(files.profile[0].path)
+                : null;
+
+            customerProfile = profile_pic;
+        } else {
+            customerProfile = existing.rows[0].profile;
+        }
+
+        if(password == ''){
+            updatePassword = existing.rows[0].password
+        }else{
+            const hashPassword = await bcrypt.hash(password, 10)
+            updatePassword = hashPassword;
+        }
 
         const updateInfo = {
             first_name: first_name,
             last_name: last_name,
             phone_no: contact_number,
             whatsapp_no: whatsapp_number,
-           // email: email,
-           // password: hashPassword,
-           // enable_email_notification: enable_email_notification
+            email:email,
+            profile:customerProfile,
+            password:updatePassword
         };
 
-        // const formatPath = (filePath) => {
-        //     return filePath ? filePath.replace(/^public[\\/]/, '/').replace(/\\/g, '/') : null;
-        // };
-
-        // const profile_pic = files.profile && files.profile.length > 0
-        //     ? formatPath(files.profile[0].path)
-        //     : null;
-
-        // if (profile_pic) updateInfo.profile = profile_pic;
         const updateCustomerPassword = await Customer.update(updateInfo, {
             where: {
                 id: customer_id
@@ -562,6 +570,73 @@ const delete_customer_address = catchAsync(async (req, res) => {
     }
 });
 
+const addCustomerAddress = catchAsync(async (req, res) => {
+  await Promise.all([
+    body("customer_id").notEmpty().withMessage("Customer Id is required").run(req),
+    body("full_name").notEmpty().withMessage("Full Name is required").run(req),
+    body("address").notEmpty().withMessage("Address is required").run(req),
+    body("zip_code").notEmpty().withMessage("Zip Code is required").run(req),
+    body("country").notEmpty().withMessage("Country is required").run(req),
+    body("state").notEmpty().withMessage("State is required").run(req),
+    body("city").notEmpty().withMessage("City is required").run(req),
+  ]);
+
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    const error_message = errors.array()[0].msg;
+    throw new AppError(error_message, 200, errors);
+  }
+
+  const {
+    full_name,
+    mobile_number,
+    address,
+    zip_code,
+    country,
+    city,
+    state,
+    customer_id,
+  } = req.body;
+
+  try {
+
+      const add_address = await db.query(
+        `INSERT INTO customer_addresses
+         (customer_id, full_name, mobile_number, address1, zip_code, country, city, state,created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+        [
+          customer_id,
+          full_name,
+          mobile_number,
+          address,
+          zip_code,
+          country,
+          city,
+          state,
+          req.user.id
+        ]
+      );
+
+      if (add_address.rowCount > 0) {
+        res.status(200).json({
+          status: true,
+          message: "Address added successfully!",
+        });
+      } else {
+        res.status(400).json({
+          status: false,
+          message: "Something went wrong",
+        });
+      }
+  } catch (error) {
+    console.error("Error:", error);
+    res.status(500).json({
+      status: false,
+      message: error.message,
+    });
+  }
+});
+
 export {
     getCustomers,
     exportCustomers,
@@ -570,5 +645,6 @@ export {
     add_customer,
     activationStatus,
     update_customer_address,
-    delete_customer_address
+    delete_customer_address,
+    addCustomerAddress
 }
