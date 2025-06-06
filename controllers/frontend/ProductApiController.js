@@ -332,7 +332,7 @@ const product_list = catchAsync(async (req, res) => {
         p.name AS product_name,
         p.slug,
         p.description,
-        pl.price,
+        p.price,
         p.minimum_order_place,
         p.maximum_order_place,
         COALESCE(q.total_ordered_quantity_today, 0) AS total_ordered_quantity_today,
@@ -387,7 +387,7 @@ const product_list = catchAsync(async (req, res) => {
         p.name AS product_name,
         p.slug,
         p.description,
-        pl.price,
+        p.price,
         p.minimum_order_place,
         p.maximum_order_place,
         COALESCE(q.total_ordered_quantity_today, 0) AS total_ordered_quantity_today,
@@ -440,14 +440,15 @@ const product_list = catchAsync(async (req, res) => {
     let cartListLength = 0;
     if (customerId) {
       const cartCountResult = await db.query(
-        `SELECT COALESCE(SUM(qty), 0) AS cart_count
+        `SELECT *
          FROM add_to_carts
          WHERE created_by = $1
          AND status = 1
          AND deleted_at IS NULL`,
         [customerId]
       );
-      cartListLength = parseInt(cartCountResult.rows[0].cart_count) || 0;
+      console.log("cartCountResult??",cartCountResult)
+      cartListLength = parseInt(cartCountResult.rowCount) || 0;
     }
 
    const totalCount = parseInt(getproductlist.rowCount || 0);
@@ -633,18 +634,29 @@ const cart_list = catchAsync(async (req, res) => {
       [1, customer_id]
     );
 
-    let cartSum;
-    if (cartlist.rowCount > 0) {
-      //sum of cart qty and price
-      cartSum = cartlist.rows.reduce(
-        (acc, item) => {
-          acc.qty += parseInt(item.qty);
-          acc.price += parseFloat(item.price) * parseInt(item.qty);
-          return acc;
-        },
-        { qty: 0, price: 0 }
-      );
-    }
+    // let cartSum;
+    // if (cartlist.rowCount > 0) {
+    //   //sum of cart qty and price
+    //   cartSum = cartlist.rows.reduce(
+    //     (acc, item) => {
+    //       acc.qty += parseInt(item.length);
+    //       acc.price += parseFloat(item.price) * parseInt(item.qty);
+    //       return acc;
+    //     },
+    //     { qty: 0, price: 0 }
+    //   );
+    // }
+
+    let cartSum = { qty: 0, price: 0 };
+
+  if (cartlist.rowCount > 0) {
+    cartSum.qty = cartlist.rowCount;
+
+    cartSum.price = cartlist.rows.reduce((total, item) => {
+      return total + (parseFloat(item.price) * parseInt(item.qty));
+    }, 0);
+  }
+
 
     return res.status(200).json({
       status: true,
@@ -1044,6 +1056,12 @@ const order_history = catchAsync(async (req, res) => {
       }
     }
 
+    // if (sort_by_price === "low_to_high") {
+    //   orderByClause = `ORDER BY SUM(oi.quantity * oi.price::numeric) ASC`;
+    // } else if (sort_by_price === "high_to_low") {
+    //   orderByClause = `ORDER BY SUM(oi.quantity * oi.price::numeric) DESC`;
+    // }
+
     if (sort_by_price === "low_to_high") {
       orderByClause = `SUM(oi.quantity * oi.price::numeric) ASC`;
     } else if (sort_by_price === "high_to_low") {
@@ -1064,9 +1082,11 @@ const order_history = catchAsync(async (req, res) => {
 
     if (search) {
       wildcardSearch = `%${search.toLowerCase()}%`;
-      searchQuery = `AND lower(p.name) LIKE $${queryParams.length + 1}`;
+      searchQuery = `AND lower(p.name) LIKE $${queryParams.length + 1} OR lower(o.order_ref_id) LIKE $${queryParams.length + 1}`;
       queryParams.push(wildcardSearch);
     }
+
+    // Get total count for pagination
 
     const result = await db.query(
       `
@@ -1089,11 +1109,11 @@ const order_history = catchAsync(async (req, res) => {
           ELSE 'Unknown'
         END AS order_status_text,
         CASE o.delivery_option_id
-          WHEN 1 THEN CONCAT(ca.address1, ca.address2)
+          WHEN 1 THEN CONCAT(ca.address1,' ', ca.address2)
           WHEN 2 THEN sl.store_address
         END AS address,
     CASE o.delivery_option_id WHEN 1 THEN ca.address1 ELSE sl.store_address END AS address_1,
-    CASE o.delivery_option_id WHEN 1 THEN ca.address2 ELSE NULL END AS address_2,
+    CASE o.delivery_option_id WHEN 1 THEN ca.address2 ELSE '' END AS address_2,
     CASE o.delivery_option_id WHEN 1 THEN ca.full_name ELSE sl.store_name END AS full_name,
     CASE o.delivery_option_id WHEN 1 THEN ca.mobile_number ELSE '988765533' END AS mobile_number,
     CASE o.delivery_option_id
@@ -1122,7 +1142,7 @@ const order_history = catchAsync(async (req, res) => {
             'price', oi.price,
             'total_price', oi.quantity * oi.price,
             'country_flag', CONCAT('${BASE_URL}', '/images/img-country-flag/', cd.flag),
-             'country_name', cd.country_name,
+            'country_name', cd.country_name,
             'product_image', (
               SELECT CONCAT('${BASE_URL}', pi.image_path)
               FROM product_images pi
@@ -1151,11 +1171,11 @@ const order_history = catchAsync(async (req, res) => {
                sl.store_address, sl.store_pincode,sl.store_name
       ORDER BY ${orderByClause ? ` ${orderByClause}` : 'o.id DESC'}
       ${paginationClause}
+
       `,
       queryParams
     );
 
-    // Get total count for pagination
     const countResult = isPaginationEnabled
       ? await db.query(
           `

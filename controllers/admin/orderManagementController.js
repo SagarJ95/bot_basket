@@ -31,10 +31,32 @@ const getOrderlist = catchAsync(async (req, res) => {
     }
 
     try {
-        const {order_status, page , search} = req.body
+        const {order_status, page , search,filter_date} = req.body
         const query_params = [order_status,1,1];
+        const total_query_params = [order_status,1,1];
         let pageCountQuery = '';
         let searchQuery = '';
+        let dateCondition='';
+
+        if (filter_date && filter_date.includes(" - ")) {
+            const [startDateStr, endDateStr] = filter_date.split(" - ");
+            const startDate = new Date(startDateStr.split("-").reverse().join("-"));
+            const endDate = new Date(endDateStr.split("-").reverse().join("-"));
+
+            if (!isNaN(startDate) && !isNaN(endDate)) {
+                dateCondition = `AND o.created_at BETWEEN $${
+                query_params.length + 1
+                } AND $${query_params.length + 2}`;
+                query_params.push(startDate, endDate);
+                total_query_params.push(startDate, endDate)
+            }
+        }
+
+         if (search) {
+            searchQuery = `AND (lower(o.customer_name) ILIKE $${query_params.length + 1} OR lower(o.order_ref_id) LIKE $${query_params.length + 1})`;
+            query_params.push(`%${search.toLowerCase()}%`);
+            total_query_params.push(`%${search.toLowerCase()}%`)
+        }
 
         if(page){
             let pageCount = (page - 1) * 10;
@@ -42,13 +64,11 @@ const getOrderlist = catchAsync(async (req, res) => {
             query_params.push(10,pageCount)
          }
 
-         if (search) {
-            searchQuery = `AND o.customer_name ILIKE $${query_params.length + 1}`;
-            query_params.push(`%${search}%`);
-         }
 
-        const query = `select o.id as order_id,o.order_ref_id,o.customer_name,TO_CHAR(o.created_at,'FMDDth FMMonth YYYY') as order_date,
+
+        const totalPageCount = await db.query(`select o.id as order_id,o.order_ref_id,o.customer_name,TO_CHAR(o.created_at,'FMDDth FMMonth YYYY') as order_date,
         o.order_status,SUM(oi.quantity * oi.price::numeric) as total_price,
+        SUM(oi.quantity * oi.price::numeric) as grand_total,
         CASE
             WHEN o.status = 1 THEN 'Pending'
             WHEN o.status = 2 THEN 'Confirmed'
@@ -57,10 +77,29 @@ const getOrderlist = catchAsync(async (req, res) => {
             WHEN o.status = 5 THEN 'Cancelled'
             ELSE ''
         END AS status_name,
-        TO_CHAR(o.delivery_date,'FMDDth FMMonth YYYY') as delivery_date
+        TO_CHAR(o.delivery_date,'FMDDth FMMonth YYYY') as delivery_date,
+        TO_CHAR(o.created_at,'FMDDth FMMonth YYYY') as created_at
         from orders AS o
         LEFT JOIN order_items as oi ON o.id = oi.order_id AND oi.order_item_status = $2
-        where o.order_status = $1 and o.status = $3 ${searchQuery}
+        where o.order_status = $1 and o.status = $3 ${dateCondition} ${searchQuery}
+        GROUP BY o.id,o.order_ref_id,o.customer_name,o.created_at, o.order_status, o.delivery_date`,total_query_params)
+
+        const query = `select o.id as order_id,o.order_ref_id,o.customer_name,TO_CHAR(o.created_at,'FMDDth FMMonth YYYY') as order_date,
+        o.order_status,SUM(oi.quantity * oi.price::numeric) as total_price,
+        SUM(oi.quantity * oi.price::numeric) as grand_total,
+        CASE
+            WHEN o.status = 1 THEN 'Pending'
+            WHEN o.status = 2 THEN 'Confirmed'
+            WHEN o.status = 3 THEN 'Shipped'
+            WHEN o.status = 4 THEN 'Delivered'
+            WHEN o.status = 5 THEN 'Cancelled'
+            ELSE ''
+        END AS status_name,
+        TO_CHAR(o.delivery_date,'FMDDth FMMonth YYYY') as delivery_date,
+        TO_CHAR(o.created_at,'FMDDth FMMonth YYYY') as created_at
+        from orders AS o
+        LEFT JOIN order_items as oi ON o.id = oi.order_id AND oi.order_item_status = $2
+        where o.order_status = $1 and o.status = $3 ${dateCondition} ${searchQuery}
         GROUP BY o.id,o.order_ref_id,o.customer_name,o.created_at, o.order_status, o.delivery_date
         ${pageCountQuery}`;
 
@@ -68,7 +107,7 @@ const getOrderlist = catchAsync(async (req, res) => {
 
         return res.status(200).json({
             status: true,
-            total:(result.rowCount > 0) ? parseInt(result.rowCount) : 0,
+            total:(totalPageCount.rowCount > 0) ? parseInt(totalPageCount.rowCount) : 0,
             message: 'Fetch Order details Successfully',
             data:(result.rowCount > 0) ? result.rows : []
           });
@@ -134,9 +173,9 @@ const orderViewDetails = catchAsync(async (req, res) => {
                             o.whatsapp_number,
                             o.email,
                             o.special_instruction,
-                            TO_CHAR(o.perferred_delivery_date, 'FMDDth Month YYYY') AS perferred_delivery_date,
+                            TO_CHAR(o.perferred_delivery_date, 'FMDDth FMMonth YYYY') AS perferred_delivery_date,
                             TO_CHAR(o.created_at, 'FMDDth Month YYYY') AS order_date,
-                            ca.address as address,
+                            CONCAT(ca.address1,' ',ca.address2) as address,
                             o.address as address_id,
                             o.order_status as order_status
                             FROM orders AS o
@@ -157,11 +196,16 @@ const orderViewDetails = catchAsync(async (req, res) => {
                                 SELECT JSON_AGG(DISTINCT CONCAT('${BASE_URL}', pi.image_path))
                                 FROM product_images pi
                                 WHERE pi.product_id = p.id AND pi.image_path IS NOT NULL
-                            ) AS product_images
+                            ) AS product_images,
+                             CONCAT('${BASE_URL}', p.thumbnail_product_image) as thumbnail_product_image,
+                             CONCAT('${BASE_URL}/images/img-country-flag/',cd.flag) as country_flag,
+                            c.cat_name as category_name
                             FROM order_items AS oi
                             LEFT JOIN products AS p ON oi.product_id = p.id
+                            LEFT JOIN categories as c ON p.category = c.id
+                            LEFT JOIN country_data as cd ON p.country_id = cd.id
                             WHERE oi.order_id = $1 And oi.order_item_status = $2
-                            GROUP BY oi.id,p.description,p.id`,[order_id,1]);
+                            GROUP BY oi.id,p.description,p.id,cd.flag,c.cat_name`,[order_id,1]);
 
                             let Sumoflist;
                             if(order_item.rowCount > 0){

@@ -379,7 +379,7 @@ const resend_otp = catchAsync(async (req, res, next) => {
       }`;
     }
 
-    const checkOtpResponse = await sendEmail(email, customer_name);
+    const checkOtpResponse = await sendEmail(email, customer_name,status);
 
     if (!checkOtpResponse.status) {
       return res.status(200).json({
@@ -520,7 +520,7 @@ async function otpexpire(email, otp, res) {
 }
 
 //send email
-async function sendEmail(email, customer_name) {
+async function sendEmail(email, customer_name,status) {
   //generate random otp
   const otpCode = Math.floor(Math.random() * 900000) + 100000;
 
@@ -547,10 +547,19 @@ async function sendEmail(email, customer_name) {
       rejectUnauthorized: false,
     },
   });
+
+  //change subject for sign_up and forget_password
+  console.log("status>>",status)
+  let subject;
+  if(status == 1){
+    subject = `Email Authetication`
+  }else{
+    subject = `Password Reset Request`;
+  }
   const mailconfig = {
     from: `${process.env.MAIL_USERNAME}`,
     to: email.toLowerCase(),
-    subject: "Email Authetication",
+    subject: subject,
     html: `<!DOCTYPE html
                   PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
                 <html xmlns="http://www.w3.org/1999/xhtml">
