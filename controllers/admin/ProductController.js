@@ -25,92 +25,99 @@ import fs from "fs";
 import { format } from "fast-csv";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
+import axios  from 'axios';
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3848';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+const IMAGE_FOLDER = "public/uploads/product_images";
+const FALLBACK_IMAGE = "uploads/product_images/default.png";
+
 /* Product API Start ------------------------------- */
 const importProduct = catchAsync(async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ status: false, message: "No file uploaded" });
+  }
+  const filePath = req.file.path;
+  // Create image folder if missing
+  if (!fs.existsSync(IMAGE_FOLDER)) {
+    fs.mkdirSync(IMAGE_FOLDER, { recursive: true });
+  }
+  const workbook = XLSX.readFile(filePath);
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet);
 
-    try {
-        const { category_id, page, search } = req.body;
-        const query_params = [];
-        const total_query_params = [];
+  for (let row of rows) {
+    const {
+      "Product Name": product_name,
+      "Category Name": category_name,
+      "Country Name": country_name,
+      "Minimum Order Place": min_order,
+      "Maximum Order Place": max_order,
+      Price: price,
+      "Product Thumbnail Image": image_url,
+    } = row;
 
-        let categories = '';
-        let pageCountQuery = '';
-        let searchQuery = ``;
+    let local_image_path = FALLBACK_IMAGE;
 
-        if (category_id) {
-            categories = `and p.category = $${query_params.length + 1}`;
-            query_params.push(category_id)
-            total_query_params.push(category_id)
-        }
+    if (image_url && image_url.startsWith("https")) {
 
-         if (search) {
-            searchQuery = `and p.name ILIKE $${query_params.length + 1}`;
-            query_params.push(`%${search}%`);
-            total_query_params.push(`%${search}%`)
-        }
-
-        if (page) {
-            let pageCount = (page - 1) * 10;
-            pageCountQuery = `LIMIT $${query_params.length + 1} OFFSET $${query_params.length + 2}`
-            query_params.push(10, pageCount)
-        }
-
-
-
-        //get total number of products
-        const totalCountQuery = `
-            SELECT COUNT(*) AS total
-            FROM products AS p
-            LEFT JOIN categories AS c ON p.category = c.id
-            LEFT JOIN country_data AS ca ON p.country_id = ca.id
-            WHERE  p.deleted_at IS NULL
-            ${categories}
-            ${searchQuery}
-        `;
-
-        const totalProducts = await db.query(totalCountQuery, total_query_params);
-
-        //get get product list
-        const query = `select p.id as product_id,p.name as product_name,c.cat_name as category_name
-        ,p.price as current_price,
-        CONCAT('${BASE_URL}/images/img-country-flag/',ca.flag) as country_flag,
-        p.category as category_id,
-        ca.country_name,
-        TO_CHAR(ppl.upload_date,'FMDD FMMonth YYYY') as last_updated_date,
-        p.product_stock_status,p.status
-         from products as p LEFT JOIN categories as c ON p.category = c.id
-         LEFT JOIN country_data as ca ON p.country_id = ca.id
-         LEFT JOIN products_price_logs as ppl ON p.id = ppl.product_id
-         WHERE p.deleted_at IS NULL ${categories} ${searchQuery} ORDER BY p.id desc ${pageCountQuery}`;
-
-
-        const getProductslist = await db.query(query, query_params)
-
-        return res.status(200).json({
-            status: true,
-            total: (totalProducts.rowCount > 0) ? parseInt(totalProducts.rows[0].total) : 0,
-            message: 'Fetch Product Successfully',
-            data: (getProductslist.rowCount > 0) ? getProductslist.rows : []
+      try {
+        const imageRes = await axios.get(image_url, {
+          responseType: "arraybuffer",
         });
-    } catch (error) {
-        throw new AppError(error.message, 400);
+        const ext = path.extname(image_url).split("?")[0] || ".jpg";
+        const imageName = `${Date.now()}-${product_name.replace(
+          /\s+/g,
+          "_"
+        )}${ext}`;
+        const savePath = path.join(IMAGE_FOLDER, imageName);
+
+        fs.writeFileSync(savePath, imageRes.data);
+        local_image_path = `public/uploads/product_images/${imageName}`;
+
+        console.log(`✅ Image saved: ${local_image_path}`);
+      } catch (err) {
+        console.warn(
+          ` Failed to download image for ${product_name}: ${err.message}`
+        );
+      }
     }
 
+    // await db.query(
+    //   `INSERT INTO products
+    //   (product_name, category_name, country_name, min_order, max_order, price, image_url)
+    //   VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    //   [
+    //     product_name,
+    //     category_name,
+    //     country_name,
+    //     min_order || 0,
+    //     max_order || 0,
+    //     price,
+    //     local_image_path,
+    //   ]
+    // );
+  }
+
+  fs.unlinkSync(filePath);
+
+  res.status(200).json({
+    status: true,
+    message: "Products uploaded successfully",
+  });
 });
 
 const getProductlist = catchAsync(async (req, res) => {
 
     try {
-        const { category_id, page, search } = req.body;
+        const { category_id,country_id, page, search } = req.body;
         const query_params = [];
         const total_query_params = [];
 
         let categories = '';
+        let countries = '';
         let pageCountQuery = '';
         let searchQuery = ``;
 
@@ -118,6 +125,12 @@ const getProductlist = catchAsync(async (req, res) => {
             categories = `and p.category = $${query_params.length + 1}`;
             query_params.push(category_id)
             total_query_params.push(category_id)
+        }
+
+        if (country_id) {
+            countries = `and p.country_id = $${query_params.length + 1}`;
+            query_params.push(country_id)
+            total_query_params.push(country_id)
         }
 
          if (search) {
@@ -142,6 +155,7 @@ const getProductlist = catchAsync(async (req, res) => {
             LEFT JOIN country_data AS ca ON p.country_id = ca.id
             WHERE  p.deleted_at IS NULL
             ${categories}
+            ${countries}
             ${searchQuery}
         `;
 
@@ -152,13 +166,14 @@ const getProductlist = catchAsync(async (req, res) => {
         ,p.price as current_price,
         CONCAT('${BASE_URL}/images/img-country-flag/',ca.flag) as country_flag,
         p.category as category_id,
+        p.country_id as country_id,
         ca.country_name,
         TO_CHAR(ppl.upload_date,'FMDD FMMonth YYYY') as last_updated_date,
         p.product_stock_status,p.status
          from products as p LEFT JOIN categories as c ON p.category = c.id
          LEFT JOIN country_data as ca ON p.country_id = ca.id
          LEFT JOIN products_price_logs as ppl ON p.id = ppl.product_id
-         WHERE p.deleted_at IS NULL ${categories} ${searchQuery} ORDER BY p.id desc ${pageCountQuery}`;
+         WHERE p.deleted_at IS NULL ${categories} ${countries} ${searchQuery} ORDER BY p.id desc ${pageCountQuery}`;
 
 
         const getProductslist = await db.query(query, query_params)
@@ -1137,7 +1152,7 @@ const getProductPriceLogs = catchAsync(async (req, res) => {
             return res.status(200).json({ status: false, message: 'Invalid Product ID', error: '' });
         }
 
-        const query = `SELECT price, TO_CHAR(upload_date, 'DD-Mon-YYYY') AS date_of_update
+        const query = `SELECT price, TO_CHAR(upload_date, 'FMDD FMMonth YYYY') AS date_of_update
             FROM products_price_logs
             WHERE product_id = ${productId} order by id desc`;
         const result = await db.query(query, []);

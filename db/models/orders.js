@@ -32,6 +32,15 @@ const orders = sequelize.define(
     delivery_date: {
       type: DataTypes.DATE,
     },
+    cancelled_date: {
+      type: DataTypes.DATE,
+    },
+    shipped_date: {
+      type: DataTypes.DATE,
+    },
+    excepted_delivery_date: {
+      type: DataTypes.DATE,
+    },
     payment_status: {
       type: DataTypes.INTEGER,
     },

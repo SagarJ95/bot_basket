@@ -96,6 +96,9 @@ const getOrderlist = catchAsync(async (req, res) => {
             ELSE ''
         END AS status_name,
         TO_CHAR(o.delivery_date,'FMDDth FMMonth YYYY') as delivery_date,
+        TO_CHAR(o.excepted_delivery_date,'FMDDth FMMonth YYYY') as excepted_delivery_date,
+        TO_CHAR(o.shipped_date,'FMDDth FMMonth YYYY') as shipped_date,
+        TO_CHAR(o.cancelled_date,'FMDDth FMMonth YYYY') as cancelled_date,
         TO_CHAR(o.created_at,'FMDDth FMMonth YYYY') as created_at
         from orders AS o
         LEFT JOIN order_items as oi ON o.id = oi.order_id AND oi.order_item_status = $2
@@ -139,6 +142,18 @@ const changeStatus = catchAsync(async (req, res) => {
         const query = `update orders SET order_status = $1 WHERE id = $2`;
         const result = await db.query(query,query_params)
 
+        //update order_status wise date in delivery_date,cancelled date
+        const dateFields = {
+                    "2": "excepted_delivery_date",
+                    "3": "shipped_date",
+                    "4": "delivery_date",
+                    "5": "cancelled_date"
+                };
+
+        if (dateFields[status]) {
+            await db.query(`UPDATE orders SET ${dateFields[status]} = $1 WHERE id = $2`, [today, order_id]);
+        }
+
         return res.status(200).json({
             status: true,
             message: 'update Order status Successfully'
@@ -173,8 +188,11 @@ const orderViewDetails = catchAsync(async (req, res) => {
                             o.whatsapp_number,
                             o.email,
                             o.special_instruction,
+                            o.order_ref_id,
+                            o.payment_mode,
+                            o.payment_status,
                             TO_CHAR(o.perferred_delivery_date, 'FMDDth FMMonth YYYY') AS perferred_delivery_date,
-                            TO_CHAR(o.created_at, 'FMDDth Month YYYY') AS order_date,
+                            TO_CHAR(o.created_at, 'FMDDth FMMonth YYYY') AS order_date,
                             CONCAT(ca.address1,' ',ca.address2) as address,
                             o.address as address_id,
                             o.order_status as order_status
@@ -214,6 +232,8 @@ const orderViewDetails = catchAsync(async (req, res) => {
                                     acc.price += parseFloat(item.total_price) || 0;
                                     return acc;
                                     }, { qty: 0, price: 0 });
+
+                                    Sumoflist.price = parseFloat(Sumoflist.price.toFixed(2));
                                 }
 
         return res.status(200).json({

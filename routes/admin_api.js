@@ -60,7 +60,9 @@ const StorageFile = multer.diskStorage({
       uploadPath = './public/uploads/invoice';
     } else if (file.fieldname === 'csv_file') {
       uploadPath = './public/uploads/import_product_update_price';
-    } else if(file.fieldname === 'country_flag'){
+    } else if (file.fieldname === "excel") {
+      uploadPath = "./public/uploads/import_product_upload_excel";
+    }else if(file.fieldname === 'country_flag'){
       uploadPath = './public/images/img-country-flag';
     }
     else {
@@ -152,6 +154,12 @@ router.post("/excelExportCategory", authenticate, masterController.excelExportCa
 router.post('/updateCategoryStatusById', authenticate, masterController.updateCategoryStatusById)
 
 /* Category API End ------------------------------------ */
+router.post(
+  "/importProduct",
+  authenticate,
+  upload.single("excel"),
+  productController.importProduct
+);
 router.post("/createProduct", upload.fields([
   { name: 'product_images', maxCount: 5 },{ name: 'thumbnail_product_image', maxCount: 1 }]), authenticate, productController.createProduct)
 router.post("/updateProduct", upload.fields([
