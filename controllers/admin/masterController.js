@@ -35,8 +35,7 @@ const BASE_URL = process.env.BASE_URL || "http://localhost:3848";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 /* Category API Start ------------------------------- */
-const IMAGE_FOLDER = "public/uploads/product_images";
-const FALLBACK_IMAGE = "uploads/product_images/default.png";
+22
 
 // GET all categories (datatables)
 const getCategories = catchAsync(async (req, res) => {
@@ -488,7 +487,8 @@ const excelExportCategory = catchAsync(async (req, res) => {
     });
   }
 });
-/******************************************** Import Category            *************************************************************88/
+
+/******************************************** Import Category *************************************************************88/
 
 
 
@@ -830,6 +830,9 @@ const upload_product_excel = catchAsync(async (req, res) => {
       Price: price,
       "Product Thumbnail Image": image_url,
     } = row;
+    console.log(product_name);
+    console.log(category_name);
+    console.log(country_name);
 
     let local_image_path = FALLBACK_IMAGE;
 
