@@ -1,6 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config({ path: `${process.cwd()}/.env` });
-
+import XLSX from "xlsx";
+import axios from "axios";
 // Defaults
 import catchAsync from "../../utils/catchAsync.js";
 import AppError from "../../utils/appError.js";
@@ -34,6 +35,8 @@ const BASE_URL = process.env.BASE_URL || "http://localhost:3848";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 /* Category API Start ------------------------------- */
+const IMAGE_FOLDER = "public/uploads/product_images";
+const FALLBACK_IMAGE = "uploads/product_images/default.png";
 
 // GET all categories (datatables)
 const getCategories = catchAsync(async (req, res) => {
@@ -495,7 +498,6 @@ const excelExportCategory = catchAsync(async (req, res) => {
 /* Product API Start ------------------------------- */
 
 const excelImportCategory = catchAsync(async (req, res) => {
-  
   try {
     if (!req.file) {
       return res
@@ -798,6 +800,85 @@ const createProduct = catchAsync(async (req, res) => {
       error: error.message,
     });
   }
+});
+
+/***************************************** Import product ******************************************************************************/
+
+const upload_product_excel = catchAsync(async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ status: false, message: "No file uploaded" });
+  }
+
+  const filePath = req.file.path;
+
+  // Create image folder if missing
+  if (!fs.existsSync(IMAGE_FOLDER)) {
+    fs.mkdirSync(IMAGE_FOLDER, { recursive: true });
+  }
+
+  const workbook = XLSX.readFile(filePath);
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet);
+
+  for (let row of rows) {
+    const {
+      "Product Name": product_name,
+      "Category Name": category_name,
+      "Country Name": country_name,
+      "Minimum Order Place": min_order,
+      "Maximum Order Place": max_order,
+      Price: price,
+      "Product Thumbnail Image": image_url,
+    } = row;
+
+    let local_image_path = FALLBACK_IMAGE;
+
+    if (image_url && image_url.startsWith("https")) {
+      console.log(`image_url ${image_url}`);
+      try {
+        const imageRes = await axios.get(image_url, {
+          responseType: "arraybuffer",
+        });
+        const ext = path.extname(image_url).split("?")[0] || ".jpg";
+        const imageName = `${Date.now()}-${product_name.replace(
+          /\s+/g,
+          "_"
+        )}${ext}`;
+        const savePath = path.join(IMAGE_FOLDER, imageName);
+
+        fs.writeFileSync(savePath, imageRes.data);
+        local_image_path = `public/uploads/product_images/${imageName}`;
+
+        console.log(`✅ Image saved: ${local_image_path}`);
+      } catch (err) {
+        console.warn(
+          `❌ Failed to download image for ${product_name}: ${err.message}`
+        );
+      }
+    }
+
+    // await db.query(
+    //   `INSERT INTO products
+    //   (product_name, category_name, country_name, min_order, max_order, price, image_url)
+    //   VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    //   [
+    //     product_name,
+    //     category_name,
+    //     country_name,
+    //     min_order || 0,
+    //     max_order || 0,
+    //     price,
+    //     local_image_path,
+    //   ]
+    // );
+  }
+
+  fs.unlinkSync(filePath); // Clean up Excel
+
+  res.status(200).json({
+    status: true,
+    message: "Products uploaded successfully",
+  });
 });
 
 const updateProduct = catchAsync(async (req, res) => {
@@ -1781,4 +1862,5 @@ export {
   importProductListwithPrice,
   ChangePricelist,
   excelImportCategory,
+  upload_product_excel,
 };
