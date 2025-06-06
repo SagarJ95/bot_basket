@@ -9,23 +9,25 @@ const dashboardController = async (req, res) => {
     const date = moment().format("YYYY-MM-DD");
 
     const getTotalOrder = await db.query(
-      "SELECT * FROM orders WHERE created_at::date = $1 AND status = $2",
+      "SELECT * FROM orders WHERE deleted_at IS NULL AND created_at::date = $1 AND status = $2",
       [date, "1"]
     );
 
     const pendingOrder = await db.query(
-      `SELECT SUM(order_status) AS pending_order_count FROM orders WHERE created_at::date = $1 AND order_status = $2 AND status = $3`,
+      `SELECT SUM(order_status) AS pending_order_count FROM orders WHERE deleted_at IS NULL AND  created_at::date = $1 AND order_status = $2 AND status = $3`,
       [date, "1", "1"]
     );
 
     const total_price_result = await db.query(
-      `SELECT SUM(price::numeric) AS total_price FROM order_items WHERE created_at::date = $1 AND order_item_status = $2`,
+      `SELECT TO_CHAR(SUM(price::numeric), 'FM999999999.00') AS total_price FROM order_items WHERE deleted_at IS NULL AND created_at::date = $1 AND order_item_status = $2`,
       [date, "1"]
     );
+
 
     const get_customers_details = await db.query(
       `select o.id as order_id,o.customer_name,o.order_status,
       SUM(ot.quantity::integer* ot.price::numeric) as total_price,
+      TO_CHAR(o.created_at,'FMDDth FMMonth YYYY') as created_at,
       CASE
       WHEN o.order_status =1 THEN 'Pending'
       WHEN o.order_status= 2 THEN 'Confirmed'
@@ -34,14 +36,17 @@ const dashboardController = async (req, res) => {
       WHEN o.order_status =5 THEN 'Cancelled'
       ELSE ''
       END as order_status
-       from orders as o LEFT JOIN order_items as ot
-      ON o.id = ot.order_id
-      WHERE o.created_at::date =$1 AND o.status= $2 AND ot.order_item_status=$3
+       from orders as o
+       LEFT JOIN order_items as ot ON o.id = ot.order_id AND ot.order_item_status = $3
+      WHERE o.deleted_at IS NULL AND o.created_at::date =$1 AND o.status= $2
       GROUP BY o.id
       `,
       [date, "1", "1"]
     );
 
+    const graphCountDelivery = await db.query(`select COUNT(*) as count_delivery from orders   WHERE deleted_at IS NULL And created_at::date = $1 AND order_status = 4`,[date])
+    const graphCountPending = await db.query(`select COUNT(*) as count_pending from orders WHERE deleted_at IS NULL And created_at::date = $1 AND order_status = 1`,[date])
+    const graphCountConfirmed = await db.query(`select COUNT(*) as count_confirm from orders WHERE deleted_at IS NULL And created_at::date = $1 AND order_status = 2`,[date])
 
     res.status(200).json({
       status: true,
@@ -49,10 +54,17 @@ const dashboardController = async (req, res) => {
       data: [
         {
           total_order: getTotalOrder.rowCount,
-          total_price: parseInt(total_price_result.rows[0].total_price) || 0,
+          total_price: total_price_result.rows[0].total_price || 0,
           pending_order_count:
             parseInt(pendingOrder.rows[0].pending_order_count) || 0,
           order_list: get_customers_details.rows || [],
+          graphCount:[
+            {
+              delivery:parseInt(graphCountDelivery.rows[0].count_delivery),
+              pending:parseInt(graphCountPending.rows[0].count_pending),
+              confirm:parseInt(graphCountConfirmed.rows[0].count_confirm),
+            }
+          ]
         },
       ],
     });
