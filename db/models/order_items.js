@@ -38,6 +38,9 @@ const order_items = sequelize.define(
     item_delivery_status: {
       type: DataTypes.INTEGER
     },
+    reason: {
+      type: DataTypes.TEXT
+    },
     created_by:{
       type:DataTypes.INTEGER,
     },

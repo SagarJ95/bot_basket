@@ -1458,6 +1458,183 @@ const get_country_based_product = catchAsync(async (req, res) => {
   }
 });
 
+//particular product details
+const particularProductDetails = catchAsync(async (req, res) => {
+  await Promise.all([
+    body("product_id").notEmpty().withMessage("Product Id is required").run(req),
+  ]);
+
+  // Handle validation result
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    const error_message = errors.array()[0].msg;
+    throw new AppError(error_message, 200, errors);
+  }
+  try {
+    const {product_id} = req.body;
+
+    let query_params = [1, 1];
+    let query_params_count = [1, 1];
+
+    // Soft Authentication
+    const authHeader = req.headers.authorization;
+    let customer;
+    if (authHeader?.startsWith("Bearer")) {
+      const token = authHeader.split(" ")[1];
+      try {
+        const decoded = verify(token, process.env.JWT_SECRET_KEY);
+        customer = await Customer.findByPk(decoded.id);
+      } catch (_) {
+        customer = null;
+      }
+    }
+    const customerId = customer ? customer.id : null;
+
+    let cartJoin = "";
+    let cartgroupjoin = "";
+    let cartqtyandid = "";
+    if (customerId) {
+      cartJoin = `
+        LEFT JOIN (
+          SELECT
+            atc.id AS cart_id,
+            atc.product_id,
+            atc.qty,
+            atc.price
+          FROM add_to_carts atc
+          WHERE atc.created_by = $${query_params.length + 1}
+            AND atc.status = 1
+            AND atc.deleted_at IS NULL
+        ) AS cart ON cart.product_id = p.id
+      `;
+      query_params.push(customerId);
+      query_params_count.push(customerId)
+      cartgroupjoin = ", cart.cart_id, cart.qty";
+      cartqtyandid = `, COALESCE(cart.cart_id, 0) AS cart_id, COALESCE(cart.qty, 0) AS cart_qty`;
+    }
+
+    const productquery = `
+      SELECT
+        p.id,
+        p.name AS product_name,
+        p.slug,
+        p.description,
+        p.price,
+        p.minimum_order_place,
+        p.maximum_order_place,
+        COALESCE(q.total_ordered_quantity_today, 0) AS total_ordered_quantity_today,
+        (p.maximum_order_place - COALESCE(q.total_ordered_quantity_today, 0)) AS available_quantity,
+        c.id AS categoryId,
+        c.cat_name AS category_name,
+        cd.id AS country_id,
+        cd.country_name,
+        CONCAT('${BASE_URL}', '/images/img-country-flag/', cd.flag) AS country_flag,
+        CONCAT('${BASE_URL}', p.thumbnail_product_image) AS thumbnail_product_image,
+        ARRAY[pi.image_path] AS product_images
+        ${cartqtyandid}
+      FROM products AS p
+      LEFT JOIN categories AS c ON p.category = c.id
+      LEFT JOIN country_data AS cd ON p.country_id = cd.id
+      LEFT JOIN LATERAL (
+        SELECT CONCAT('${BASE_URL}', pi.image_path) AS image_path
+        FROM product_images pi
+        WHERE pi.product_id = p.id
+        ORDER BY pi.id DESC
+        LIMIT 1
+      ) AS pi ON true
+      LEFT JOIN (
+        SELECT
+          product_id,
+          SUM(quantity) AS total_ordered_quantity_today
+        FROM order_items
+        WHERE order_item_status = $2 AND DATE(created_at) = CURRENT_DATE
+        GROUP BY product_id
+      ) AS q ON p.id = q.product_id
+      LEFT JOIN (
+        SELECT DISTINCT ON (product_id)
+          product_id,
+          price,
+          upload_date
+        FROM products_price_logs
+        WHERE deleted_at IS NULL
+        ORDER BY product_id, upload_date DESC
+      ) AS pl ON pl.product_id = p.id
+      ${cartJoin}
+      WHERE p.id = ${product_id} AND p.status = $1 AND p.deleted_at IS NULL
+      GROUP BY p.id, c.cat_name, c.id, q.total_ordered_quantity_today, pi.image_path, pl.price, cd.id, cd.country_name ${cartgroupjoin}
+    `;
+
+    const getproductlist = await db.query(productquery, query_params);
+
+    //category based product list
+    const categoryId = getproductlist?.rows[0].categoryid;
+
+    const categoriesList = await db.query(`SELECT
+        p.id,
+        p.name AS product_name,
+        p.slug,
+        p.description,
+        p.price,
+        p.minimum_order_place,
+        p.maximum_order_place,
+        COALESCE(q.total_ordered_quantity_today, 0) AS total_ordered_quantity_today,
+        (p.maximum_order_place - COALESCE(q.total_ordered_quantity_today, 0)) AS available_quantity,
+        c.id AS categoryId,
+        c.cat_name AS category_name,
+        cd.id AS country_id,
+        cd.country_name,
+        CONCAT('${BASE_URL}', '/images/img-country-flag/', cd.flag) AS country_flag,
+        CONCAT('${BASE_URL}', p.thumbnail_product_image) AS thumbnail_product_image,
+        ARRAY[pi.image_path] AS product_images
+        ${cartqtyandid}
+      FROM products AS p
+      LEFT JOIN categories AS c ON p.category = c.id
+      LEFT JOIN country_data AS cd ON p.country_id = cd.id
+      LEFT JOIN LATERAL (
+        SELECT CONCAT('${BASE_URL}', pi.image_path) AS image_path
+        FROM product_images pi
+        WHERE pi.product_id = p.id
+        ORDER BY pi.id DESC
+        LIMIT 1
+      ) AS pi ON true
+      LEFT JOIN (
+        SELECT
+          product_id,
+          SUM(quantity) AS total_ordered_quantity_today
+        FROM order_items
+        WHERE order_item_status = $2 AND DATE(created_at) = CURRENT_DATE
+        GROUP BY product_id
+      ) AS q ON p.id = q.product_id
+      LEFT JOIN (
+        SELECT DISTINCT ON (product_id)
+          product_id,
+          price,
+          upload_date
+        FROM products_price_logs
+        WHERE deleted_at IS NULL
+        ORDER BY product_id, upload_date DESC
+      ) AS pl ON pl.product_id = p.id
+      ${cartJoin}
+      WHERE p.category = ${categoryId} AND p.status = $1 AND p.deleted_at IS NULL
+      GROUP BY p.id, c.cat_name, c.id, q.total_ordered_quantity_today, pi.image_path, pl.price, cd.id, cd.country_name ${cartgroupjoin}
+    `,query_params)
+
+    return res.status(200).json({
+      status: true,
+      message: "fetch Product list successfully",
+      data: (getproductlist.rowCount > 0 ) ? getproductlist.rows : [],
+      catBasedProduct:(categoriesList.rowCount > 0) ? categoriesList.rows : []
+    });
+  } catch (e) {
+    return res.status(500).json({
+      status: false,
+      message: "Failed to retrieve data",
+      errors: e.message,
+    });
+  }
+});
+
+
 export {
   category_list,
   product_list,
@@ -1473,6 +1650,7 @@ export {
   repeat_order,
   country_list,
   get_price,
+  particularProductDetails,
 //  footer
   get_categories_based_product,
   get_country_based_product

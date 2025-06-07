@@ -128,6 +128,9 @@ router.get("/price_list", staticApiKey, productController.get_price);
 //product list
 router.post("/product_list", staticApiKey, productController.product_list);
 
+//particular product details
+router.post("/particularProductDetails", staticApiKey, productController.particularProductDetails);
+
 //Add cart
 router.post(
   "/add_update_cart",
