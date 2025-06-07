@@ -9,7 +9,6 @@ import Category from "../../db/models/category.js";
 import Product from "../../db/models/products.js";
 import Product_images from "../../db/models/product_images.js";
 import Products_price_logs from "../../db/models/products_price_logs.js";
-
 import { body, validationResult } from "express-validator";
 import { Op, QueryTypes, Sequelize } from "sequelize";
 import { compare } from "bcrypt";
@@ -61,7 +60,8 @@ const importProduct = catchAsync(async (req, res) => {
 
     let local_image_path = FALLBACK_IMAGE;
 
-    if (image_url && image_url.startsWith("https")) {
+    // if (image_url && image_url.startsWith("https")) {
+    if (image_url && (image_url.startsWith("https://") || image_url.startsWith("http://"))) {
 
       try {
         const imageRes = await axios.get(image_url, {
@@ -72,6 +72,7 @@ const importProduct = catchAsync(async (req, res) => {
           /\s+/g,
           "_"
         )}${ext}`;
+
         const savePath = path.join(IMAGE_FOLDER, imageName);
 
         fs.writeFileSync(savePath, imageRes.data);
@@ -85,9 +86,16 @@ const importProduct = catchAsync(async (req, res) => {
       }
     }
 
+    //category table
+    const catgories = await db.query(`select id from categories where cat_name ILIKE $1`,[category_name])
+
+    //country table
+    const countries = await db.query(`select id from country_data where country_data ILIKE $1`,[country_name])
+
+
     // await db.query(
     //   `INSERT INTO products
-    //   (product_name, category_name, country_name, min_order, max_order, price, image_url)
+    //   (name, category, country_name, min_order, max_order, price, image_url)
     //   VALUES ($1, $2, $3, $4, $5, $6, $7)`,
     //   [
     //     product_name,

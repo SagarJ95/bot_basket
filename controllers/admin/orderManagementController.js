@@ -64,8 +64,6 @@ const getOrderlist = catchAsync(async (req, res) => {
             query_params.push(10,pageCount)
          }
 
-
-
         const totalPageCount = await db.query(`select o.id as order_id,o.order_ref_id,o.customer_name,TO_CHAR(o.created_at,'FMDDth FMMonth YYYY') as order_date,
         o.order_status,SUM(oi.quantity * oi.price::numeric) as total_price,
         SUM(oi.quantity * oi.price::numeric) as grand_total,
