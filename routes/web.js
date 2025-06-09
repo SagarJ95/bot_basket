@@ -195,4 +195,6 @@ router.post('/get_country_based_product',staticApiKey,productController.get_coun
 
 /********************************** Footer Section *********************************/
 
+router.post('/ai_chat_bot',getselfController.translate)
+
 export default router;

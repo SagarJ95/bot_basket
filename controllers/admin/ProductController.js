@@ -25,6 +25,7 @@ import { format } from "fast-csv";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import axios  from 'axios';
+import XLSX from 'xlsx';
 
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3848';
 const __filename = fileURLToPath(import.meta.url);
@@ -54,7 +55,6 @@ const importProduct = catchAsync(async (req, res) => {
       "Country Name": country_name,
       "Minimum Order Place": min_order,
       "Maximum Order Place": max_order,
-      Price: price,
       "Product Thumbnail Image": image_url,
     } = row;
 
@@ -78,11 +78,11 @@ const importProduct = catchAsync(async (req, res) => {
         fs.writeFileSync(savePath, imageRes.data);
         local_image_path = `public/uploads/product_images/${imageName}`;
 
-        console.log(`✅ Image saved: ${local_image_path}`);
+        //console.log(`✅ Image saved: ${local_image_path}`);
       } catch (err) {
-        console.warn(
-          ` Failed to download image for ${product_name}: ${err.message}`
-        );
+        // console.warn(
+        //   ` Failed to download image for ${product_name}: ${err.message}`
+        // );
       }
     }
 
@@ -92,21 +92,61 @@ const importProduct = catchAsync(async (req, res) => {
     //country table
     const countries = await db.query(`select id from country_data where country_data ILIKE $1`,[country_name])
 
+    const productName = product_name;
+    const category_id = catgories.rows[0].id;
+    const country_id = countries.rows[0].id;
+    const minimum_order_place = min_order;
+    const maximum_order_place = max_order;
+    const price = price;
+    const thumbnailImage = (local_image_path) ? media_url(local_image_path) : null;
 
-    // await db.query(
-    //   `INSERT INTO products
-    //   (name, category, country_name, min_order, max_order, price, image_url)
-    //   VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    //   [
-    //     product_name,
-    //     category_name,
-    //     country_name,
-    //     min_order || 0,
-    //     max_order || 0,
-    //     price,
-    //     local_image_path,
-    //   ]
-    // );
+    let OrderingId = 0;
+    // Get the current highest ordering
+    const getCountOrdering = await db.query(
+        "SELECT * FROM products where deleted_at IS NULL ORDER BY ordering DESC LIMIT 1"
+    );
+
+    if (getCountOrdering.rows.length > 0) {
+        OrderingId = getCountOrdering.rows[0].ordering;
+    }
+
+        const product = await Product.create({
+        name: productName,
+        slug: generateSlug(productName),
+        minimum_order_place: minimum_order_place,
+        maximum_order_place: maximum_order_place,
+        price: price,
+        country_id: country_id,
+        thumbnail_product_image:thumbnailImage,
+        category:category_id,
+        created_by: req.user.id,
+        ordering: (OrderingId) ? parseInt(OrderingId) + 1 : 1,
+        status: 1,
+    });
+
+    const product_id = product.id;
+
+    if (!product) {
+        return res.status(200).json({ status: false, message: 'Product not created' });
+    }
+
+    const countryName = await db.query(`select id from country_data where id = ${country_id}`);
+
+    //product price list log
+    await db.query(
+        `INSERT INTO products_price_logs (product_id,price,country_id,country_name,upload_date,maximum_quantity
+    ,created_by,created_at,updated_by,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [product_id, price, country_id, countryName?.rows[0].id, moment(new Date()).format('YYYY-MM-DD'),maximum_order_place, req
+        .user.id, new Date(),req.user.id,new Date()]
+    );
+
+    const data = {
+        user_id: req.user.id,
+        table_id: product.id,
+        table_name: 'products',
+        action: 'import Product List',
+    };
+
+    adminLog(data);
   }
 
   fs.unlinkSync(filePath);
@@ -310,23 +350,23 @@ const createProduct = catchAsync(async (req, res) => {
         }
 
         //get country name
-        // const countryName = await db.query(`select id from country_data where id = ${body.countryId}`);
+        const countryName = await db.query(`select id from country_data where id = ${body.countryId}`);
 
-        // //product price list log
-        // await db.query(
-        //     `INSERT INTO products_price_logs (product_id,price,country_id,country_name,upload_date,maximum_quantity
-        // ,created_by,created_at,updated_by,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [product_id, body.price, body.countryId, countryName?.rows[0].id, moment(new Date()).format('YYYY-MM-DD'), body.maximum_order_place, req
-        //     .user.id, new Date(),req.user.id,new Date()]
-        // );
+        //product price list log
+        await db.query(
+            `INSERT INTO products_price_logs (product_id,price,country_id,country_name,upload_date,maximum_quantity
+        ,created_by,created_at,updated_by,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [product_id, body.price, body.countryId, countryName?.rows[0].id, moment(new Date()).format('YYYY-MM-DD'), body.maximum_order_place, req
+            .user.id, new Date(),req.user.id,new Date()]
+        );
 
-        // const data = {
-        //     user_id: req.user.id,
-        //     table_id: product.id,
-        //     table_name: 'products',
-        //     action: 'insert',
-        // };
+        const data = {
+            user_id: req.user.id,
+            table_id: product.id,
+            table_name: 'products',
+            action: 'insert',
+        };
 
-        // adminLog(data);
+        adminLog(data);
 
         return res.status(200).json({ status: true, message: 'Product created successfully' });
 
@@ -1314,6 +1354,85 @@ const ChangePricelist = catchAsync(async (req, res) => {
 
 /* Product API END ------------------------------- */
 
+const exportProductlistSample = catchAsync(async (req, res) => {
+    try {
+        const categoriesQuery = `SELECT id, cat_name FROM categories ORDER BY ID ASC`;
+        const categoriesResult = await db.query(categoriesQuery);
+
+        const countryQuery = `SELECT id, country_name FROM country_data ORDER BY ID ASC`;
+        const countryResult = await db.query(countryQuery);
+
+        // Create Excel workbook
+        const workbook = new ExcelJS.Workbook();
+
+
+        const productSheet = workbook.addWorksheet("Products Sample");
+        productSheet.columns = [
+            { header: "Product Name", key: "product_name", width: 30 },
+            { header: "Category Name", key: "category_name", width: 25 },
+            { header: "Country Name", key: "country_name", width: 25 },
+            { header: "Minimum Order Place", key: "min_order", width: 20 },
+            { header: "Maximum Order Place", key: "max_order", width: 20 },
+            { header: "Price", key: "price", width: 15 },
+            { header: "Product Thumbnail Image", key: "thumbnail", width: 40 },
+        ];
+
+        // Add one sample row
+        productSheet.addRow({
+            product_name: "Veg",
+            category_name: "Beverages",
+            country_name: "Angola",
+            min_order: "1",
+            max_order: "10",
+            price: "12.11",
+            thumbnail: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT4DpNCwVWdf4efPhMS4GMXJopo9CFx3GBT7w&s"
+        });
+
+        // ===== Sheet 2: Categories =====
+        const categoriesSheet = workbook.addWorksheet("Categories");
+        categoriesSheet.columns = [
+            { header: "ID", key: "id", width: 10 },
+            { header: "Category Name", key: "cat_name", width: 30 },
+        ];
+        categoriesResult.rows.forEach(row => {
+            categoriesSheet.addRow({ id: row.id, cat_name: row.cat_name });
+        });
+
+        // ===== Sheet 3: Countries =====
+        const countrySheet = workbook.addWorksheet("Countries");
+        countrySheet.columns = [
+            { header: "ID", key: "id", width: 10 },
+            { header: "Country Name", key: "country_name", width: 30 },
+        ];
+        countryResult.rows.forEach(row => {
+            countrySheet.addRow({ id: row.id, country_name: row.country_name });
+        });
+
+        // Save the file
+        const dateTime = moment().tz("Asia/Kolkata").format("YYYY-MM-DD_HH-mm-ss");
+        const fileName = `export_product_upload_sample_${dateTime}.xlsx`;
+        const filePath = path.join(process.cwd(), "public/uploads/export_product_upload_sample", fileName);
+
+        if (!fs.existsSync(path.dirname(filePath))) {
+            fs.mkdirSync(path.dirname(filePath), { recursive: true });
+        }
+
+        await workbook.xlsx.writeFile(filePath);
+
+        return res.status(200).json({
+            status: true,
+            filePath: `${BASE_URL}/uploads/export_product_upload_sample/${fileName}`
+        });
+
+    } catch (error) {
+        return res.status(500).json({
+            status: false,
+            message: "Internal Server Error",
+            error: error.message
+        });
+    }
+});
+
 export {
 
     /* Products */
@@ -1334,5 +1453,6 @@ export {
     ChangePricelist,
     getChangePriceProductlist,
     importProduct,
+    exportProductlistSample
 
 }

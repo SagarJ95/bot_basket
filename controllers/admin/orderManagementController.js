@@ -137,29 +137,29 @@ const changeStatus = catchAsync(async (req, res) => {
         const {status,order_id,date,order_item} = req.body
         const query_params = [status,order_id];
 
-        // const query = `update orders SET order_status = $1 WHERE id = $2`;
-        // const result = await db.query(query,query_params)
+        const query = `update orders SET order_status = $1 WHERE id = $2`;
+        const result = await db.query(query,query_params)
 
         //if order_status is 2 then update item_deleivery_status
         if(status == 2){
             if(order_item){
                 for(let items of order_item){
-                    //await db.query(`update order_items SET item_delivery_status = $1, reason = $4 WHERE id = $2 AND order_id = $3`,[items.order_item_status,items.order_item_id,order_id,items.reason])
+                    await db.query(`update order_items SET item_delivery_status = $1, reason = $4 WHERE id = $2 AND order_id = $3`,[items.order_item_status,items.order_item_id,order_id,items.reason])
                 }
             }
         }
 
         //update order_status wise date in delivery_date,cancelled date
-        // const dateFields = {
-        //     "2": "excepted_delivery_date",
-        //     "3": "shipped_date",
-        //     "4": "delivery_date",
-        //     "5": "cancelled_date"
-        // };
+        const dateFields = {
+            "2": "excepted_delivery_date",
+            "3": "shipped_date",
+            "4": "delivery_date",
+            "5": "cancelled_date"
+        };
 
-        // if (dateFields[status]) {
-        //     await db.query(`UPDATE orders SET ${dateFields[status]} = $1 WHERE id = $2`, [date, order_id]);
-        // }
+        if (dateFields[status]) {
+            await db.query(`UPDATE orders SET ${dateFields[status]} = $1 WHERE id = $2`, [date, order_id]);
+        }
 
         return res.status(200).json({
             status: true,
@@ -209,41 +209,41 @@ const orderViewDetails = catchAsync(async (req, res) => {
 
             //fetch order_item table fetch order item list based on order_id
             const order_item = await db.query(`SELECT
-                            oi.id,
-                            oi.order_id,
-                            oi.product_id,
-                            oi.product_name AS product_name,
-                            p.description,
-                            oi.price AS product_price,
-                            oi.quantity AS product_quantity,
-                            SUM(oi.quantity * oi.price::numeric) As total_price,
-                            (
-                                SELECT JSON_AGG(DISTINCT CONCAT('${BASE_URL}', pi.image_path))
-                                FROM product_images pi
-                                WHERE pi.product_id = p.id AND pi.image_path IS NOT NULL
-                            ) AS product_images,
-                             CONCAT('${BASE_URL}', p.thumbnail_product_image) as thumbnail_product_image,
-                             CONCAT('${BASE_URL}/images/img-country-flag/',cd.flag) as country_flag,
-                            c.cat_name as category_name,
-                            oi.item_delivery_status,
-                            oi.reason
-                            FROM order_items AS oi
-                            LEFT JOIN products AS p ON oi.product_id = p.id
-                            LEFT JOIN categories as c ON p.category = c.id
-                            LEFT JOIN country_data as cd ON p.country_id = cd.id
-                            WHERE oi.order_id = $1 And oi.order_item_status = $2
-                            GROUP BY oi.id,p.description,p.id,cd.flag,c.cat_name`,[order_id,1]);
+                    oi.id,
+                    oi.order_id,
+                    oi.product_id,
+                    oi.product_name AS product_name,
+                    p.description,
+                    oi.price AS product_price,
+                    oi.quantity AS product_quantity,
+                    SUM(oi.quantity * oi.price::numeric) As total_price,
+                    (
+                        SELECT JSON_AGG(DISTINCT CONCAT('${BASE_URL}', pi.image_path))
+                        FROM product_images pi
+                        WHERE pi.product_id = p.id AND pi.image_path IS NOT NULL
+                    ) AS product_images,
+                        CONCAT('${BASE_URL}', p.thumbnail_product_image) as thumbnail_product_image,
+                        CONCAT('${BASE_URL}/images/img-country-flag/',cd.flag) as country_flag,
+                    c.cat_name as category_name,
+                    oi.item_delivery_status,
+                    oi.reason
+                    FROM order_items AS oi
+                    LEFT JOIN products AS p ON oi.product_id = p.id
+                    LEFT JOIN categories as c ON p.category = c.id
+                    LEFT JOIN country_data as cd ON p.country_id = cd.id
+                    WHERE oi.order_id = $1 And oi.order_item_status = $2
+                    GROUP BY oi.id,p.description,p.id,cd.flag,c.cat_name`,[order_id,1]);
 
-                            let Sumoflist;
-                            if(order_item.rowCount > 0){
-                                Sumoflist = order_item.rows.reduce((acc, item) => {
-                                    acc.qty += parseFloat(item.product_quantity) || 0;
-                                    acc.price += parseFloat(item.total_price) || 0;
-                                    return acc;
-                                    }, { qty: 0, price: 0 });
+                let Sumoflist;
+                if(order_item.rowCount > 0){
+                    Sumoflist = order_item.rows.reduce((acc, item) => {
+                        acc.qty += parseFloat(item.product_quantity) || 0;
+                        acc.price += parseFloat(item.total_price) || 0;
+                        return acc;
+                        }, { qty: 0, price: 0 });
 
-                                    Sumoflist.price = parseFloat(Sumoflist.price.toFixed(2));
-                                }
+                        Sumoflist.price = parseFloat(Sumoflist.price.toFixed(2));
+                }
 
         return res.status(200).json({
             status: true,

@@ -342,7 +342,8 @@ const product_list = catchAsync(async (req, res) => {
         cd.id AS country_id,
         cd.country_name,
         CONCAT('${BASE_URL}', '/images/img-country-flag/', cd.flag) AS country_flag,
-        ARRAY[pi.image_path] AS product_images
+        ARRAY[CONCAT('${BASE_URL}', p.thumbnail_product_image)] AS product_images,
+        ARRAY[pi.image_path] AS thumbnail_product_image
         ${cartqtyandid}
       FROM products AS p
       LEFT JOIN categories AS c ON p.category = c.id

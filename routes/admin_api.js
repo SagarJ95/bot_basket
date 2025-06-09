@@ -181,6 +181,9 @@ router.post('/getChangePriceProductlist', authenticate, productController.getCha
 //export product list for price change
 router.post("/excelExportProductsInfo", authenticate, productController.excelExportProductsInfo)
 
+//export product list sample
+router.post('/exportProductlistSample',authenticate,productController.exportProductlistSample)
+
 //import product list with update price and store update price in log table
 router.post("/importProductListwithPrice", authenticate,
   upload.fields([{ name: 'csv_file', maxCount: 1 }]), productController.importProductListwithPrice)
