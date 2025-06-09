@@ -210,18 +210,28 @@ const getProductlist = catchAsync(async (req, res) => {
         const totalProducts = await db.query(totalCountQuery, total_query_params);
 
         //get get product list
-        const query = `select p.id as product_id,p.name as product_name,c.cat_name as category_name
-        ,p.price as current_price,
-        CONCAT('${BASE_URL}/images/img-country-flag/',ca.flag) as country_flag,
-        p.category as category_id,
-        p.country_id as country_id,
-        ca.country_name,
-        TO_CHAR(ppl.upload_date,'FMDD FMMonth YYYY') as last_updated_date,
-        p.product_stock_status,p.status
-         from products as p LEFT JOIN categories as c ON p.category = c.id
-         LEFT JOIN country_data as ca ON p.country_id = ca.id
-         LEFT JOIN products_price_logs as ppl ON p.id = ppl.product_id
-         WHERE p.deleted_at IS NULL ${categories} ${countries} ${searchQuery} ORDER BY p.id desc ${pageCountQuery}`;
+        const query = `SELECT
+                    p.id AS product_id,
+                    p.name AS product_name,
+                    c.cat_name AS category_name,
+                    p.price AS current_price,
+                    CONCAT('${BASE_URL}/images/img-country-flag/', ca.flag) AS country_flag,
+                    p.category AS category_id,
+                    p.country_id AS country_id,
+                    ca.country_name,
+                    TO_CHAR(ppl.upload_date, 'FMDD FMMonth YYYY') AS last_updated_date,
+                    p.product_stock_status,
+                    p.status
+                FROM products AS p
+                LEFT JOIN categories AS c ON p.category = c.id
+                LEFT JOIN country_data AS ca ON p.country_id = ca.id
+                LEFT JOIN (
+                    SELECT DISTINCT ON (product_id) product_id, upload_date
+                    FROM products_price_logs
+                    ORDER BY product_id, upload_date DESC
+                ) AS ppl ON p.id = ppl.product_id
+
+                WHERE p.deleted_at IS NULL ${categories} ${countries} ${searchQuery} ORDER BY p.id desc ${pageCountQuery}`;
 
 
         const getProductslist = await db.query(query, query_params)
@@ -1356,11 +1366,12 @@ const ChangePricelist = catchAsync(async (req, res) => {
 
 const exportProductlistSample = catchAsync(async (req, res) => {
     try {
-        const categoriesQuery = `SELECT id, cat_name FROM categories ORDER BY ID ASC`;
-        const categoriesResult = await db.query(categoriesQuery);
+         const categoriesQuery = `SELECT id, cat_name FROM categories Where status = $1 ORDER BY ID ASC`;
+        const categoriesResult = await db.query(categoriesQuery,[1]);
 
-        const countryQuery = `SELECT id, country_name FROM country_data ORDER BY ID ASC`;
-        const countryResult = await db.query(countryQuery);
+        const countryQuery = `SELECT id, country_name FROM country_data Where status = $1 ORDER BY ID ASC`;
+        const countryResult = await db.query(countryQuery,[1]);
+
 
         // Create Excel workbook
         const workbook = new ExcelJS.Workbook();

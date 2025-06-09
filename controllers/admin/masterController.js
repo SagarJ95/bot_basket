@@ -325,10 +325,10 @@ const updateCategoryStatusById = catchAsync(async (req, res) => {
         where c.id = $1 and c.status = $2 and c.deleted_at IS NULL
         GROUP BY c.cat_name,c.id Order BY c.id desc`, [category_id, 1]);
 
-        if (count.rowCount > 0 && count.rows.no_of_products > 0) {
+        if (count.rowCount > 0 && count.rows[0].no_of_products > 0) {
             return res.status(200).json({
                 status: false,
-                message: `Category has products cannot be deleted`
+                message: `Category has products cannot be Deactive`
             });
         } else {
 
