@@ -6,13 +6,13 @@ import moment from "moment-timezone";
 
 const dashboardController = async (req, res) => {
   try {
-    const {page,search} = req.body;
+    const { page, search } = req.body;
 
     const date = moment().format("YYYY-MM-DD");
-     const query_params = [date, "1", "1"];
-     const total_query_params = [date, "1", "1"];
-     let pageCountQuery='';
-     let searchQuery = '';
+    const query_params = [date, "1", "1"];
+    const total_query_params = [date, "1", "1"];
+    let pageCountQuery = "";
+    let searchQuery = "";
 
     const getTotalOrder = await db.query(
       "SELECT * FROM orders WHERE deleted_at IS NULL AND created_at::date = $1 AND status = $2",
@@ -25,20 +25,24 @@ const dashboardController = async (req, res) => {
     );
 
     const total_price_result = await db.query(
-      `SELECT TO_CHAR(SUM(price::numeric), 'FM999999999.00') AS total_price FROM order_items WHERE deleted_at IS NULL AND created_at::date = $1 AND order_item_status = $2`,
+      `SELECT TO_CHAR(SUM(price::numeric * quantity::numeric), 'FM999999999.00') AS total_price FROM order_items WHERE deleted_at IS NULL AND created_at::date = $1 AND order_item_status = $2`,
       [date, "1"]
     );
 
     if (search) {
-        searchQuery = `AND (lower(o.customer_name) ILIKE $${query_params.length + 1} OR lower(o.order_ref_id) LIKE $${query_params.length + 1})`;
-        query_params.push(`%${search.toLowerCase()}%`);
-        total_query_params.push(`%${search.toLowerCase()}%`)
+      searchQuery = `AND (lower(o.customer_name) ILIKE $${
+        query_params.length + 1
+      } OR lower(o.order_ref_id) LIKE $${query_params.length + 1})`;
+      query_params.push(`%${search.toLowerCase()}%`);
+      total_query_params.push(`%${search.toLowerCase()}%`);
     }
 
-    if(page){
+    if (page) {
       let pageCount = (page - 1) * 10;
-      pageCountQuery = `LIMIT $${query_params.length + 1} OFFSET $${query_params.length + 2}`
-      query_params.push(10,pageCount)
+      pageCountQuery = `LIMIT $${query_params.length + 1} OFFSET $${
+        query_params.length + 2
+      }`;
+      query_params.push(10, pageCount);
     }
 
     const total_customers_details = await db.query(
@@ -81,13 +85,25 @@ const dashboardController = async (req, res) => {
       query_params
     );
 
-    const graphCountDelivery = await db.query(`select COUNT(*) as count_delivery from orders   WHERE deleted_at IS NULL And created_at::date = $1 AND order_status = 4`,[date])
-    const graphCountPending = await db.query(`select COUNT(*) as count_pending from orders WHERE deleted_at IS NULL And created_at::date = $1 AND order_status = 1`,[date])
-    const graphCountConfirmed = await db.query(`select COUNT(*) as count_confirm from orders WHERE deleted_at IS NULL And created_at::date = $1 AND order_status = 2`,[date])
+    const graphCountDelivery = await db.query(
+      `select COUNT(*) as count_delivery from orders   WHERE deleted_at IS NULL And created_at::date = $1 AND order_status = 4`,
+      [date]
+    );
+    const graphCountPending = await db.query(
+      `select COUNT(*) as count_pending from orders WHERE deleted_at IS NULL And created_at::date = $1 AND order_status = 1`,
+      [date]
+    );
+    const graphCountConfirmed = await db.query(
+      `select COUNT(*) as count_confirm from orders WHERE deleted_at IS NULL And created_at::date = $1 AND order_status = 2`,
+      [date]
+    );
 
     res.status(200).json({
       status: true,
-      total:(total_customers_details.rowCount > 0) ? total_customers_details.rowCount : 0,
+      total:
+        total_customers_details.rowCount > 0
+          ? total_customers_details.rowCount
+          : 0,
       message: "Dashboard details fetched successfully!",
       data: [
         {
@@ -96,13 +112,13 @@ const dashboardController = async (req, res) => {
           pending_order_count:
             parseInt(pendingOrder.rows[0].pending_order_count) || 0,
           order_list: get_customers_details.rows || [],
-          graphCount:[
+          graphCount: [
             {
-              delivery:parseInt(graphCountDelivery.rows[0].count_delivery),
-              pending:parseInt(graphCountPending.rows[0].count_pending),
-              confirm:parseInt(graphCountConfirmed.rows[0].count_confirm),
-            }
-          ]
+              delivery: parseInt(graphCountDelivery.rows[0].count_delivery),
+              pending: parseInt(graphCountPending.rows[0].count_pending),
+              confirm: parseInt(graphCountConfirmed.rows[0].count_confirm),
+            },
+          ],
         },
       ],
     });

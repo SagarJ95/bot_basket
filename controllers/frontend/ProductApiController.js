@@ -236,20 +236,20 @@ const product_list = catchAsync(async (req, res) => {
     if (category_id && category_id.length > 0) {
       categories = `AND p.category = ANY ($${query_params.length + 1})`;
       query_params.push(category_id);
-      query_params_count.push(category_id)
+      query_params_count.push(category_id);
     }
 
     if (search) {
       wildcardSearch = `%${search.toLowerCase()}%`;
       searchQuery = `AND lower(p.name) LIKE $${query_params.length + 1}`;
       query_params.push(wildcardSearch);
-      query_params_count.push(wildcardSearch)
+      query_params_count.push(wildcardSearch);
     }
 
     if (country_id && country_id.length > 0) {
       countryFilter = `AND p.country_id = ANY ($${query_params.length + 1})`;
       query_params.push(country_id);
-      query_params_count.push(country_id)
+      query_params_count.push(country_id);
     }
 
     if (price_ranges && price_ranges.length > 0) {
@@ -257,7 +257,6 @@ const product_list = catchAsync(async (req, res) => {
       let priceParams = [];
       price_ranges.forEach((range) => {
         priceParams.push(range.min, range.max);
-
       });
 
       const baseIndex = query_params.length + 1;
@@ -270,7 +269,7 @@ const product_list = catchAsync(async (req, res) => {
 
       priceFilter = `AND (${priceRangeFilter.slice(0, -4)})`;
       query_params.push(...priceParams);
-      query_params_count.push(...priceParams)
+      query_params_count.push(...priceParams);
     }
 
     if (sort_by_price === "low_to_high") {
@@ -311,7 +310,7 @@ const product_list = catchAsync(async (req, res) => {
         ) AS cart ON cart.product_id = p.id
       `;
       query_params.push(customerId);
-      query_params_count.push(customerId)
+      query_params_count.push(customerId);
       cartgroupjoin = ", cart.cart_id, cart.qty";
       cartqtyandid = `, COALESCE(cart.cart_id, 0) AS cart_id, COALESCE(cart.qty, 0) AS cart_qty`;
     }
@@ -434,9 +433,10 @@ const product_list = catchAsync(async (req, res) => {
       ${orderByClause}
     `;
 
-
-    const getoverallproductlistCount = await db.query(overallproductcountquery, query_params_count);
-
+    const getoverallproductlistCount = await db.query(
+      overallproductcountquery,
+      query_params_count
+    );
 
     let cartListLength = 0;
     if (customerId) {
@@ -448,12 +448,14 @@ const product_list = catchAsync(async (req, res) => {
          AND deleted_at IS NULL`,
         [customerId]
       );
-      console.log("cartCountResult??",cartCountResult)
+      console.log("cartCountResult??", cartCountResult);
       cartListLength = parseInt(cartCountResult.rowCount) || 0;
     }
 
-   const totalCount = parseInt(getproductlist.rowCount || 0);
-    const totalPages = page ? Math.ceil(getoverallproductlistCount.rowCount / 10) : 1;
+    const totalCount = parseInt(getproductlist.rowCount || 0);
+    const totalPages = page
+      ? Math.ceil(getoverallproductlistCount.rowCount / 10)
+      : 1;
     const hasNextPage = page ? page < totalPages : false;
 
     return res.status(200).json({
@@ -461,7 +463,7 @@ const product_list = catchAsync(async (req, res) => {
       total: getproductlist.rowCount,
       message: "fetch Product list successfully",
       cartListLength: cartListLength,
-      overallProductCount:getoverallproductlistCount.rowCount,
+      overallProductCount: getoverallproductlistCount.rowCount,
       data: getproductlist.rows,
       pagination: page
         ? {
@@ -650,14 +652,13 @@ const cart_list = catchAsync(async (req, res) => {
 
     let cartSum = { qty: 0, price: 0 };
 
-  if (cartlist.rowCount > 0) {
-    cartSum.qty = cartlist.rowCount;
+    if (cartlist.rowCount > 0) {
+      cartSum.qty = cartlist.rowCount;
 
-    cartSum.price = cartlist.rows.reduce((total, item) => {
-      return total + (parseFloat(item.price) * parseInt(item.qty));
-    }, 0);
-  }
-
+      cartSum.price = cartlist.rows.reduce((total, item) => {
+        return total + parseFloat(item.price) * parseInt(item.qty);
+      }, 0);
+    }
 
     return res.status(200).json({
       status: true,
@@ -768,7 +769,7 @@ const create_order_bkp = catchAsync(async (req, res) => {
     const orderrefid = `Order_ID_${orderidInc}`;
 
     let order_items = await db.query(
-              `SELECT DISTINCT ON (atc.id)
+      `SELECT DISTINCT ON (atc.id)
                   atc.id as cart_id,
                   atc.product_id,
                   p.name AS product_name,
@@ -789,11 +790,11 @@ const create_order_bkp = catchAsync(async (req, res) => {
                   AND atc.created_by = $2
                   AND atc.deleted_at IS NULL
               `,
-          [1, customer_id]
-        );
+      [1, customer_id]
+    );
 
-    if(order_items.rowCount == 0){
-        return res.status(200).json({
+    if (order_items.rowCount == 0) {
+      return res.status(200).json({
         status: false,
         message: "There are no items in your cart yet.",
       });
@@ -966,7 +967,6 @@ const create_order = catchAsync(async (req, res) => {
       }
     }
 
-
     let getaddres;
     let final_address = "";
 
@@ -1049,7 +1049,7 @@ const order_history = catchAsync(async (req, res) => {
       const endDate = new Date(endDateStr.split("-").reverse().join("-"));
 
       if (!isNaN(startDate) && !isNaN(endDate)) {
-        dateCondition = `AND o.perferred_delivery_date BETWEEN $${
+        dateCondition = `AND o.created_at BETWEEN $${
           queryParams.length + 1
         } AND $${queryParams.length + 2}`;
         queryParams.push(startDate, endDate);
@@ -1083,7 +1083,9 @@ const order_history = catchAsync(async (req, res) => {
 
     if (search) {
       wildcardSearch = `%${search.toLowerCase()}%`;
-      searchQuery = `AND lower(p.name) LIKE $${queryParams.length + 1} OR lower(o.order_ref_id) LIKE $${queryParams.length + 1}`;
+      searchQuery = `AND lower(p.name) LIKE $${
+        queryParams.length + 1
+      } OR lower(o.order_ref_id) LIKE $${queryParams.length + 1}`;
       queryParams.push(wildcardSearch);
     }
 
@@ -1170,7 +1172,7 @@ const order_history = catchAsync(async (req, res) => {
                ca.full_name, ca.mobile_number, ca.zip_code, ca.country,
                ca.city, ca.state,
                sl.store_address, sl.store_pincode,sl.store_name
-      ORDER BY ${orderByClause ? ` ${orderByClause}` : 'o.id DESC'}
+      ORDER BY ${orderByClause ? ` ${orderByClause}` : "o.id DESC"}
       ${paginationClause}
 
       `,
@@ -1397,7 +1399,6 @@ const repeat_order = catchAsync(async (req, res) => {
 /******************* End Order creation Flow ************************ */
 
 const get_categories_based_product = catchAsync(async (req, res) => {
-
   try {
     const result = await db.query(
       `SELECT
@@ -1411,13 +1412,14 @@ const get_categories_based_product = catchAsync(async (req, res) => {
     WHERE c.status = $1 AND c.deleted_at IS NULL
     GROUP BY c.id, c.cat_name, c.slug, c.description
     ORDER BY no_of_products DESC LIMIT 4
-    `,[1]
+    `,
+      [1]
     );
 
     return res.status(200).json({
       status: true,
       message: "Fetch category based product Details Successfully",
-      data:(result.rowCount) > 0 ? result.rows : [],
+      data: result.rowCount > 0 ? result.rows : [],
     });
   } catch (error) {
     return res.status(200).json({
@@ -1429,7 +1431,6 @@ const get_categories_based_product = catchAsync(async (req, res) => {
 });
 
 const get_country_based_product = catchAsync(async (req, res) => {
-
   try {
     const result = await db.query(
       `SELECT
@@ -1442,13 +1443,14 @@ const get_country_based_product = catchAsync(async (req, res) => {
     GROUP BY c.id, c.country_name
     ORDER BY no_of_products DESC
       LIMIT 4
-  `,[1]
+  `,
+      [1]
     );
 
-     return res.status(200).json({
+    return res.status(200).json({
       status: true,
       message: "Fetch country based product Details Successfully",
-      data:(result.rowCount) > 0 ? result.rows : [],
+      data: result.rowCount > 0 ? result.rows : [],
     });
   } catch (error) {
     return res.status(200).json({
@@ -1462,7 +1464,10 @@ const get_country_based_product = catchAsync(async (req, res) => {
 //particular product details
 const particularProductDetails = catchAsync(async (req, res) => {
   await Promise.all([
-    body("product_id").notEmpty().withMessage("Product Id is required").run(req),
+    body("product_id")
+      .notEmpty()
+      .withMessage("Product Id is required")
+      .run(req),
   ]);
 
   // Handle validation result
@@ -1472,7 +1477,7 @@ const particularProductDetails = catchAsync(async (req, res) => {
     throw new AppError(error_message, 200, errors);
   }
   try {
-    const {product_id} = req.body;
+    const { product_id } = req.body;
 
     let query_params = [1, 1];
     let query_params_count = [1, 1];
@@ -1509,7 +1514,7 @@ const particularProductDetails = catchAsync(async (req, res) => {
         ) AS cart ON cart.product_id = p.id
       `;
       query_params.push(customerId);
-      query_params_count.push(customerId)
+      query_params_count.push(customerId);
       cartgroupjoin = ", cart.cart_id, cart.qty";
       cartqtyandid = `, COALESCE(cart.cart_id, 0) AS cart_id, COALESCE(cart.qty, 0) AS cart_qty`;
     }
@@ -1531,18 +1536,12 @@ const particularProductDetails = catchAsync(async (req, res) => {
         cd.country_name,
         CONCAT('${BASE_URL}', '/images/img-country-flag/', cd.flag) AS country_flag,
         CONCAT('${BASE_URL}', p.thumbnail_product_image) AS thumbnail_product_image,
-        ARRAY[pi.image_path] AS product_images
+        array_agg(DISTINCT CONCAT('${BASE_URL}', pi.image_path)) AS product_images
         ${cartqtyandid}
       FROM products AS p
       LEFT JOIN categories AS c ON p.category = c.id
       LEFT JOIN country_data AS cd ON p.country_id = cd.id
-      LEFT JOIN LATERAL (
-        SELECT CONCAT('${BASE_URL}', pi.image_path) AS image_path
-        FROM product_images pi
-        WHERE pi.product_id = p.id
-        ORDER BY pi.id DESC
-        LIMIT 1
-      ) AS pi ON true
+      LEFT JOIN product_images pi ON pi.product_id = p.id AND pi.deleted_at IS NULL
       LEFT JOIN (
         SELECT
           product_id,
@@ -1562,7 +1561,7 @@ const particularProductDetails = catchAsync(async (req, res) => {
       ) AS pl ON pl.product_id = p.id
       ${cartJoin}
       WHERE p.id = ${product_id} AND p.status = $1 AND p.deleted_at IS NULL
-      GROUP BY p.id, c.cat_name, c.id, q.total_ordered_quantity_today, pi.image_path, pl.price, cd.id, cd.country_name ${cartgroupjoin}
+      GROUP BY p.id, c.cat_name, c.id, q.total_ordered_quantity_today,  pl.price, cd.id, cd.country_name ${cartgroupjoin}
     `;
 
     const getproductlist = await db.query(productquery, query_params);
@@ -1570,7 +1569,8 @@ const particularProductDetails = catchAsync(async (req, res) => {
     //category based product list
     const categoryId = getproductlist?.rows[0].categoryid;
 
-    const categoriesList = await db.query(`SELECT
+    const categoriesList = await db.query(
+      `SELECT
         p.id,
         p.name AS product_name,
         p.slug,
@@ -1618,13 +1618,15 @@ const particularProductDetails = catchAsync(async (req, res) => {
       ${cartJoin}
       WHERE p.category = ${categoryId} AND p.status = $1 AND p.deleted_at IS NULL
       GROUP BY p.id, c.cat_name, c.id, q.total_ordered_quantity_today, pi.image_path, pl.price, cd.id, cd.country_name ${cartgroupjoin}
-    `,query_params)
+    `,
+      query_params
+    );
 
     return res.status(200).json({
       status: true,
       message: "fetch Product list successfully",
-      data: (getproductlist.rowCount > 0 ) ? getproductlist.rows : [],
-      catBasedProduct:(categoriesList.rowCount > 0) ? categoriesList.rows : []
+      data: getproductlist.rowCount > 0 ? getproductlist.rows : [],
+      catBasedProduct: categoriesList.rowCount > 0 ? categoriesList.rows : [],
     });
   } catch (e) {
     return res.status(500).json({
@@ -1634,7 +1636,6 @@ const particularProductDetails = catchAsync(async (req, res) => {
     });
   }
 });
-
 
 export {
   category_list,
@@ -1652,7 +1653,7 @@ export {
   country_list,
   get_price,
   particularProductDetails,
-//  footer
+  //  footer
   get_categories_based_product,
-  get_country_based_product
+  get_country_based_product,
 };
