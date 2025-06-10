@@ -62,6 +62,15 @@ const importProduct = catchAsync(async (req, res) => {
       "Product Thumbnail Image": image_url,
     } = row;
 
+    //Check for duplicate product
+    const existingProduct = await db.query(
+      `SELECT id FROM products WHERE LOWER(name) = LOWER($1) AND deleted_at IS NULL`,
+      [product_name]
+    );
+    if (existingProduct.rows.length > 0) {
+      continue;
+    }
+
     let local_image_path = FALLBACK_IMAGE;
 
     // if (image_url && image_url.startsWith("https")) {
@@ -100,7 +109,7 @@ const importProduct = catchAsync(async (req, res) => {
 
     //country table
     const countries = await db.query(
-      `select id from country_data where country_data ILIKE $1`,
+      `select id from country_data where country_name ILIKE $1`,
       [country_name]
     );
 
@@ -109,7 +118,7 @@ const importProduct = catchAsync(async (req, res) => {
     const country_id = countries.rows[0].id;
     const minimum_order_place = min_order;
     const maximum_order_place = max_order;
-    const price = price;
+
     const thumbnailImage = local_image_path
       ? media_url(local_image_path)
       : null;
@@ -129,7 +138,7 @@ const importProduct = catchAsync(async (req, res) => {
       slug: generateSlug(productName),
       minimum_order_place: minimum_order_place,
       maximum_order_place: maximum_order_place,
-      price: price,
+      price: row.Price,
       country_id: country_id,
       thumbnail_product_image: thumbnailImage,
       category: category_id,
@@ -156,7 +165,7 @@ const importProduct = catchAsync(async (req, res) => {
     ,created_by,created_at,updated_by,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
       [
         product_id,
-        price,
+        row.Price,
         country_id,
         countryName?.rows[0].id,
         moment(new Date()).format("YYYY-MM-DD"),
