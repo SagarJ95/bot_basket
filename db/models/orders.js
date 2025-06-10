@@ -56,6 +56,9 @@ const orders = sequelize.define(
     special_instruction: {
       type: DataTypes.STRING,
     },
+    cancel_reason: {
+      type: DataTypes.TEXT,
+    },
     invoice_path: {
       type: DataTypes.STRING,
     },

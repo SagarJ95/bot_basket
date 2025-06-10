@@ -14,6 +14,7 @@ import Customer from "../../db/models/customers.js";
 import Orders from "../../db/models/orders.js";
 import customer_address from "../../db/models/customer_address.js";
 import { formatDateToISO } from "../../helpers/slug_helper.js";
+import { sendOrderConfirmation } from "../../helpers/orderconformation_mail.js";
 
 const BASE_URL = process.env.BASE_URL || "http://localhost:3848";
 
@@ -130,6 +131,10 @@ const changeStatus = catchAsync(async (req, res) => {
   await Promise.all([
     body("order_id").notEmpty().withMessage("Order Id is required").run(req),
     body("status").notEmpty().withMessage("status is required").run(req),
+    body("payment_status")
+      .notEmpty()
+      .withMessage("payment status is required")
+      .run(req),
   ]);
 
   // Handle validation result
@@ -140,15 +145,37 @@ const changeStatus = catchAsync(async (req, res) => {
   }
 
   try {
-    const { status, order_id, date, order_item } = req.body;
-    const query_params = [status, order_id];
+    const {
+      status,
+      order_id,
+      date,
+      order_item,
+      payment_status,
+      payment_mode,
+      cancel_reason,
+    } = req.body;
+    const files = req.files || {};
     const formattedDate = await formatDateToISO(date);
 
-    const query = `update orders SET order_status = $1 WHERE id = $2`;
-    const result = await db.query(query, query_params);
 
-    //if order_status is 2 then update item_delivery_status
+    // console.log('addressListInfo',addressListInfo.rows)
+    //if order_status is 2 (confirm order) then update item_delivery_status
     if (status == 2) {
+      //update Order details in order table
+      const formatPath = (filePath) => {
+        return filePath
+          ? filePath.replace(/^public[\\/]/, "/").replace(/\\/g, "/")
+          : null;
+      };
+
+      const invoicePath =
+        files.invoice && files.invoice.length > 0
+          ? formatPath(files.invoice[0].path)
+          : null;
+
+      const query = `update orders SET order_status = $1,payment_status = $2,payment_mode = $3,invoice_path = '${invoicePath}' WHERE id = $4`;
+       const result =  await db.query(query, [status, payment_status, payment_mode, order_id]);
+
       if (order_item) {
         for (let items of order_item) {
           await db.query(
@@ -162,9 +189,16 @@ const changeStatus = catchAsync(async (req, res) => {
           );
         }
       }
+    } else if (status == 5) {
+      //order cancelled
+      const query = `update orders SET order_status = $1,cancel_reason = $2 WHERE id = $3`;
+      await db.query(query, [status, cancel_reason, order_id]);
+    }else{
+      const query = `update orders SET order_status = $1 WHERE id = $2`;
+      await db.query(query, [status, order_id]);
     }
 
-    //update order_status wise date in delivery_date,cancelled date
+    // //update order_status wise date in delivery_date,cancelled date
     const dateFields = {
       2: "excepted_delivery_date",
       3: "shipped_date",
@@ -178,6 +212,33 @@ const changeStatus = catchAsync(async (req, res) => {
         [formattedDate, order_id]
       );
     }
+
+    //get order_id ,customer info ,order_item info
+    const orderInfo = await db.query(`select customer_id,customer_name,email,whatsapp_number,address,payment_mode,
+      CASE WHEN payment_status = 1 THEN 'Paid'
+          WHEN payment_status = 2 THEN 'Unpaid'
+          WHEN payment_status = 3 THEN 'Partially Paid'
+          ELSE '' END AS pay_status from orders where id = $1`,[order_id])
+
+    const orderItemInfo = await db.query(`select product_name,quantity,price,CASE
+                  WHEN item_delivery_status = 1 THEN 'Accept'
+                  ELSE 'Reject'
+                END AS delivery_status,reason from order_items where id = $1`,[order_id])
+
+        //get address list
+        const addressListInfo = await db.query(`select CONCAT(address1, ' ',address2) as address,zip_code,country,city,state from customer_addresses where id = $1 and customer_id = $2`,[orderInfo.rows[0].address,orderInfo.rows[0].customer_id])
+
+        await sendOrderConfirmation(
+          req,
+          orderInfo.rows[0].email,
+          orderInfo.rows[0].customer_name,
+          orderInfo.rows[0].payment_mode,
+          orderInfo.rows[0].pay_status,
+          addressListInfo.rows,
+          orderItemInfo.rows,
+          order_id,
+          status
+        );
 
     return res.status(200).json({
       status: true,

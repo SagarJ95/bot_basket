@@ -11,26 +11,55 @@ export async function sendOrderConfirmation(
   req,
   email,
   customer_name,
+  payment_mode,
+  payment_status,
   delivery_address,
-  products = [],
-  order_id
+  products,
+  order_id,
+  status
 ) {
-  const totalPrice = products.reduce((sum, p) => sum + p.price * p.quantity, 0);
+ // const totalPrice = products.reduce((sum, p) => sum + p.price * p.quantity, 0);
   const orderId = `BOT${order_id}`;
   const orderDate = moment().format("YYYY-MM-DD HH:mm");
   const pdfPath = `./public/uploads/order_pdf/order_${Date.now()}.pdf`;
+    const statusMessages = {
+      2: {
+        title: 'Thanks for your purchase! Your order has been confirmed and is being prepared.',
+        statusText: 'Confirmed'
+      },
+      3: {
+        title: 'Good news! Your order is on its way.',
+        statusText: 'Shipped'
+      },
+      4: {
+        title: 'Your order has been delivered successfully. We hope you enjoy it!',
+        statusText: 'Delivered'
+      },
+      default: {
+        title: 'We’re sorry! Your order has been cancelled. For more info, contact support.',
+        statusText: 'Cancelled'
+      }
+    };
 
-  // Prepare data for the EjS template
-  const emailData = {
-    orderId,
-    orderDate,
-    customer_name,
-    delivery_address,
-    products,
-    totalPrice,
-  };
+    const { title, statusText } = statusMessages[status] || statusMessages.default;
 
-  // Render separate EJS templates for email body and PDF
+    let titleEmail = title;
+    let orderStatus = statusText;
+
+    const emailData = {
+      orderId,
+      orderDate,
+      customer_name,
+      payment_mode,
+      payment_status,
+      delivery_address,
+      products,
+      order_id,
+      status,
+      titleEmail
+    };
+
+  // // Render separate EJS templates for email body and PDF
   const emailBodyHtml = await new Promise((resolve, reject) => {
     req.app.render(
       "admin/pages/email/order_summary_email",
@@ -42,60 +71,73 @@ export async function sendOrderConfirmation(
     );
   });
 
-  const pdfHtml = await new Promise((resolve, reject) => {
-    req.app.render(
-      "admin/pages/email/order_invoice_pdf",
-      emailData,
-      (err, html) => {
-        if (err) return reject(err);
-        resolve(html);
-      }
-    );
-  });
+  // const pdfHtml = await new Promise((resolve, reject) => {
+  //   req.app.render(
+  //     "admin/pages/email/order_invoice_pdf",
+  //     emailData,
+  //     (err, html) => {
+  //       if (err) return reject(err);
+  //       resolve(html);
+  //     }
+  //   );
+  // });
 
-  // Generate PDF from the detailed invoice template
-  const browser = await puppeteer.launch({
-    executablePath: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
-    headless: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--enable-logging", // Enable detailed logs
-      ],
-  });
+  // // Generate PDF from the detailed invoice template
+  // const browser = await puppeteer.launch({
+  //   executablePath: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+  //   headless: true,
+  //     args: [
+  //       "--no-sandbox",
+  //       "--disable-setuid-sandbox",
+  //       "--enable-logging", // Enable detailed logs
+  //     ],
+  // });
 
-  const page = await browser.newPage();
-  await page.setContent(pdfHtml, { waitUntil: "domcontentloaded" });
-  await page.pdf({ path: pdfPath, format: "A4", printBackground: true });
-  await browser.close();
+  // const page = await browser.newPage();
+  // await page.setContent(pdfHtml, { waitUntil: "domcontentloaded" });
+  // await page.pdf({ path: pdfPath, format: "A4", printBackground: true });
+  // await browser.close();
 
-  // Configure mail transporter
-  const transport = nodemailer.createTransport({
-    service: "gmail",
+  // // Configure mail transporter
+  // const transport = nodemailer.createTransport({
+  //   service: "gmail",
+  //   auth: {
+  //     user: process.env.MAIL_USERNAME,
+  //     pass: process.env.MAIL_PASSWORD,
+  //   },
+  // });
+const transport = nodemailer.createTransport({
+    host: process.env.MAIL_HOST,
+    port: process.env.MAIL_PORT, // Use port 587 for STARTTLS
+    secure: false, // Set to false since STARTTLS is being used
     auth: {
       user: process.env.MAIL_USERNAME,
       pass: process.env.MAIL_PASSWORD,
     },
+    tls: {
+      // This is optional but can help avoid some TLS-related issues.
+      rejectUnauthorized: false,
+    },
   });
 
-  // Send mail using the simpler email body template
+  // // Send mail using the simpler email body template
   const mailOptions = {
     from: `"BotBasket" <${process.env.MAIL_USERNAME}>`,
-    to: email.toLowerCase(),
-    subject: "🛒 Your BotBasket Order Confirmation",
+    to: 'sjagade84@gmail.com',
+    subject: `🛒 Your BotBasket Order ${orderStatus}`,
     html: emailBodyHtml,
-    attachments: [
-      {
-        filename: "order-confirmation.pdf",
-        path: pdfPath,
-        contentType: "application/pdf",
-      },
-    ],
+    // attachments: [
+    //   {
+    //     filename: "order-confirmation.pdf",
+    //     path: pdfPath,
+    //     contentType: "application/pdf",
+    //   },
+    //],
   };
 
   try {
     await transport.sendMail(mailOptions);
-    fs.unlinkSync(pdfPath); // Delete temporary PDF file
+    //fs.unlinkSync(pdfPath); // Delete temporary PDF file
     return { status: true, message: "Order confirmation email sent!" };
   } catch (err) {
     console.error("Email sending error:", err);

@@ -1,17 +1,47 @@
 <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
     <h2 style="color: #4CAF50;">Hello <%= customer_name %>,</h2>
-    <p>Thank you for shopping with <strong>BotBasket</strong>! Your order has been successfully placed.</p>
-  
-    <h3>🧾 Order Summary</h3>
-    <p><strong>Total Price:</strong> ₹<%= totalPrice.toFixed(2) %></p>
-    <p><strong>Delivery Address:</strong> <%= delivery_address %></p>
-  
-    <p>We've attached a detailed invoice for your reference.</p>
-  
+    <p><%= titleEmail %></p>
+
+    <h3>🧾 Your Order Details are mentioned below: </h3>
+    <p><strong>Order ID:</strong> <%= orderId %> </p>
+    <p><strong>Date of Purchase:</strong> <%= orderDate %></p>
+    <p><strong>Payment Method:</strong> <%= payment_mode %></p>
+    <p><strong>Payment Status:</strong> <%= payment_status %></p>
+
+    <h3>Shipping Address:</h3>
+    <% if (delivery_address && delivery_address.length > 0) { %>
+        <p><%= delivery_address[0].address %></p>
+        <p><%= delivery_address[0].city %>, <%= delivery_address[0].state %></p>
+        <p><%= delivery_address[0].zip_code %>, <%= delivery_address[0].country %></p>
+    <% } %>
+
+    <h3>Product Details:</h3>
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+        <thead>
+          <tr style="background-color: #f5f5f5;">
+            <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Product Name</th>
+            <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Quantity</th>
+            <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Price</th>
+            <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Status</th>
+            <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          <% products.forEach(function(product) { %>
+          <tr>
+            <td style="padding: 10px; border: 1px solid #ddd;"><%= product.product_name %></td>
+            <td style="padding: 10px; border: 1px solid #ddd;"><%= product.quantity %></td>
+            <td style="padding: 10px; border: 1px solid #ddd;">₹<%= product.price %></td>
+            <td style="padding: 10px; border: 1px solid #ddd;"><%= product.delivery_status %></td>
+            <td style="padding: 10px; border: 1px solid #ddd;"><%= product.reason %></td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+
     <p style="margin-top: 30px;">We appreciate your trust in us. If you have any questions, feel free to reply to this email.</p>
     <p>Happy Shopping!<br/><strong>Team BotBasket</strong></p>
-  
+
     <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;" />
     <p style="font-size: 12px; color: #888;">This is an automated email. Please do not reply to it.</p>
-  </div>
-  
+</div>

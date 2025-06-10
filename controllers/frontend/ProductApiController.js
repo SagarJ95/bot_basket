@@ -724,165 +724,6 @@ const delete_product_cart = catchAsync(async (req, res) => {
 
 /******************* Start Order creation Flow ************************ */
 //place order
-const create_order_bkp = catchAsync(async (req, res) => {
-  await Promise.all([
-    body("name").notEmpty().withMessage("Name is required").run(req),
-    body("whatsapp_number")
-      .notEmpty()
-      .withMessage("Whatsapp Number is required")
-      .run(req),
-    body("email").notEmpty().withMessage("Email is required").run(req),
-    body("perferred_delivery_date")
-      .notEmpty()
-      .withMessage("Perferred delivery date is required")
-      .run(req),
-    body("address").notEmpty().withMessage("Address is required").run(req),
-    // body("order_item")
-    //   .isArray({ min: 1 })
-    //   .withMessage("At least one order item is required")
-    //   .run(req),
-  ]);
-
-  // Handle validation result
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    const error_message = errors.array()[0].msg;
-    throw new AppError(error_message, 200, errors);
-  }
-
-  try {
-    const customer_id = req.user.id;
-    const {
-      name,
-      whatsapp_number,
-      email,
-      perferred_delivery_date,
-      address,
-      instruction,
-      order_item,
-      delivery_option_id,
-    } = req.body;
-
-    //get order id from order table
-    const getorderid = await db.query(`select id from orders order by id desc`);
-    const orderidInc = getorderid.rowCount > 0 ? getorderid.rows[0].id + 1 : 1;
-    const orderrefid = `Order_ID_${orderidInc}`;
-
-    let order_items = await db.query(
-      `SELECT DISTINCT ON (atc.id)
-                  atc.id as cart_id,
-                  atc.product_id,
-                  p.name AS product_name,
-                  atc.qty,
-                  p.price
-                FROM add_to_carts AS atc
-                LEFT JOIN products AS p ON atc.product_id = p.id
-                LEFT JOIN categories AS c ON p.category = c.id
-                LEFT JOIN country_data AS cd ON p.country_id = cd.id
-                LEFT JOIN LATERAL (
-                  SELECT image_path
-                  FROM product_images
-                  WHERE product_id = p.id
-                  ORDER BY id DESC
-                  LIMIT 1
-                ) pi ON true
-                WHERE atc.status = $1
-                  AND atc.created_by = $2
-                  AND atc.deleted_at IS NULL
-              `,
-      [1, customer_id]
-    );
-
-    if (order_items.rowCount == 0) {
-      return res.status(200).json({
-        status: false,
-        message: "There are no items in your cart yet.",
-      });
-    }
-
-    const order_id = await Orders.create({
-      customer_id: customer_id,
-      order_ref_id: orderrefid,
-      customer_name: name,
-      whatsapp_number: whatsapp_number,
-      email: email,
-      perferred_delivery_date: perferred_delivery_date,
-      address: address,
-      special_instruction: instruction,
-      delivery_option_id: delivery_option_id,
-      status: 1,
-      order_status: 1,
-      created_by: customer_id,
-    });
-
-    if (order_id.id) {
-      for (let item of order_items.rows) {
-        const order_item_id = await OrderItem.create({
-          order_id: order_id.id,
-          customer_id: customer_id,
-          cart_id: item.cart_id,
-          product_id: item.product_id,
-          product_name: item.product_name,
-          quantity: item.quantity,
-          price: item.price,
-          order_item_status: 1,
-          item_delivery_status: 1,
-          created_by: customer_id,
-        });
-
-        //Deactive status in cart_list
-        const cart_id = item.cart_id;
-        const cart = await addToCart.update(
-          { status: 0 },
-          { where: { id: cart_id } }
-        );
-      }
-    }
-    let getaddres;
-    let final_address = "";
-
-    if (delivery_option_id == 1) {
-      getaddres = await db.query(
-        `select CONCAT(address1,' ',address2) as address from customer_addresses where customer_id=$1 AND id=$2 AND status=$3 `,
-        [customer_id, address, "1"]
-      );
-      final_address = getaddres.rows[0]?.address || "";
-      // console.log("final_address", final_address);
-    } else if (delivery_option_id == 2) {
-      getaddres = await db.query(
-        `select store_address from store_self_locations where status=$1 `,
-        ["1"]
-      );
-      final_address = getaddres.rows[0]?.store_address || "";
-      // console.log("final_address", final_address);
-    }
-
-    // send conformation mail with pdf attach invoice
-    await sendOrderConfirmation(
-      req,
-      email,
-      name,
-      final_address,
-      order_items.rows.map((item) => ({
-        name: item.product_name,
-        quantity: item.qty,
-        price: item.price,
-      })),
-      order_id.id
-    );
-
-    return res.status(200).json({
-      status: true,
-      message: "Order Place Successfully",
-    });
-  } catch (error) {
-    return res.status(200).json({
-      status: false,
-      message: "Failed to retrieve data",
-      errors: error.message,
-    });
-  }
-});
 
 const create_order = catchAsync(async (req, res) => {
   await Promise.all([
@@ -987,18 +828,18 @@ const create_order = catchAsync(async (req, res) => {
     }
 
     // send conformation mail with pdf attach invoice
-    await sendOrderConfirmation(
-      req,
-      email,
-      name,
-      final_address,
-      order_item.map((item) => ({
-        name: item.product_name,
-        quantity: item.quantity,
-        price: item.price,
-      })),
-      order_id.id
-    );
+    // await sendOrderConfirmation(
+    //   req,
+    //   email,
+    //   name,
+    //   final_address,
+    //   order_item.map((item) => ({
+    //     name: item.product_name,
+    //     quantity: item.quantity,
+    //     price: item.price,
+    //   })),
+    //   order_id.id
+    // );
 
     return res.status(200).json({
       status: true,
@@ -1100,9 +941,9 @@ const order_history = catchAsync(async (req, res) => {
         SUM(oi.quantity * oi.price::numeric) AS total_price,
         TO_CHAR(o.created_at, 'FMDDth FMMonth YYYY') AS order_placed,
         SUM(oi.quantity) AS total_item,
-        TO_CHAR(o.cancelled_date, 'DD/MM/YYYY') AS cancelled_date,
+        TO_CHAR(o.cancelled_date, 'FMDDth FMMonth YYYY') AS cancelled_date,
         o.order_status,
-        o.delivery_date AS delivery_date,
+        TO_CHAR(o.delivery_date, 'FMDDth FMMonth YYYY') AS delivery_date,
         CASE o.order_status
           WHEN 1 THEN 'Pending'
           WHEN 2 THEN 'Confirmed'

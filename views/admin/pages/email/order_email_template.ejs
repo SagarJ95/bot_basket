@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Order Update - Keep In Basket</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      margin: 0;
+      padding: 20px;
+    }
+    .container {
+      max-width: 700px;
+      margin: auto;
+      background: #fff;
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 0 10px rgba(0,0,0,0.05);
+    }
+    .header {
+      background-color: #4CAF50;
+      color: #fff;
+      padding: 20px;
+      text-align: center;
+    }
+    .content {
+      padding: 30px;
+    }
+    .footer {
+      background-color: #eee;
+      padding: 10px;
+      text-align: center;
+      font-size: 12px;
+      color: #777;
+    }
+    .button {
+      display: inline-block;
+      padding: 12px 20px;
+      margin-top: 20px;
+      background-color: #4CAF50;
+      color: white;
+      text-decoration: none;
+      border-radius: 4px;
+    }
+    .order-meta {
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+    .order-meta span {
+      display: block;
+      margin-bottom: 5px;
+    }
+    .product-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    .product-table th,
+    .product-table td {
+      border: 1px solid #ddd;
+      padding: 10px;
+    }
+    .product-table th {
+      background-color: #f0f0f0;
+      text-align: left;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h2>{{subjectTitle}}</h2>
+    </div>
+    <div class="content">
+      <p>Hi {{customerName}},</p>
+      <p>{{message}}</p>
+
+      <!-- Order ID and Date Outside Table -->
+      <div class="order-meta">
+        <span><strong>Order ID:</strong> {{orderId}}</span>
+        <span><strong>Order Date:</strong> {{orderDate}}</span>
+      </div>
+
+      <!-- Product Table -->
+      <table class="product-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Product Name</th>
+            <th>Quantity</th>
+            <th>Price</th>
+            <th>Status</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{#each products}}
+          <tr>
+            <td>{{id}}</td>
+            <td>{{name}}</td>
+            <td>{{quantity}}</td>
+            <td>₹{{price}}</td>
+            <td>{{status}}</td>
+            <td>{{reason}}</td>
+          </tr>
+          {{/each}}
+        </tbody>
+      </table>
+
+      <a href="{{trackingLink}}" class="button">Track Your Order</a>
+    </div>
+    <div class="footer">
+      &copy; {{year}} Keep In Basket. All rights reserved.
+    </div>
+  </div>
+</body>
+</html>

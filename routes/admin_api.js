@@ -25,10 +25,10 @@ const file_storage = diskStorage({
   destination: function (req, file, cb) {
     let uploadPath;
 
-    if (file.fieldname === 'profile') {
-      uploadPath = './public/uploads/profile';
+    if (file.fieldname === "profile") {
+      uploadPath = "./public/uploads/profile";
     } else {
-      return cb(new Error('Invalid fieldname'), null);
+      return cb(new Error("Invalid fieldname"), null);
     }
 
     if (!existsSync(uploadPath)) {
@@ -38,35 +38,32 @@ const file_storage = diskStorage({
     cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + extname(file.originalname));
-  }
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, file.fieldname + "-" + uniqueSuffix + extname(file.originalname));
+  },
 });
 
 //uploadCategory
 const StorageFile = multer.diskStorage({
-
   destination: (req, file, cb) => {
     let uploadPath;
 
-    if (file.fieldname === 'icon') {
-      uploadPath = './public/uploads/category';
-    }
-    else if (file.fieldname === 'product_images') {
-      uploadPath = './public/uploads/product_images';
-    } else if(file.fieldname === 'thumbnail_product_image'){
-      uploadPath = './public/uploads/thumbnail_product_image';
-    }else if (file.fieldname === 'invoice') {
-      uploadPath = './public/uploads/invoice';
-    } else if (file.fieldname === 'csv_file') {
-      uploadPath = './public/uploads/import_product_update_price';
+    if (file.fieldname === "icon") {
+      uploadPath = "./public/uploads/category";
+    } else if (file.fieldname === "product_images") {
+      uploadPath = "./public/uploads/product_images";
+    } else if (file.fieldname === "thumbnail_product_image") {
+      uploadPath = "./public/uploads/thumbnail_product_image";
+    } else if (file.fieldname === "invoice") {
+      uploadPath = "./public/uploads/invoice";
+    } else if (file.fieldname === "csv_file") {
+      uploadPath = "./public/uploads/import_product_update_price";
     } else if (file.fieldname === "excel") {
       uploadPath = "./public/uploads/import_product_upload_excel";
-    }else if(file.fieldname === 'country_flag'){
-      uploadPath = './public/images/img-country-flag';
-    }
-    else {
-      return cb(new Error('Invalid fieldname'), null);
+    } else if (file.fieldname === "country_flag") {
+      uploadPath = "./public/images/img-country-flag";
+    } else {
+      return cb(new Error("Invalid fieldname"), null);
     }
 
     if (!existsSync(uploadPath)) {
@@ -87,16 +84,19 @@ const StorageFile = multer.diskStorage({
 const upload = multer({ storage: StorageFile });
 const upload_profile = multer({ storage: file_storage });
 
-
 const compressImage = async (req, res, next) => {
-  if (req.file && req.file.mimetype.startsWith('image')) {
-    const outputFilePath = req.file.path.replace(extname(req.file.filename), '-compressed.jpg');
+  if (req.file && req.file.mimetype.startsWith("image")) {
+    const outputFilePath = req.file.path.replace(
+      extname(req.file.filename),
+      "-compressed.jpg"
+    );
     try {
-      await sharp(req.file.path)
-        .jpeg({ quality: 80 })
-        .toFile(outputFilePath);
+      await sharp(req.file.path).jpeg({ quality: 80 }).toFile(outputFilePath);
       req.file.path = outputFilePath;
-      req.file.filename = req.file.filename.replace(extname(req.file.filename), '-compressed.jpg');
+      req.file.filename = req.file.filename.replace(
+        extname(req.file.filename),
+        "-compressed.jpg"
+      );
     } catch (err) {
       return next(err);
     }
@@ -107,7 +107,7 @@ const compressImage = async (req, res, next) => {
 /* Auth API Routes -------------------------------------- */
 
 //countries
-router.post('/countries', masterController.countries)
+router.post("/countries", masterController.countries);
 
 // POST user login
 router.post("/sign-in", signInController.userLogin);
@@ -121,7 +121,11 @@ router.get("/sign-out", authenticate, signInController.userLogout);
 router.post("/getUsers", authenticate, userManagementController.getUsers);
 
 //dashboard
-router.post("/dashboard", authenticate, dashboardController.dashboardController);
+router.post(
+  "/dashboard",
+  authenticate,
+  dashboardController.dashboardController
+);
 
 // POST add new user || GET get all user
 router
@@ -136,7 +140,9 @@ router
   .patch(authenticate, userManagementController.updateUserById)
   .delete(authenticate, userManagementController.deleteUserById);
 
-router.route("/users_change_status/:id").patch(authenticate, userManagementController.activeUserById);
+router
+  .route("/users_change_status/:id")
+  .patch(authenticate, userManagementController.activeUserById);
 
 /* Users API End ------------------------------------ */
 
@@ -144,14 +150,34 @@ router.route("/users_change_status/:id").patch(authenticate, userManagementContr
 // POST add new category || GET get all categories
 router.post("/getCategories", authenticate, masterController.getCategories);
 
-router.post("/createCategory", authenticate, upload.fields([
-  { name: 'icon', maxCount: 1 }]), masterController.createCategory);
+router.post(
+  "/createCategory",
+  authenticate,
+  upload.fields([{ name: "icon", maxCount: 1 }]),
+  masterController.createCategory
+);
 router.post("/getCategoryById", authenticate, masterController.getCategoryById);
-router.post("/updateCategoryById", authenticate, upload.fields([
-  { name: 'icon', maxCount: 1 }]), masterController.updateCategoryById);
-router.post("/deleteCategoryById", authenticate, masterController.deleteCategoryById);
-router.post("/excelExportCategory", authenticate, masterController.excelExportCategory);
-router.post('/updateCategoryStatusById', authenticate, masterController.updateCategoryStatusById)
+router.post(
+  "/updateCategoryById",
+  authenticate,
+  upload.fields([{ name: "icon", maxCount: 1 }]),
+  masterController.updateCategoryById
+);
+router.post(
+  "/deleteCategoryById",
+  authenticate,
+  masterController.deleteCategoryById
+);
+router.post(
+  "/excelExportCategory",
+  authenticate,
+  masterController.excelExportCategory
+);
+router.post(
+  "/updateCategoryStatusById",
+  authenticate,
+  masterController.updateCategoryStatusById
+);
 
 /* Category API End ------------------------------------ */
 router.post(
@@ -160,59 +186,157 @@ router.post(
   upload.single("excel"),
   productController.importProduct
 );
-router.post("/createProduct", upload.fields([
-  { name: 'product_images', maxCount: 5 },{ name: 'thumbnail_product_image', maxCount: 1 }]), authenticate, productController.createProduct)
-router.post("/updateProduct", upload.fields([
-  { name: 'product_images', maxCount: 5 },{ name: 'thumbnail_product_image', maxCount: 1 }]), authenticate, productController.updateProduct)
+router.post(
+  "/createProduct",
+  upload.fields([
+    { name: "product_images", maxCount: 5 },
+    { name: "thumbnail_product_image", maxCount: 1 },
+  ]),
+  authenticate,
+  productController.createProduct
+);
+router.post(
+  "/updateProduct",
+  upload.fields([
+    { name: "product_images", maxCount: 5 },
+    { name: "thumbnail_product_image", maxCount: 1 },
+  ]),
+  authenticate,
+  productController.updateProduct
+);
 router.post("/getProductById", authenticate, productController.getProductById);
-router.post("/deleteProductById", authenticate, productController.deleteProductById);
-router.post("/updateProductStatusById", authenticate, productController.updateProductStatusById);
-router.post("/excelExportProducts", authenticate, productController.excelExportProducts);
-router.post("/changeProductPrice", authenticate, productController.changeProductPrice);
-router.post("/getProductPriceLogs", authenticate, productController.getProductPriceLogs);
-router.post("/exportProductPriceLogs", authenticate, productController.exportProductPriceLogs);
-router.post("/ChangePricelist", authenticate, productController.ChangePricelist)
-router.post("/changeProductStockStatus", authenticate, productController.changeProductStockStatus);
-router.post('/getProductlist', authenticate, productController.getProductlist)
+router.post(
+  "/deleteProductById",
+  authenticate,
+  productController.deleteProductById
+);
+router.post(
+  "/updateProductStatusById",
+  authenticate,
+  productController.updateProductStatusById
+);
+router.post(
+  "/excelExportProducts",
+  authenticate,
+  productController.excelExportProducts
+);
+router.post(
+  "/changeProductPrice",
+  authenticate,
+  productController.changeProductPrice
+);
+router.post(
+  "/getProductPriceLogs",
+  authenticate,
+  productController.getProductPriceLogs
+);
+router.post(
+  "/exportProductPriceLogs",
+  authenticate,
+  productController.exportProductPriceLogs
+);
+router.post(
+  "/ChangePricelist",
+  authenticate,
+  productController.ChangePricelist
+);
+router.post(
+  "/changeProductStockStatus",
+  authenticate,
+  productController.changeProductStockStatus
+);
+router.post("/getProductlist", authenticate, productController.getProductlist);
 
 //change price product list
-router.post('/getChangePriceProductlist', authenticate, productController.getChangePriceProductlist)
+router.post(
+  "/getChangePriceProductlist",
+  authenticate,
+  productController.getChangePriceProductlist
+);
 
 //export product list for price change
-router.post("/excelExportProductsInfo", authenticate, productController.excelExportProductsInfo)
+router.post(
+  "/excelExportProductsInfo",
+  authenticate,
+  productController.excelExportProductsInfo
+);
 
 //export product list sample
-router.post('/exportProductlistSample',authenticate,productController.exportProductlistSample)
+router.post(
+  "/exportProductlistSample",
+  authenticate,
+  productController.exportProductlistSample
+);
 
 //import product list with update price and store update price in log table
-router.post("/importProductListwithPrice", authenticate,
-  upload.fields([{ name: 'csv_file', maxCount: 1 }]), productController.importProductListwithPrice)
+router.post(
+  "/importProductListwithPrice",
+  authenticate,
+  upload.fields([{ name: "csv_file", maxCount: 1 }]),
+  productController.importProductListwithPrice
+);
 
 /* Customers */
 router.post("/getCustomers", authenticate, customerController.getCustomers);
-router.post("/exportCustomers", authenticate, customerController.exportCustomers);
-router.post('/getParticularCustomerInfo', authenticate, customerController.getParticularCustomerInfo)
-router.post('/update_customer_info', authenticate, upload_profile.fields([
-  { name: "profile", maxCount: 1 }
-]), customerController.update_customer_info)
-router.post('/update_customer_address', authenticate,customerController.update_customer_address)
-router.post('/delete_customer_address', authenticate,customerController.delete_customer_address)
-router.post('/add_customer', authenticate, upload_profile.fields([
-  { name: "profile", maxCount: 1 }
-]), customerController.add_customer)
-router.post('/activationStatus', authenticate, customerController.activationStatus)
-router.post('/addCustomerAddress',authenticate, customerController.addCustomerAddress);
+router.post(
+  "/exportCustomers",
+  authenticate,
+  customerController.exportCustomers
+);
+router.post(
+  "/getParticularCustomerInfo",
+  authenticate,
+  customerController.getParticularCustomerInfo
+);
+router.post(
+  "/update_customer_info",
+  authenticate,
+  upload_profile.fields([{ name: "profile", maxCount: 1 }]),
+  customerController.update_customer_info
+);
+router.post(
+  "/update_customer_address",
+  authenticate,
+  customerController.update_customer_address
+);
+router.post(
+  "/delete_customer_address",
+  authenticate,
+  customerController.delete_customer_address
+);
+router.post(
+  "/add_customer",
+  authenticate,
+  upload_profile.fields([{ name: "profile", maxCount: 1 }]),
+  customerController.add_customer
+);
+router.post(
+  "/activationStatus",
+  authenticate,
+  customerController.activationStatus
+);
+router.post(
+  "/addCustomerAddress",
+  authenticate,
+  customerController.addCustomerAddress
+);
 
 /* Permission API Start ----------------------------------- */
 
 // GET role by id
-router.route("/permission_role/:id").get(authenticate, userManagementController.getRoleBasedUserById);
+router
+  .route("/permission_role/:id")
+  .get(authenticate, userManagementController.getRoleBasedUserById);
 
 // POST add permission based on role id and user id
-router.route("/permission_role").post(authenticate, userManagementController.savePermissions);
+router
+  .route("/permission_role")
+  .post(authenticate, userManagementController.savePermissions);
 
 // GET permission based on role id and user id
-router.route("/getPermissions").post(authenticate, userManagementController.getPermissions);
+router
+  .route("/getPermissions")
+  .post(authenticate, userManagementController.getPermissions);
 
 /* Permission API End ------------------------------------ */
 
@@ -238,7 +362,12 @@ router
 
 /* Order Management */
 router.post("/getOrderlist", authenticate, orderController.getOrderlist);
-router.post("/changeOrderStatus", authenticate, orderController.changeStatus);
+router.post(
+  "/changeOrderStatus",
+  authenticate,
+  upload.fields([{ name: "invoice", maxCount: 1 }]),
+  orderController.changeStatus
+);
 router.post(
   "/orderViewDetails",
   authenticate,
@@ -295,16 +424,32 @@ router.get(
 router.post("/getcountrylist", authenticate, masterController.getcountrylist);
 
 // POST add new country || GET get all country
-router
-  .post('/createCountry',authenticate, upload.fields([{ name: "country_flag", maxCount: 1 }]),masterController.createCountry);
+router.post(
+  "/createCountry",
+  authenticate,
+  upload.fields([{ name: "country_flag", maxCount: 1 }]),
+  masterController.createCountry
+);
 
 // GET country by id || PATCH update country by id || DELETE delete country by id
-  router.post('/getCountryById',authenticate, masterController.getCountryById)
-  router.post('/updateCountryById',authenticate,upload.fields([{ name: "country_flag", maxCount: 1 }]), masterController.updateCountryById)
-  router.post('/deleteCountryById',authenticate, masterController.deleteCountryById);
-  router.post('/updateCountryStatusById',authenticate, masterController.updateCountryStatusById);
+router.post("/getCountryById", authenticate, masterController.getCountryById);
+router.post(
+  "/updateCountryById",
+  authenticate,
+  upload.fields([{ name: "country_flag", maxCount: 1 }]),
+  masterController.updateCountryById
+);
+router.post(
+  "/deleteCountryById",
+  authenticate,
+  masterController.deleteCountryById
+);
+router.post(
+  "/updateCountryStatusById",
+  authenticate,
+  masterController.updateCountryStatusById
+);
 
 /* Country API End ------------------------------------ */
-
 
 export default router;
