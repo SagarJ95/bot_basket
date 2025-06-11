@@ -956,6 +956,11 @@ const order_history = catchAsync(async (req, res) => {
           WHEN 1 THEN CONCAT(ca.address1,' ', ca.address2)
           WHEN 2 THEN sl.store_address
         END AS address,
+        o.cancel_reason,
+        CASE
+          WHEN o.invoice_path IS NULL OR o.invoice_path = '' THEN ''
+          ELSE CONCAT('${BASE_URL}', o.invoice_path)
+        END AS download_invoice,
     CASE o.delivery_option_id WHEN 1 THEN ca.address1 ELSE sl.store_address END AS address_1,
     CASE o.delivery_option_id WHEN 1 THEN ca.address2 ELSE '' END AS address_2,
     CASE o.delivery_option_id WHEN 1 THEN ca.full_name ELSE sl.store_name END AS full_name,

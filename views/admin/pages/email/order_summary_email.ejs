@@ -2,6 +2,10 @@
     <h2 style="color: #4CAF50;">Hello <%= customer_name %>,</h2>
     <p><%= titleEmail %></p>
 
+    <% if(status == 5){ %>
+      <p><strong>Cancel Reason :</strong></p> <%= cancel_reason %>
+    <% } %>
+
     <h3>🧾 Your Order Details are mentioned below: </h3>
     <p><strong>Order ID:</strong> <%= orderId %> </p>
     <p><strong>Date of Purchase:</strong> <%= orderDate %></p>

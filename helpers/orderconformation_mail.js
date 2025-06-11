@@ -16,7 +16,8 @@ export async function sendOrderConfirmation(
   delivery_address,
   products,
   order_id,
-  status
+  status,
+  cancel_reason
 ) {
  // const totalPrice = products.reduce((sum, p) => sum + p.price * p.quantity, 0);
   const orderId = `BOT${order_id}`;
@@ -56,7 +57,8 @@ export async function sendOrderConfirmation(
       products,
       order_id,
       status,
-      titleEmail
+      titleEmail,
+      cancel_reason
     };
 
   // // Render separate EJS templates for email body and PDF

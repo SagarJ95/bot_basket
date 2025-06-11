@@ -218,9 +218,9 @@ const changeStatus = catchAsync(async (req, res) => {
       CASE WHEN payment_status = 1 THEN 'Paid'
           WHEN payment_status = 2 THEN 'Unpaid'
           WHEN payment_status = 3 THEN 'Partially Paid'
-          ELSE '' END AS pay_status from orders where id = $1`,[order_id])
+          ELSE '' END AS pay_status,cancel_reason from orders where id = $1`,[order_id])
 
-    const orderItemInfo = await db.query(`select product_name,quantity,price,CASE
+        const orderItemInfo = await db.query(`select product_name,quantity,price,CASE
                   WHEN item_delivery_status = 1 THEN 'Accept'
                   ELSE 'Reject'
                 END AS delivery_status,reason from order_items where id = $1`,[order_id])
@@ -237,7 +237,8 @@ const changeStatus = catchAsync(async (req, res) => {
           addressListInfo.rows,
           orderItemInfo.rows,
           order_id,
-          status
+          status,
+          orderInfo.rows[0].cancel_reason,
         );
 
     return res.status(200).json({
