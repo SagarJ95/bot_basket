@@ -17,7 +17,8 @@ export async function sendOrderConfirmation(
   products,
   order_id,
   status,
-  cancel_reason
+  cancel_reason,
+  download_invoice
 ) {
  // const totalPrice = products.reduce((sum, p) => sum + p.price * p.quantity, 0);
   const orderId = `BOT${order_id}`;
@@ -58,8 +59,10 @@ export async function sendOrderConfirmation(
       order_id,
       status,
       titleEmail,
-      cancel_reason
+      cancel_reason,
+      download_invoice
     };
+
 
   // // Render separate EJS templates for email body and PDF
   const emailBodyHtml = await new Promise((resolve, reject) => {
@@ -123,19 +126,54 @@ const transport = nodemailer.createTransport({
   });
 
   // // Send mail using the simpler email body template
+  // const mailOptions = {
+  //   from: `"BotBasket" <${process.env.MAIL_USERNAME}>`,
+  //   to: 'sjagade84@gmail.com',
+  //   subject: `🛒 Your BotBasket Order ${orderStatus}`,
+  //   html: emailBodyHtml,
+  //   attachments: [
+  //     {
+  //       filename: `order-${statusText}.${fileExt}`,
+  //       path: download_invoice,
+  //       contentType: content_Type,
+  //     },
+  //   ],
+  // };
+
   const mailOptions = {
-    from: `"BotBasket" <${process.env.MAIL_USERNAME}>`,
-    to: 'sjagade84@gmail.com',
-    subject: `🛒 Your BotBasket Order ${orderStatus}`,
-    html: emailBodyHtml,
-    // attachments: [
-    //   {
-    //     filename: "order-confirmation.pdf",
-    //     path: pdfPath,
-    //     contentType: "application/pdf",
-    //   },
-    //],
-  };
+      from: `"BotBasket" <${process.env.MAIL_USERNAME}>`,
+      to: "sjagade84@gmail.com",
+      subject: `🛒 Your BotBasket Order ${orderStatus}`,
+      html: emailBodyHtml,
+      attachments: [],
+    };
+
+    // Check if download_invoice is provided
+    if (download_invoice && download_invoice.trim() !== "") {
+      const fileUrl = download_invoice;
+
+      const fileName = path.basename(fileUrl);
+      const fileExt = fileName.split('.').pop().toLowerCase();
+
+      // Map file extension to MIME type
+      const mimeTypes = {
+        pdf: "application/pdf",
+        css: "text/css",
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+        png: "image/png",
+        txt: "text/plain",
+        html: "text/html",
+      };
+
+      const contentType = mimeTypes[fileExt] || "application/octet-stream";
+
+      mailOptions.attachments.push({
+        filename: `order-${statusText}.${fileExt}`,
+        path: download_invoice,
+        contentType: contentType,
+      });
+    }
 
   try {
     await transport.sendMail(mailOptions);
