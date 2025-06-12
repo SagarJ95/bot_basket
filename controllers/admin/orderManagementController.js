@@ -71,8 +71,9 @@ const getOrderlist = catchAsync(async (req, res) => {
 
     const totalPageCount = await db.query(
       `select o.id as order_id,o.order_ref_id,o.customer_name,TO_CHAR(o.created_at,'FMDDth FMMonth YYYY') as order_date,
-        o.order_status,SUM(oi.quantity * oi.price::numeric) as total_price,
-        SUM(oi.quantity * oi.price::numeric) as grand_total,
+        o.order_status,
+        SUM(CASE WHEN oi.item_delivery_status = 1 THEN oi.quantity * oi.price::numeric ELSE 0 END) AS total_price,
+        SUM(CASE WHEN oi.item_delivery_status = 1 THEN oi.quantity * oi.price::numeric ELSE 0 END) AS grand_total,
         CASE
             WHEN o.status = 1 THEN 'Pending'
             WHEN o.status = 2 THEN 'Confirmed'
@@ -86,13 +87,14 @@ const getOrderlist = catchAsync(async (req, res) => {
         from orders AS o
         LEFT JOIN order_items as oi ON o.id = oi.order_id AND oi.order_item_status = $2
         where o.order_status = $1 and o.status = $3 ${dateCondition} ${searchQuery}
-        GROUP BY o.id,o.order_ref_id,o.customer_name,o.created_at, o.order_status, o.delivery_date`,
+        GROUP BY o.id,o.order_ref_id,o.customer_name,o.created_at, o.order_status, o.delivery_date order BY id desc`,
       total_query_params
     );
 
     const query = `select o.id as order_id,o.order_ref_id,o.customer_name,TO_CHAR(o.created_at,'FMDDth FMMonth YYYY') as order_date,
-        o.order_status,SUM(oi.quantity * oi.price::numeric) as total_price,
-        SUM(oi.quantity * oi.price::numeric) as grand_total,
+        o.order_status,
+        SUM(CASE WHEN oi.item_delivery_status = 1 THEN oi.quantity * oi.price::numeric ELSE 0 END) AS total_price,
+        SUM(CASE WHEN oi.item_delivery_status = 1 THEN oi.quantity * oi.price::numeric ELSE 0 END) AS grand_total,
         CASE
             WHEN o.status = 1 THEN 'Pending'
             WHEN o.status = 2 THEN 'Confirmed'
@@ -109,7 +111,7 @@ const getOrderlist = catchAsync(async (req, res) => {
         from orders AS o
         LEFT JOIN order_items as oi ON o.id = oi.order_id AND oi.order_item_status = $2
         where o.order_status = $1 and o.status = $3 ${dateCondition} ${searchQuery}
-        GROUP BY o.id,o.order_ref_id,o.customer_name,o.created_at, o.order_status, o.delivery_date
+        GROUP BY o.id,o.order_ref_id,o.customer_name,o.created_at, o.order_status, o.delivery_date ORDER BY id desc
         ${pageCountQuery}`;
 
     const result = await db.query(query, query_params);
@@ -160,58 +162,60 @@ const changeStatus = catchAsync(async (req, res) => {
 
     // console.log('addressListInfo',addressListInfo.rows)
     //if order_status is 2 (confirm order) then update item_delivery_status
-    // if (status == 2) {
-    //   //update Order details in order table
-    //   const formatPath = (filePath) => {
-    //     return filePath
-    //       ? filePath.replace(/^public[\\/]/, "/").replace(/\\/g, "/")
-    //       : null;
-    //   };
+    if (status == 2) {
+      //update Order details in order table
+      const formatPath = (filePath) => {
+        return filePath
+          ? filePath.replace(/^public[\\/]/, "/").replace(/\\/g, "/")
+          : null;
+      };
 
-    //   const invoicePath =
-    //     files.invoice && files.invoice.length > 0
-    //       ? formatPath(files.invoice[0].path)
-    //       : null;
+      const invoicePath =
+        files.invoice && files.invoice.length > 0
+          ? formatPath(files.invoice[0].path)
+          : null;
 
-    //   const query = `update orders SET order_status = $1,payment_status = $2,payment_mode = $3,invoice_path = '${invoicePath}' WHERE id = $4`;
-    //    const result =  await db.query(query, [status, payment_status, payment_mode, order_id]);
+      const query = `update orders SET order_status = $1,payment_status = $2,payment_mode = $3,invoice_path = '${invoicePath}' WHERE id = $4`;
+       const result =  await db.query(query, [status, payment_status, payment_mode, order_id]);
 
-    //   if (order_item) {
-    //     for (let items of order_item) {
-    //       await db.query(
-    //         `update order_items SET item_delivery_status = $1, reason = $4 WHERE id = $2 AND order_id = $3`,
-    //         [
-    //           items.order_item_status,
-    //           items.order_item_id,
-    //           order_id,
-    //           items.reason,
-    //         ]
-    //       );
-    //     }
-    //   }
-    // } else if (status == 5) {
-    //   //order cancelled
-    //   const query = `update orders SET order_status = $1,cancel_reason = $2 WHERE id = $3`;
-    //   await db.query(query, [status, cancel_reason, order_id]);
-    // }else{
-    //   const query = `update orders SET order_status = $1 WHERE id = $2`;
-    //   await db.query(query, [status, order_id]);
-    // }
+      if (order_item) {
+         let order_items = JSON.parse(order_item);
+        for (let items of order_items) {
 
-    // // //update order_status wise date in delivery_date,cancelled date
-    // const dateFields = {
-    //   2: "excepted_delivery_date",
-    //   3: "shipped_date",
-    //   4: "delivery_date",
-    //   5: "cancelled_date",
-    // };
+          await db.query(
+            `update order_items SET item_delivery_status = $1, reason = $4 WHERE id = $2 AND order_id = $3`,
+            [
+              items.order_item_status,
+              items.order_item_id,
+              order_id,
+              items.reason,
+            ]
+          );
+        }
+      }
+    } else if (status == 5) {
+      //order cancelled
+      const query = `update orders SET order_status = $1,cancel_reason = $2 WHERE id = $3`;
+      await db.query(query, [status, cancel_reason, order_id]);
+    }else{
+      const query = `update orders SET order_status = $1 WHERE id = $2`;
+      await db.query(query, [status, order_id]);
+    }
 
-    // if (dateFields[status]) {
-    //   await db.query(
-    //     `UPDATE orders SET ${dateFields[status]} = $1 WHERE id = $2`,
-    //     [formattedDate, order_id]
-    //   );
-    // }
+    // //update order_status wise date in delivery_date,cancelled date
+    const dateFields = {
+      2: "excepted_delivery_date",
+      3: "shipped_date",
+      4: "delivery_date",
+      5: "cancelled_date",
+    };
+
+    if (dateFields[status]) {
+      await db.query(
+        `UPDATE orders SET ${dateFields[status]} = $1 WHERE id = $2`,
+        [formattedDate, order_id]
+      );
+    }
 
     //get order_id ,customer info ,order_item info
     const orderInfo = await db.query(`select customer_id,customer_name,email,whatsapp_number,address,payment_mode,
@@ -227,7 +231,7 @@ const changeStatus = catchAsync(async (req, res) => {
         const orderItemInfo = await db.query(`select product_name,quantity,price,CASE
                   WHEN item_delivery_status = 1 THEN 'Accept'
                   ELSE 'Reject'
-                END AS delivery_status,reason from order_items where id = $1`,[order_id])
+                END AS delivery_status,reason from order_items where order_id = $1`,[order_id])
 
         //get address list
         const addressListInfo = await db.query(`select CONCAT(address1, ' ',address2) as address,zip_code,country,city,state from customer_addresses where id = $1 and customer_id = $2`,[orderInfo.rows[0].address,orderInfo.rows[0].customer_id])
@@ -302,7 +306,7 @@ const orderViewDetails = catchAsync(async (req, res) => {
                     p.description,
                     oi.price AS product_price,
                     oi.quantity AS product_quantity,
-                    SUM(oi.quantity * oi.price::numeric) As total_price,
+                    SUM(CASE WHEN oi.item_delivery_status = 1 THEN oi.quantity * oi.price::numeric ELSE 0 END) AS total_price,
                     (
                         SELECT JSON_AGG(DISTINCT CONCAT('${BASE_URL}', pi.image_path))
                         FROM product_images pi

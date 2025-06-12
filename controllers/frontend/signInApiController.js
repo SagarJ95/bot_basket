@@ -549,7 +549,7 @@ async function sendEmail(email, customer_name,status) {
   });
 
   //change subject for sign_up and forget_password
-  console.log("status>>",status)
+
   let subject;
   if(status == 1){
     subject = `Email Authetication`
@@ -557,7 +557,7 @@ async function sendEmail(email, customer_name,status) {
     subject = `Password Reset Request`;
   }
   const mailconfig = {
-    from: `${process.env.MAIL_USERNAME}`,
+    from: `"BotBasket" ${process.env.MAIL_USERNAME}`,
     to: email.toLowerCase(),
     subject: subject,
     html: `<!DOCTYPE html

@@ -42,7 +42,7 @@
       <tbody>
         <% let totalAmount = 0; %>
         <% products.forEach(function(product) { %>
-          <% totalAmount += product.price * product.quantity; %>
+          <% if (product.delivery_status !== 'Reject') { totalAmount += product.price * product.quantity; } %>
         <tr>
           <td style="padding: 12px; border: 1px solid #ddd;"><%= product.product_name %></td>
           <td style="padding: 12px; border: 1px solid #ddd; text-align: center;"><%= product.quantity %></td>

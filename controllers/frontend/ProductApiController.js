@@ -933,12 +933,11 @@ const order_history = catchAsync(async (req, res) => {
     // Get total count for pagination
 
     const result = await db.query(
-      `
-      SELECT
+      `SELECT
         o.id AS order_id,
         o.order_ref_id AS order_number,
         TO_CHAR(o.perferred_delivery_date, 'FMDDth FMMonth YYYY') AS expected_date,
-        SUM(oi.quantity * oi.price::numeric) AS total_price,
+        SUM(CASE WHEN oi.item_delivery_status = 1 THEN oi.quantity * oi.price::numeric ELSE 0 END) AS total_price,
         TO_CHAR(o.created_at, 'FMDDth FMMonth YYYY') AS order_placed,
         SUM(oi.quantity) AS total_item,
         TO_CHAR(o.cancelled_date, 'FMDDth FMMonth YYYY') AS cancelled_date,
@@ -992,14 +991,11 @@ const order_history = catchAsync(async (req, res) => {
             'total_price', oi.quantity * oi.price,
             'country_flag', CONCAT('${BASE_URL}', '/images/img-country-flag/', cd.flag),
             'country_name', cd.country_name,
-            'product_image', (
-              SELECT CONCAT('${BASE_URL}', pi.image_path)
-              FROM product_images pi
-              WHERE pi.product_id = p.id AND pi.image_path IS NOT NULL
-              ORDER BY pi.created_at DESC NULLS LAST
-              LIMIT 1
-            )
+            'item_status',oi.item_delivery_status,
+            'item_cancel_reason',oi.reason,
+            'product_image',  CONCAT('${BASE_URL}', p.thumbnail_product_image)
           )
+            ORDER BY oi.item_delivery_status DESC
         ) AS products
       FROM orders o
       LEFT JOIN customer_addresses ca ON o.address = ca.id

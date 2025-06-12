@@ -60,9 +60,9 @@ export async function sendOrderConfirmation(
       status,
       titleEmail,
       cancel_reason,
-      download_invoice
+      //download_invoice
     };
-
+console.log("emailData>>",emailData)
 
   // // Render separate EJS templates for email body and PDF
   const emailBodyHtml = await new Promise((resolve, reject) => {
