@@ -557,7 +557,7 @@ async function sendEmail(email, customer_name,status) {
     subject = `Password Reset Request`;
   }
   const mailconfig = {
-    from: `"BotBasket" ${process.env.MAIL_USERNAME}`,
+    from: `"KeepInBasket" ${process.env.MAIL_USERNAME}`,
     to: email.toLowerCase(),
     subject: subject,
     html: `<!DOCTYPE html

@@ -141,9 +141,9 @@ const transport = nodemailer.createTransport({
   // };
 
   const mailOptions = {
-      from: `"BotBasket" <${process.env.MAIL_USERNAME}>`,
-      to: "sjagade84@gmail.com",
-      subject: `🛒 Your BotBasket Order ${orderStatus}`,
+      from: `"KeepInBasket" <${process.env.MAIL_USERNAME}>`,
+      to: email.toLowerCase(),
+      subject: `🛒 Your KeepInBasket Order ${orderStatus}`,
       html: emailBodyHtml,
       attachments: [],
     };
