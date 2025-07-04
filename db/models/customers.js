@@ -23,7 +23,13 @@ const customers = sequelize.define(
     phone_no: {
       type: DataTypes.STRING
     },
+    phone_country_code: {
+      type: DataTypes.STRING
+    },
     whatsapp_no:{
+      type: DataTypes.STRING
+    },
+    whatsapp_country_code: {
       type: DataTypes.STRING
     },
     profile:{

@@ -58,6 +58,8 @@ const StorageFile = multer.diskStorage({
       uploadPath = "./public/uploads/invoice";
     } else if (file.fieldname === "csv_file") {
       uploadPath = "./public/uploads/import_product_update_price";
+    } else if (file.fieldname === "file") {
+      uploadPath = "./public/uploads/import_category_excel";
     } else if (file.fieldname === "excel") {
       uploadPath = "./public/uploads/import_product_upload_excel";
     } else if (file.fieldname === "country_flag") {
@@ -174,18 +176,18 @@ router.post(
   masterController.excelExportCategory
 );
 router.post(
+  "/excelImportCategory",
+  authenticate,
+  upload.single("file"),
+  masterController.excelImportCategory
+);
+router.post(
   "/updateCategoryStatusById",
   authenticate,
   masterController.updateCategoryStatusById
 );
 
 /* Category API End ------------------------------------ */
-router.post(
-  "/importProduct",
-  authenticate,
-  upload.single("excel"),
-  productController.importProduct
-);
 router.post(
   "/createProduct",
   upload.fields([
@@ -260,12 +262,19 @@ router.post(
   authenticate,
   productController.excelExportProductsInfo
 );
-
 //export product list sample
 router.post(
   "/exportProductlistSample",
   authenticate,
   productController.exportProductlistSample
+);
+
+//import product list sample
+router.post(
+  "/importProduct",
+  authenticate,
+  upload.single("excel"),
+  productController.importProduct
 );
 
 //import product list with update price and store update price in log table
@@ -295,16 +304,6 @@ router.post(
   customerController.update_customer_info
 );
 router.post(
-  "/update_customer_address",
-  authenticate,
-  customerController.update_customer_address
-);
-router.post(
-  "/delete_customer_address",
-  authenticate,
-  customerController.delete_customer_address
-);
-router.post(
   "/add_customer",
   authenticate,
   upload_profile.fields([{ name: "profile", maxCount: 1 }]),
@@ -315,12 +314,22 @@ router.post(
   authenticate,
   customerController.activationStatus
 );
+
+router.post(
+  "/update_customer_address",
+  authenticate,
+  customerController.update_customer_address
+);
+router.post(
+  "/delete_customer_address",
+  authenticate,
+  customerController.delete_customer_address
+);
 router.post(
   "/addCustomerAddress",
   authenticate,
   customerController.addCustomerAddress
 );
-
 /* Permission API Start ----------------------------------- */
 
 // GET role by id
@@ -362,12 +371,7 @@ router
 
 /* Order Management */
 router.post("/getOrderlist", authenticate, orderController.getOrderlist);
-router.post(
-  "/changeOrderStatus",
-  authenticate,
-  upload.fields([{ name: "invoice", maxCount: 1 }]),
-  orderController.changeStatus
-);
+router.post("/changeOrderStatus",upload.fields([{ name: "invoice", maxCount: 1 }]), authenticate, orderController.changeStatus);
 router.post(
   "/orderViewDetails",
   authenticate,
@@ -449,7 +453,8 @@ router.post(
   authenticate,
   masterController.updateCountryStatusById
 );
-
 /* Country API End ------------------------------------ */
+router.post('/getActiveCategories',authenticate,productController.getActiveCategories)
+router.post('/getcountries',authenticate,productController.getcountries)
 
 export default router;

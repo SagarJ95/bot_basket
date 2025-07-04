@@ -49,11 +49,10 @@
       </tr>
     </thead>
     <tbody>
-
       <% products.forEach(p => { %>
         <tr>
           <td><%= p.name %></td>
-          <td><%= parseInt(p.quantity) %></td>
+          <td><%= p.quantity %></td>
           <td>₹<%= parseFloat(p.price).toFixed(2) %></td>
           <td>₹<%= (parseFloat(p.price) * parseInt(p.quantity)).toFixed(2) %></td>
         </tr>
@@ -71,4 +70,3 @@
   </div>
 </body>
 </html>
-

@@ -91,7 +91,8 @@ const userLogin = catchAsync(async (req, res) => {
                 message: "Logged in successfully",
                 data: [{
                     token: token,
-                    user_id: result.id
+                    user_id: result.id,
+                    name:result.name
                 }]
             });
         }

@@ -1,0 +1,25 @@
+Product_Id,Product_Name,Country_Name,Max_Quantity,Price
+1,Apple,Curacao,200,190.00
+2,Mango,Equatorial Guinea,10,80.10
+3,Orange,Bangladesh,100,301.00
+4,Banana,Bolivia,100,134.00
+5,Watermelon,Burkina Faso,100,210.00
+6,tomato,Brazil,100,100.00
+7,potato,Curacao,100,23.45
+8,Onion,Antarctica,100,234.00
+9,Cucumber,Egypt,100,45.11
+10,Tea,Aruba,100,11.10
+11,Milk,Burkina Faso,100,23.11
+12,Soda,Bonaire,100,110.00
+13,Coffee,Croatia,100,45.10
+14,Wine,Antarctica,100,12.00
+15,Potato chips,Barbados,100,11.00
+16,Popcorn,Brazil,100,203.00
+17,Banana chips,Barbados,100,40.00
+18,Cheese,Ivory Coast,100,41.00
+19,Ice cream,Equatorial Guinea,100,63.00
+21,carrot,Aruba,10,52.22
+63,Prod Name,India,5,6000.87
+65,Veg,Angola,10,15.12
+66,Excel Upload,India,10,59.89
+75,test,Aruba,10,11.00

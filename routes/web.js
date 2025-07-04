@@ -127,7 +127,6 @@ router.get("/price_list", staticApiKey, productController.get_price);
 
 //product list
 router.post("/product_list", staticApiKey, productController.product_list);
-
 //particular product details
 router.post("/particularProductDetails", staticApiKey, productController.particularProductDetails);
 
@@ -187,6 +186,7 @@ router.post(
 
 /********************************** End Customer Section *********************************/
 
+
 /********************************** Footer Section *********************************/
 
 router.post('/get_categories_based_product',staticApiKey,productController.get_categories_based_product)
@@ -195,6 +195,10 @@ router.post('/get_country_based_product',staticApiKey,productController.get_coun
 
 /********************************** Footer Section *********************************/
 
-router.post('/ai_chat_bot',getselfController.translate)
+router.post('/search_api',staticApiKey,productController.search_api)
+
+router.post('/country_phonecode',getselfController.country_phonecode)
+
+
 
 export default router;

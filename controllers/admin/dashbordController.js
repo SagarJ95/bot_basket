@@ -20,8 +20,8 @@ const dashboardController = async (req, res) => {
     );
 
     const pendingOrder = await db.query(
-      `SELECT SUM(order_status) AS pending_order_count FROM orders WHERE deleted_at IS NULL AND  created_at::date = $1 AND order_status = $2 AND status = $3`,
-      [date, "1", "1"]
+      `SELECT SUM(order_status) AS pending_order_count FROM orders WHERE deleted_at IS NULL AND  order_status = $1 AND status = $2`,
+      ["1", "1"]
     );
 
     const total_price_result = await db.query(
@@ -46,7 +46,7 @@ const dashboardController = async (req, res) => {
     }
 
     const total_customers_details = await db.query(
-      `select o.id as order_id,o.order_ref_id,o.customer_name,o.order_status,
+      `select o.id as order_id,o.customer_name,o.order_status,
       SUM(ot.quantity::integer* ot.price::numeric) as total_price,
       TO_CHAR(o.created_at,'FMDDth FMMonth YYYY') as created_at,
       CASE
@@ -66,7 +66,7 @@ const dashboardController = async (req, res) => {
     );
 
     const get_customers_details = await db.query(
-      `select o.id as order_id,o.customer_name,o.order_status,
+      `select o.id as order_id,o.order_ref_id,o.customer_name,o.order_status,
       SUM(ot.quantity::integer* ot.price::numeric) as total_price,
       TO_CHAR(o.created_at,'FMDDth FMMonth YYYY') as created_at,
       CASE

@@ -38,12 +38,12 @@ const products = sequelize.define(
     slug: {
       type: DataTypes.STRING
     },
-    thumbnail_product_image:{
-        type: DataTypes.STRING
-    },
     status: {
       type: DataTypes.INTEGER,
       defaultValue:1
+    },
+    thumbnail_product_image:{
+        type: DataTypes.STRING
     },
     product_stock_status: {
         type: DataTypes.INTEGER,

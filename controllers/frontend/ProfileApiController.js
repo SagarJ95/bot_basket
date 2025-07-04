@@ -25,7 +25,9 @@ const fetch_profile = catchAsync(async (req, res) => {
             c.phone_no,
             c.whatsapp_no,
             c.email,
-            TO_CHAR(c.created_at, 'DD/MM/YYYY') AS accoute_create,
+            c.phone_country_code,
+            c.whatsapp_country_code,
+             TO_CHAR(c.created_at, 'FMDDth FMMonth YYYY') AS accoute_create,
             CASE
                 WHEN c.profile IS NULL OR c.profile = '' THEN ''
                 ELSE CONCAT('${BASE_URL}', c.profile)
@@ -41,9 +43,8 @@ const fetch_profile = catchAsync(async (req, res) => {
                     'city',ca.city,
                     'state',ca.state,
                     'address_1', ca.address1,
-                    'address_2', ca.address2
-
-
+                    'address_2', ca.address2,
+                    'phone_country_code',ca.phone_country_code
                 )
             ) FILTER (WHERE ca.id IS NOT NULL AND ca.status = $3),
             '[]'
@@ -112,6 +113,8 @@ const update_customer_profile = catchAsync(async (req, res) => {
       password,
       enable_email_notification,
       address,
+      phone_country_code,
+      whatsapp_country_code
     } = req.body;
     const files = req.files || {};
     //let addressInfo;
@@ -134,29 +137,6 @@ const update_customer_profile = catchAsync(async (req, res) => {
       ? await bcrypt.hash(password, 10)
       : getCustomerInfo.rows[0].password;
 
-    // if (Array.isArray(addressInfo)) {
-    //   for (const val of addressInfo) {
-    //     if (val.id == "") {
-    //       const Insertquery = `INSERT INTO customer_addresses (customer_id, address, tag,status,created_by) values ($1, $2, $3,$4,$5)`;
-    //       await db.query(Insertquery, [
-    //         customer_id,
-    //         val.address,
-    //         val.tag,
-    //         1,
-    //         customer_id,
-    //       ]);
-    //     } else {
-    //       const updatequery = `Update customer_addresses SET address = $1, tag = $2 Where customer_id = $3 and id = $4 and status = $5`;
-    //       await db.query(updatequery, [
-    //         val.address,
-    //         val.tag,
-    //         customer_id,
-    //         val.id,
-    //         1,
-    //       ]);
-    //     }
-    //   }
-    // }
 
     const updateInfo = {
       first_name: first_name,
@@ -166,6 +146,8 @@ const update_customer_profile = catchAsync(async (req, res) => {
       email: email,
       password: hashPassword,
       enable_email_notification: enable_email_notification,
+      phone_country_code:phone_country_code,
+      whatsapp_country_code:whatsapp_country_code
     };
 
     const formatPath = (filePath) => {
@@ -207,7 +189,7 @@ const getAddressList = catchAsync(async (req, res) => {
     const customer_id = req.user.id;
 
     const result = await db.query(
-      `SELECT id, full_name, mobile_number, address1, address2, zip_code, country, city, state
+      `SELECT id, full_name, mobile_number, address1, address2, zip_code, country, city, state,phone_country_code
        FROM customer_addresses
        WHERE customer_id = $1`,
       [customer_id]
@@ -248,6 +230,7 @@ const addAddress = catchAsync(async (req, res) => {
     country,
     city,
     state,
+    phone_country_code
   } = req.body;
 
   const customer_id = req.user.id;
@@ -269,8 +252,8 @@ const addAddress = catchAsync(async (req, res) => {
       const update_address = await db.query(
         `UPDATE customer_addresses
          SET customer_id=$1, full_name=$2, mobile_number=$3, address1=$4,
-             address2=$5, zip_code=$6, country=$7, city=$8, state=$9
-         WHERE id=$10`,
+             address2=$5, zip_code=$6, country=$7, city=$8, state=$9,phone_country_code=$10
+         WHERE id=$11`,
         [
           customer_id,
           full_name,
@@ -281,6 +264,7 @@ const addAddress = catchAsync(async (req, res) => {
           country,
           city,
           state,
+          phone_country_code,
           id,
         ]
       );
@@ -290,12 +274,12 @@ const addAddress = catchAsync(async (req, res) => {
         message: "Address updated successfully!",
       });
     } else {
-      console.log("insert address");
+
 
       const add_address = await db.query(
         `INSERT INTO customer_addresses
-         (customer_id, full_name, mobile_number, address1, address2, zip_code, country, city, state)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+         (customer_id, full_name, mobile_number, address1, address2, zip_code, country, city, state,phone_country_code)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9,$10)`,
         [
           customer_id,
           full_name,
@@ -306,6 +290,7 @@ const addAddress = catchAsync(async (req, res) => {
           country,
           city,
           state,
+          phone_country_code
         ]
       );
 

@@ -13,6 +13,7 @@ import Category from "../../db/models/category.js";
 import Product from "../../db/models/products.js";
 import Product_images from "../../db/models/product_images.js";
 import Products_price_logs from "../../db/models/products_price_logs.js";
+
 import { body, validationResult } from "express-validator";
 import { Op, QueryTypes, Sequelize } from "sequelize";
 import { compare } from "bcrypt";
@@ -28,9 +29,8 @@ import fs from "fs";
 import { format } from "fast-csv";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
-import axios from "axios";
 import XLSX from "xlsx";
-
+import axios from "axios";
 const BASE_URL = process.env.BASE_URL || "http://localhost:3848";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -39,161 +39,9 @@ const IMAGE_FOLDER = "public/uploads/product_images";
 const FALLBACK_IMAGE = "uploads/product_images/default.png";
 
 /* Product API Start ------------------------------- */
-const importProduct = catchAsync(async (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ status: false, message: "No file uploaded" });
-  }
-  const filePath = req.file.path;
-  // Create image folder if missing
-  if (!fs.existsSync(IMAGE_FOLDER)) {
-    fs.mkdirSync(IMAGE_FOLDER, { recursive: true });
-  }
-  const workbook = XLSX.readFile(filePath);
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(sheet);
-
-  for (let row of rows) {
-    const {
-      "Product Name": product_name,
-      "Category Name": category_name,
-      "Country Name": country_name,
-      "Minimum Order Place": min_order,
-      "Maximum Order Place": max_order,
-      "Product Thumbnail Image": image_url,
-    } = row;
-
-    //Check for duplicate product
-    const existingProduct = await db.query(
-      `SELECT id FROM products WHERE LOWER(name) = LOWER($1) AND deleted_at IS NULL`,
-      [product_name]
-    );
-    if (existingProduct.rows.length > 0) {
-      continue;
-    }
-
-    let local_image_path = FALLBACK_IMAGE;
-
-    // if (image_url && image_url.startsWith("https")) {
-    if (
-      image_url &&
-      (image_url.startsWith("https://") || image_url.startsWith("http://"))
-    ) {
-      try {
-        const imageRes = await axios.get(image_url, {
-          responseType: "arraybuffer",
-        });
-        const ext = path.extname(image_url).split("?")[0] || ".jpg";
-        const imageName = `${Date.now()}-${product_name.replace(
-          /\s+/g,
-          "_"
-        )}${ext}`;
-
-        const savePath = path.join(IMAGE_FOLDER, imageName);
-
-        fs.writeFileSync(savePath, imageRes.data);
-        local_image_path = `public/uploads/product_images/${imageName}`;
-
-        //console.log(`✅ Image saved: ${local_image_path}`);
-      } catch (err) {
-        // console.warn(
-        //   ` Failed to download image for ${product_name}: ${err.message}`
-        // );
-      }
-    }
-
-    //category table
-    const catgories = await db.query(
-      `select id from categories where cat_name ILIKE $1`,
-      [category_name]
-    );
-
-    //country table
-    const countries = await db.query(
-      `select id from country_data where country_name ILIKE $1`,
-      [country_name]
-    );
-
-    const productName = product_name;
-    const category_id = catgories.rows[0].id;
-    const country_id = countries.rows[0].id;
-    const minimum_order_place = min_order;
-    const maximum_order_place = max_order;
-
-    const thumbnailImage = local_image_path
-      ? media_url(local_image_path)
-      : null;
-
-    let OrderingId = 0;
-    // Get the current highest ordering
-    const getCountOrdering = await db.query(
-      "SELECT * FROM products where deleted_at IS NULL ORDER BY ordering DESC LIMIT 1"
-    );
-
-    if (getCountOrdering.rows.length > 0) {
-      OrderingId = getCountOrdering.rows[0].ordering;
-    }
-
-    const product = await Product.create({
-      name: productName,
-      slug: generateSlug(productName),
-      minimum_order_place: minimum_order_place,
-      maximum_order_place: maximum_order_place,
-      price: row.Price,
-      country_id: country_id,
-      thumbnail_product_image: thumbnailImage,
-      category: category_id,
-      created_by: req.user.id,
-      ordering: OrderingId ? parseInt(OrderingId) + 1 : 1,
-      status: 1,
-    });
-
-    const product_id = product.id;
-
-    if (!product) {
-      return res
-        .status(200)
-        .json({ status: false, message: "Product not created" });
-    }
-
-    const countryName = await db.query(
-      `select id from country_data where id = ${country_id}`
-    );
-
-    //product price list log
-    await db.query(
-      `INSERT INTO products_price_logs (product_id,price,country_id,country_name,upload_date,maximum_quantity
-    ,created_by,created_at,updated_by,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
-      [
-        product_id,
-        row.Price,
-        country_id,
-        countryName?.rows[0].id,
-        moment(new Date()).format("YYYY-MM-DD"),
-        maximum_order_place,
-        req.user.id,
-        new Date(),
-        req.user.id,
-        new Date(),
-      ]
-    );
-
-    const data = {
-      user_id: req.user.id,
-      table_id: product.id,
-      table_name: "products",
-      action: "import Product List",
-    };
-
-    adminLog(data);
-  }
-
-  fs.unlinkSync(filePath);
-
-  res.status(200).json({
-    status: true,
-    message: "Products uploaded successfully",
-  });
-});
+function capitalizeFirstLetter(string) {
+  return string.charAt(0).toUpperCase() + string.slice(1).toLowerCase();
+}
 
 const getProductlist = catchAsync(async (req, res) => {
   try {
@@ -248,27 +96,27 @@ const getProductlist = catchAsync(async (req, res) => {
 
     //get get product list
     const query = `SELECT
-                    p.id AS product_id,
-                    p.name AS product_name,
-                    c.cat_name AS category_name,
-                    p.price AS current_price,
-                    CONCAT('${BASE_URL}/images/img-country-flag/', ca.flag) AS country_flag,
-                    p.category AS category_id,
-                    p.country_id AS country_id,
-                    ca.country_name,
-                    TO_CHAR(ppl.upload_date, 'FMDD FMMonth YYYY') AS last_updated_date,
-                    p.product_stock_status,
-                    p.status
-                FROM products AS p
-                LEFT JOIN categories AS c ON p.category = c.id
-                LEFT JOIN country_data AS ca ON p.country_id = ca.id
-                LEFT JOIN (
-                    SELECT DISTINCT ON (product_id) product_id, upload_date
-                    FROM products_price_logs
-                    ORDER BY product_id, upload_date DESC
-                ) AS ppl ON p.id = ppl.product_id
+                           p.id AS product_id,
+                           p.name AS product_name,
+                           c.cat_name AS category_name,
+                           p.price AS current_price,
+                           CONCAT('${BASE_URL}/images/img-country-flag/', ca.flag) AS country_flag,
+                           p.category AS category_id,
+                           p.country_id AS country_id,
+                           ca.country_name,
+                           TO_CHAR(ppl.upload_date, 'FMDD FMMonth YYYY') AS last_updated_date,
+                           p.product_stock_status,
+                           p.status
+                       FROM products AS p
+                       LEFT JOIN categories AS c ON p.category = c.id
+                       LEFT JOIN country_data AS ca ON p.country_id = ca.id
+                       LEFT JOIN (
+                           SELECT DISTINCT ON (product_id) product_id, upload_date
+                           FROM products_price_logs
+                           ORDER BY product_id, upload_date DESC
+                       ) AS ppl ON p.id = ppl.product_id
 
-                WHERE p.deleted_at IS NULL ${categories} ${countries} ${searchQuery} ORDER BY p.id desc ${pageCountQuery}`;
+                       WHERE p.deleted_at IS NULL ${categories} ${countries} ${searchQuery} ORDER BY p.id desc ${pageCountQuery}`;
 
     const getProductslist = await db.query(query, query_params);
 
@@ -381,7 +229,7 @@ const createProduct = catchAsync(async (req, res) => {
         : [];
 
     const product = await Product.create({
-      name: body.name,
+      name: capitalizeFirstLetter(body.name?.trim() || ""),
       slug: generateSlug(body.name),
       description: body.description,
       minimum_order_place: body.minimum_order_place,
@@ -403,7 +251,7 @@ const createProduct = catchAsync(async (req, res) => {
     if (!product) {
       return res
         .status(200)
-        .json({ status: false, message: "Product not created" });
+        .json({ status: false, message: "Product created unsuccessfully" });
     }
 
     const images = files && files.product_images ? files.product_images : [];
@@ -516,10 +364,11 @@ const updateProduct = catchAsync(async (req, res) => {
     });
 
     if (existing) {
-      errors.errors.push({
-        msg: "A product with the same name and category already exists",
-        path: "name",
-      });
+      return res.status(200).json({ status: false, message: "A product with the same name and category already exists" });
+      // errors.errors.push({
+      //   msg: "A product with the same name and category already exists",
+      //   path: "name",
+      // });
     }
 
     if (!errors.isEmpty()) {
@@ -535,7 +384,7 @@ const updateProduct = catchAsync(async (req, res) => {
     // Update product fields
     await Product.update(
       {
-        name: body.name,
+        name: capitalizeFirstLetter(body.name?.trim() || ""),
         slug: generateSlug(body.name),
         minimum_order_place: body.minimum_order_place,
         maximum_order_place: body.maximum_order_place,
@@ -609,7 +458,7 @@ const updateProduct = catchAsync(async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       status: false,
-      message: "Product not updated",
+      message: "Product updated unsuccessfully",
       error: error.message,
     });
   }
@@ -659,7 +508,7 @@ const getProductById = catchAsync(async (req, res) => {
                 ) AS product_images,
                  CONCAT('${BASE_URL}', p.thumbnail_product_image) as thumbnail_product_image
             FROM products p
-            LEFT JOIN product_images pi ON pi.product_id = p.id And pi.deleted_at IS NULL
+            LEFT JOIN product_images pi ON pi.product_id = p.id  And pi.deleted_at IS NULL
             WHERE p.deleted_at IS NULL AND p.id = $1
             GROUP BY p.id
         `;
@@ -669,12 +518,12 @@ const getProductById = catchAsync(async (req, res) => {
     if (result.rowCount <= 0) {
       return res
         .status(200)
-        .json({ status: false, message: "Product Not Found", error: "" });
+        .json({ status: false, message: "Fetch product info unsuccessfully", error: "" });
     }
 
     return res.status(200).json({
       status: true,
-      message: "Product Found",
+      message: "Fetch product info successful",
       data: result.rows,
     });
   } catch (error) {
@@ -711,7 +560,7 @@ const deleteProductById = catchAsync(async (req, res) => {
     if (!result) {
       return res
         .status(200)
-        .json({ status: false, message: "Product not found", error: "" });
+        .json({ status: false, message: "Product deleted unsuccessfully", error: "" });
     }
 
     await result.destroy(); // uses Sequelize's soft delete (paranoid)
@@ -774,7 +623,7 @@ const updateProductStatusById = catchAsync(async (req, res) => {
     if (!updated || updated[0] === 0) {
       return res.status(200).json({
         status: false,
-        message: "Product status not updated",
+        message: "Product status updated unsuccessfully",
         error: "",
       });
     }
@@ -794,7 +643,7 @@ const updateProductStatusById = catchAsync(async (req, res) => {
   } catch (error) {
     return res.status(200).json({
       status: false,
-      message: "Product status not updated",
+      message: "Product status updated unsuccessfully",
       error: error.message,
     });
   }
@@ -973,6 +822,7 @@ const excelExportProducts = catchAsync(async (req, res) => {
     // Send file path as response
     return res.json({
       status: true,
+      message:"Export Products list successfully",
       data: BASE_URL + `/uploads/exports/${fileName}`,
     });
   } catch (error) {
@@ -1043,6 +893,7 @@ const excelExportProductsInfo = catchAsync(async (req, res) => {
     writeStream.on("finish", () => {
       res.json({
         status: true,
+        message:"Export excel successfully",
         data: `${BASE_URL}/uploads/exports_product/${fileName}`,
       });
     });
@@ -1261,7 +1112,8 @@ const getChangePriceProductlist = catchAsync(async (req, res) => {
                             COALESCE(pp.price, 0) AS previous_price,
                             CONCAT('${BASE_URL}',p.thumbnail_product_image) as product_image,
                             CONCAT('${BASE_URL}/images/img-country-flag/',ca.flag) as country_flag,
-                            CONCAT(ca.country_name,' (',ca.code1,') ') as country_name
+                            CONCAT(ca.country_name,' (',ca.code1,') ') as country_name,
+                            pp.upload_date as price_update_date
                         FROM
                             products AS p
                         LEFT JOIN
@@ -1269,7 +1121,7 @@ const getChangePriceProductlist = catchAsync(async (req, res) => {
                         LEFT JOIN
                         country_data AS ca ON p.country_id = ca.id
                         LEFT JOIN LATERAL (
-                            SELECT price
+                            SELECT price,upload_date
                             FROM products_price_logs
                             WHERE product_id = p.id
                             AND upload_date < CURRENT_DATE
@@ -1277,7 +1129,7 @@ const getChangePriceProductlist = catchAsync(async (req, res) => {
                             LIMIT 1
                         ) AS pp ON true
                         WHERE
-                            p.status = $1 ${categories} ${countries} ${searchQuery}
+                            p.status = $1 And p.deleted_at IS NULL ${categories} ${countries} ${searchQuery}
                         ORDER BY
                             p.id ASC ${pageCountQuery}
             `;
@@ -1336,8 +1188,8 @@ const changeProductPrice = catchAsync(async (req, res) => {
       if (isexistid.rowCount > 0) {
         await db.query(
           `UPDATE products_price_logs SET price=$1,updated_by=$2,updated_at=$4
-              WHERE product_id=$3`,
-          [price, req.user.id, id, new Date()]
+              WHERE product_id=$3 and upload_date::date= $5`,
+          [price, req.user.id, id, new Date(),moment(new Date()).format("YYYY-MM-DD")]
         );
       } else {
         const getCountryId = await db.query(
@@ -1417,7 +1269,7 @@ const getProductPriceLogs = catchAsync(async (req, res) => {
 
     return res.status(200).json({
       status: true,
-      message: "logs retrieved successfully",
+      message: "Product Price logs retrieved successfully",
       data: result.rows,
     });
   } catch (error) {
@@ -1498,6 +1350,7 @@ const exportProductPriceLogs = catchAsync(async (req, res) => {
     // Send file path as response
     return res.status(200).json({
       status: true,
+      message:"Export Product Price log successfully",
       filePath: BASE_URL + `/uploads/exports/${fileName}`,
     });
   } catch (error) {
@@ -1580,6 +1433,165 @@ const ChangePricelist = catchAsync(async (req, res) => {
 
 /* Product API END ------------------------------- */
 
+/*----------------------------- Import And Export Product list sample --------------------*/
+
+const importProduct = catchAsync(async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ status: false, message: "No file uploaded" });
+  }
+  const filePath = req.file.path;
+
+  // Create image folder if missing
+  if (!fs.existsSync(IMAGE_FOLDER)) {
+    fs.mkdirSync(IMAGE_FOLDER, { recursive: true });
+  }
+  const workbook = XLSX.readFile(filePath);
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet);
+
+  for (let row of rows) {
+    const {
+      "Product Name": product_name,
+      "Category Name": category_name,
+      "Country Name": country_name,
+      "Minimum Order Place": min_order,
+      "Maximum Order Place": max_order,
+      "Product Thumbnail Image": image_url,
+    } = row;
+
+    let local_image_path = FALLBACK_IMAGE;
+
+    //Check for duplicate product
+    const existingProduct = await db.query(
+      `SELECT id FROM products WHERE LOWER(name) = LOWER($1) AND deleted_at IS NULL`,
+      [product_name]
+    );
+    if (existingProduct.rows.length > 0) {
+      continue;
+    }
+
+    // if (image_url && image_url.startsWith("https")) {
+    if (
+      image_url &&
+      (image_url.startsWith("https://") || image_url.startsWith("http://"))
+    ) {
+      try {
+        const imageRes = await axios.get(image_url, {
+          responseType: "arraybuffer",
+        });
+        const ext = path.extname(image_url).split("?")[0] || ".jpg";
+        const imageName = `${Date.now()}-${product_name.replace(
+          /\s+/g,
+          "_"
+        )}${ext}`;
+        console.log(`imageName: ${imageName}`);
+        const savePath = path.join(IMAGE_FOLDER, imageName);
+
+        fs.writeFileSync(savePath, imageRes.data);
+        local_image_path = `public/uploads/product_images/${imageName}`;
+
+        //console.log(`✅ Image saved: ${local_image_path}`);
+      } catch (err) {
+        // console.warn(
+        //   ` Failed to download image for ${product_name}: ${err.message}`
+        // );
+      }
+    }
+
+    //category table
+    const catgories = await db.query(
+      `select id from categories where cat_name ILIKE $1`,
+      [category_name]
+    );
+
+    //country table
+    const countries = await db.query(
+      `select id from country_data where country_name ILIKE $1`,
+      [country_name]
+    );
+
+    const productName = product_name;
+    const category_id = catgories.rows[0].id;
+    const country_id = countries.rows[0].id;
+    const minimum_order_place = min_order;
+    const maximum_order_place = max_order;
+
+    const thumbnailImage = local_image_path
+      ? media_url(local_image_path)
+      : null;
+
+    let OrderingId = 0;
+    // Get the current highest ordering
+    const getCountOrdering = await db.query(
+      "SELECT * FROM products where deleted_at IS NULL ORDER BY ordering DESC LIMIT 1"
+    );
+
+    if (getCountOrdering.rows.length > 0) {
+      OrderingId = getCountOrdering.rows[0].ordering;
+    }
+
+    const product = await Product.create({
+      name: productName,
+      slug: generateSlug(productName),
+      minimum_order_place: minimum_order_place,
+      maximum_order_place: maximum_order_place,
+      price: row.Price,
+      country_id: country_id,
+      thumbnail_product_image: thumbnailImage,
+      category: category_id,
+      created_by: req.user.id,
+      ordering: OrderingId ? parseInt(OrderingId) + 1 : 1,
+      status: 1,
+    });
+
+    const product_id = product.id;
+
+    if (!product) {
+      return res
+        .status(200)
+        .json({ status: false, message: "Product not created" });
+    }
+
+    const countryName = await db.query(
+      `select id from country_data where id = ${country_id}`
+    );
+
+    //product price list log
+    await db.query(
+      `INSERT INTO products_price_logs (product_id,price,country_id,country_name,upload_date,maximum_quantity
+    ,created_by,created_at,updated_by,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+      [
+        product_id,
+        row.Price,
+        country_id,
+        countryName?.rows[0].id,
+        moment(new Date()).format("YYYY-MM-DD"),
+        maximum_order_place,
+        req.user.id,
+        new Date(),
+        req.user.id,
+        new Date(),
+      ]
+    );
+
+    const data = {
+      user_id: req.user.id,
+      table_id: product.id,
+      table_name: "products",
+      action: "import Product List",
+    };
+
+    adminLog(data);
+  }
+
+  fs.unlinkSync(filePath);
+
+  res.status(200).json({
+    status: true,
+    message: "Products uploaded successfully",
+  });
+});
+
 const exportProductlistSample = catchAsync(async (req, res) => {
   try {
     const categoriesQuery = `SELECT id, cat_name FROM categories Where status = $1 ORDER BY ID ASC`;
@@ -1651,6 +1663,7 @@ const exportProductlistSample = catchAsync(async (req, res) => {
 
     return res.status(200).json({
       status: true,
+      message:"Export product list successfully",
       filePath: `${BASE_URL}/uploads/export_product_upload_sample/${fileName}`,
     });
   } catch (error) {
@@ -1659,6 +1672,49 @@ const exportProductlistSample = catchAsync(async (req, res) => {
       message: "Internal Server Error",
       error: error.message,
     });
+  }
+});
+
+/*-----------------------------End Import And Export Product list sample --------------------*/
+
+const getActiveCategories = catchAsync(async (req, res) => {
+  try {
+
+
+    //get get catgories list
+    const query = `select c.id as cat_id,c.cat_name as category_name,c.slug,COALESCE(c.description,'') as description,
+        COALESCE(COUNT(p.id),0) as No_of_products,c.status AS visibility_status  from categories as c
+        LEFT JOIN products as p ON c.id = p.category
+        where c.status = '1' and c.deleted_at IS NULL
+        GROUP BY c.cat_name,c.id Order BY c.id desc`;
+
+    const getCategorieslist = await db.query(query, []);
+
+    return res.status(200).json({
+      status: true,
+      total:0,
+      message: "Fetch Categories successfully",
+      data: getCategorieslist.rowCount > 0 ? getCategorieslist.rows : [],
+    });
+  } catch (error) {
+    throw new AppError(error.message, 400);
+  }
+});
+
+const getcountries = catchAsync(async (req, res) => {
+  try {
+    const query = `select c.id,c.country_name,c.code1 as code,CONCAT('${BASE_URL}/images/img-country-flag/',c.flag) as country_flag from country_data as c where c.status = 1 and c.deleted_at IS NULL`;
+
+    const getCountrylist = await db.query(query, []);
+
+    return res.status(200).json({
+      status: true,
+      total:0,
+      message: "Fetch Countries Successfully",
+      data: getCountrylist.rowCount > 0 ? getCountrylist.rows : [],
+    });
+  } catch (error) {
+    throw new AppError(error.message, 400);
   }
 });
 
@@ -1682,4 +1738,6 @@ export {
   getChangePriceProductlist,
   importProduct,
   exportProductlistSample,
+   getcountries,
+  getActiveCategories
 };

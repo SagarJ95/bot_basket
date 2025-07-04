@@ -29,16 +29,16 @@ const orders = sequelize.define(
     perferred_delivery_date: {
       type: DataTypes.DATE,
     },
+    partially_paid_amount: {
+      type: DataTypes.DECIMAL(10, 2),
+    },
     delivery_date: {
       type: DataTypes.DATE,
     },
-    cancelled_date: {
+    excepted_delivery_date: {
       type: DataTypes.DATE,
     },
     shipped_date: {
-      type: DataTypes.DATE,
-    },
-    excepted_delivery_date: {
       type: DataTypes.DATE,
     },
     payment_status: {
@@ -55,9 +55,6 @@ const orders = sequelize.define(
     },
     special_instruction: {
       type: DataTypes.STRING,
-    },
-    cancel_reason: {
-      type: DataTypes.TEXT,
     },
     invoice_path: {
       type: DataTypes.STRING,

@@ -55,7 +55,6 @@ const formatDateToISO = async (dateStr) => {
   const [day, month, year] = dateStr.split("-");
   return `${year}-${month}-${day}`;
 };
-
 export {
   generateSlug,
   media_url,

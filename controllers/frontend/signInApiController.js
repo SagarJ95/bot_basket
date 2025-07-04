@@ -16,6 +16,13 @@ import nodemailer from "nodemailer";
 import moment from "moment";
 import customerOtpLog from "../../db/models/customer_otp_logs.js";
 import pkg from "jsonwebtoken";
+import { dirname } from "path";
+import ejs from 'ejs'
+import { fileURLToPath } from "url";
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+import path from "path";
+import sendMail from '../../helpers/mail_helper.js'
 const project_name = process.env.APP_NAME;
 const BASE_URL = process.env.BASE_URL || "http://localhost:3848";
 
@@ -68,7 +75,7 @@ const SignUp = catchAsync(async (req, res) => {
     throw new AppError(error_message, 200, errors);
   }
 
-  const { first_name, last_name, phone_no, email, password, confirm_password } =
+  const { first_name, last_name, phone_no, email, password, confirm_password,phone_country_code } =
     req.body;
 
   let creation = null;
@@ -88,6 +95,7 @@ const SignUp = catchAsync(async (req, res) => {
       email: email.toLowerCase(),
       status: "1",
       password: hashPassword,
+      phone_country_code:phone_country_code
     });
 
     if (creation) {
@@ -110,9 +118,28 @@ const SignUp = catchAsync(async (req, res) => {
         }
       );
 
+      //send email
+      const dataInfo = {
+            name: `${first_name} ${last_name}`,
+            logo: `${BASE_URL}/media/logos/email_logo.png`,
+            image: `${BASE_URL}/media/img/user-account.png`,
+            currentYear: new Date().getFullYear(),
+        };
+        // Render the EJS template
+        const htmlContent = await ejs.renderFile(path.join(__dirname,'..','..', 'views/admin/pages/email/registeration_successful.ejs'), dataInfo);
+
+        const mailConfig = {
+          from: `"KeepInBasket" <${process.env.MAIL_USERNAME}>`,
+          to: email.toLowerCase(),
+          subject: "Welcome to KeepInBasket – Registration Successful!",
+          html: htmlContent,
+        };
+
+        await sendMail(mailConfig);
+
       return res.status(200).json({
         status: true,
-        message: "Customer created successfully",
+        message: "login successfully",
         data: [
           {
             token: token,
@@ -124,7 +151,7 @@ const SignUp = catchAsync(async (req, res) => {
     } else {
       return res.status(200).json({
         status: false,
-        message: "Customer Not created successfully",
+        message: "Account Not created successfully",
       });
     }
   } catch (err) {
@@ -288,14 +315,6 @@ const resetpassword = catchAsync(async (req, res) => {
 
 const deleteCustomer = catchAsync(async (req, res) => {
   try {
-    // const { customer_id, status } = req.body;
-    // if (!customer_id) {
-    //   return res.status(200).json({
-    //     status: false,
-    //     message: "Please provide customer_id",
-    //   });
-    // }
-
     const softDeleteCustomer = await db.query(
       `UPDATE customers SET status=$1,deleted_at=$2 Where id=$3`,
       [0, new Date(), req.user.id]
@@ -548,376 +567,36 @@ async function sendEmail(email, customer_name,status) {
     },
   });
 
-  //change subject for sign_up and forget_password
-
-  let subject;
+   let subject;
+   let title;
   if(status == 1){
     subject = `Email Authetication`
+    title = `Email Verification`
   }else{
     subject = `Password Reset Request`;
+    title = `Reset your password`
   }
-  const mailconfig = {
-    from: `"KeepInBasket" ${process.env.MAIL_USERNAME}`,
-    to: email.toLowerCase(),
-    subject: subject,
-    html: `<!DOCTYPE html
-                  PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-                <html xmlns="http://www.w3.org/1999/xhtml">
 
-                <head>
-                  <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-                  <!--[if !mso]><!-->
-                  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
-                  <!--<![endif]-->
-                  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-                  <title>New Enquiry</title>
-                  <style type="text/css">
-                   .container {
-                    max-width: 600px;
-                    margin: auto;
-                    background: white;
-                    padding: 20px;
-                    border-radius: 8px;
-                    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-                }
+   const variables = {
+        customer_name: (customer_name) ? customer_name :'',
+        otpCode: otpCode,
+        currentYear: currentYear,
+        logo: `${BASE_URL}/media/logos/email_logo.png`,
+        imgae: `${BASE_URL}/media/img/user-reset-password.png`
+    };
+    // Render the EJS template
+    const htmlContent = await ejs.renderFile(path.join(__dirname,'..','..', 'views/admin/pages/email/otp_login.ejs'), variables);
 
-                    body {
-                      font-family: "Open sans", Arial, sans-serif
-                    }
-
-                    .ReadMsgBody {
-                      width: 100%;
-                      background-color: #fff
-                    }
-
-                    .ExternalClass {
-                      width: 100%;
-                      background-color: #fff
-                    }
-
-                    .ExternalClass,
-                    .ExternalClass p,
-                    .ExternalClass span,
-                    .ExternalClass font,
-                    .ExternalClass td,
-                    .ExternalClass div {
-                      line-height: 100%
-                    }
-
-
-
-                    html {
-                      width: 100%
-                    }
-
-                     body {
-                    font-family: Arial, sans-serif;
-                    background-color: #f7f7f7;
-                    margin: 0;
-                    padding: 20px;
-                }
-
-                    table {
-                      border-spacing: 0;
-                      table-layout: auto;
-                      margin: 0 auto
-                    }
-
-                    img {
-                      display: block !important;
-                      overflow: hidden !important
-                    }
-
-                    .yshortcuts a {
-                      border-bottom: none !important
-                    }
-
-                    img:hover {
-                      opacity: .9 !important
-                    }
-
-                    .footer-link a {
-                      color: #666;
-                      text-decoration: none;
-                      transition: .5s all
-                    }
-
-                    .footer-link a:hover {
-                      color: #0895d3;
-                      text-decoration: none;
-                      transition: .5s all
-                    }
-
-                    .textbutton a {
-                      font-family: "open sans", arial, sans-serif !important
-                    }
-
-                    .btn-link a {
-                      color: #ffffff !important
-                    }
-
-                    li {
-                      margin: 0 !important
-                    }
-
-                    .submitted p {
-                      font-size: 16px;
-                      margin-top: 5px;
-                      margin-bottom: 7px;
-                      color: #000;
-                      line-height: 1.4
-                    }
-
-                    /* .submitted p b {
-                      display: block;
-                    } */
-
-                    .btn {
-                      background: #000;
-                      padding: 10px;
-                      color: #fff;
-                      margin-top: 40px;
-                      font-size: 15px
-                    }
-
-                    .btn:hover {
-                      background: #1d1d1d;
-                      padding: 10px;
-                      color: #fff;
-                      margin-top: 40px
-                    }
-
-                    .thankyou {
-                      font-weight: 900;
-                      color: #194693;
-                      font-size: 23px;
-                      font-family: "Open sans", Arial, sans-serif
-                    }
-
-                    .intro {
-                      color: #1d1d1d;
-                      font-size: 16px
-                    }
-
-                    .best-regard {
-                      margin-top: 20px !important
-                    }
-
-                    .footer-link {
-                      color: #666;
-                      font-size: 12px;
-                      letter-spacing: 1px
-                    }
-
-                    .copyright {
-                      font-size: 10px;
-                      text-align: center;
-                      margin: 0
-                    }
-
-                    .mt-mb {
-                      margin-top: 40px !important;
-                      margin-bottom: 20px !important
-                    }
-
-                    p.support {
-                      font-size: 15px;
-                      margin-top: 20px !important
-                    }
-
-                    .mb-0 {
-                      margin-bottom: 0 !important
-                    }
-
-                    @media only screen and (max-width:640px) {
-                      body {
-                        margin: 0;
-                        width: auto !important;
-                        font-family: "Open Sans", Arial, Sans-serif !important
-                      }
-
-                      .table-inner {
-                        width: 90% !important;
-                        max-width: 90% !important
-                      }
-
-                      .table-full {
-                        width: 100% !important;
-                        max-width: 100% !important;
-                        text-align: left !important
-                      }
-                    }
-
-                    @media only screen and (max-width:479px) {
-                      body {
-                        width: auto !important;
-                        font-family: "Open Sans", Arial, Sans-serif !important
-                      }
-
-                      .table-inner {
-                        width: 90% !important;
-                        text-align: center !important
-                      }
-
-                      .table-full {
-                        width: 100% !important;
-                        max-width: 100% !important;
-                        text-align: left !important
-                      }
-
-                      u+.body .full {
-                        width: 100% !important;
-                        width: 100vw !important
-                      }
-                    }
-                  </style>
-                </head>
-
-                <body >
-                <div class="container">
-                <table class="full" width="100%" border="0" align="center" cellpadding="0" cellspacing="0" bgcolor="#eceff3">
-                    <tr>
-                      <td align="center">
-                        <table width="580" class="table-inner" style="max-width:580px" align="center" border="0" cellpadding="0"
-                          cellspacing="0">
-                          <tr>
-                            <td height="100"></td>
-                          </tr>
-                          <tr>
-                            <td align="center" bgcolor="#fff"
-                              style="border-bottom:5px solid #194693;background-position:top;background-size:cover;background-repeat:no-repeat">
-                              <table width="90%" align="center" border="0" cellpadding="0" cellspacing="0">
-                                <tr>
-                                  <td height="5"></td>
-                                </tr>
-                                <tr>
-                                  <td align="center" style="line-height:0"><img
-                                      src="${BASE_URL}/media/logos/ft_logo.png" style="width:120px;height:90px" alt="Logo"
-                                      style="display:block;line-height:0;font-size:0;border:0;width:100px;padding-top:1rem" /></td>
-
-                                </tr>
-                                <tr>
-                                  <td height="10"></td>
-                                </tr>
-                              </table>
-                            </td>
-                          </tr>
-                          <tr>
-                            <td height="15" bgcolor="#FFFFFF"></td>
-                          </tr>
-                        </table>
-                      </td>
-                    </tr>
-                  </table>
-                  <table class="full" align="center" bgcolor="#eceff3" width="100%" border="0" cellspacing="0" cellpadding="0">
-                    <tr>
-                      <td align="center">
-                        <table width="580" class="table-inner" style="max-width:580px" align="center" border="0" cellpadding="0"
-                          cellspacing="0">
-                          <tr>
-                            <td bgcolor="#FFFFFF" align="center">
-                              <table width="500" class="table-inner" align="center" border="0" cellpadding="0" cellspacing="0">
-                                <tr>
-                                  <td>
-                                    <table align="left" class="table-full" width="100%" border="0" cellspacing="0" cellpadding="0">
-                                      <tr>
-                                        <td class="intro" align="left"></td>
-                                      </tr>
-                                      <tr>
-                                        <td class="thankyou" align="center">Email Verification </td>
-                                      </tr>
-                                    </table>
-                                  </td>
-                                </tr>
-                              </table>
-                            </td>
-                          </tr>
-                        </table>
-                      </td>
-                    </tr>
-                  </table>
-                  <table class="full" align="center" bgcolor="#eceff3" width="100%" border="0" cellspacing="0" cellpadding="0">
-                    <tr>
-                      <td align="center">
-                        <table width="580" class="table-inner" style="max-width:580px;height:0" align="center" border="0"
-                          cellpadding="0" cellspacing="0">
-                          <tr>
-                            <td bgcolor="#FFFFFF" align="center">
-                              <table width="500" class="table-inner" align="center" border="0" cellpadding="0" cellspacing="0">
-                                <tr>
-                                  <td>
-                                    <table align="left" class="table-full" width="100%" border="0" cellspacing="0" cellpadding="0">
-                                      <tr>
-                                        <td class="intro" align="left"></td>
-                                      </tr>
-                                      <tr>
-                                        <td class="submitted ">
-                                        <p>Hello ${
-                                          customer_name ? customer_name : ""
-                                        },</p>
-                            <p>We received a request to verify your account. Use the following otp to complete your update Password process:</p>
-                            <p class="otp-code" style="margin-bottom: 20px;"><b>${otpCode}</b></p>
-                            <p>Please do not share this OTP with anyone. </p>
-                            <p style="margin-bottom: 31px;">If you did not request this, please ignore this email or contact support.</p>
-                                        </td>
-                                      </tr>
-                                    </table>
-                                  </td>
-                                </tr>
-                              </table>
-                            </td>
-                          </tr>
-                        </table>
-                      </td>
-                    </tr>
-                  </table>
-                  <table class="full" align="center" bgcolor="#eceff3" width="100%" border="0" cellspacing="0" cellpadding="0">
-                    <tr>
-                      <td align="center">
-                        <table width="580" class="table-inner" style="max-width:580px" align="center" border="0" cellpadding="0"
-                          cellspacing="0">
-                          <tr>
-                            <td bgcolor="#FFFFFF" align="center">
-                              <table width="580" class="table-inner" align="center" border="0" cellpadding="0" cellspacing="0">
-                                <tr>
-                                  <td align="center" bgcolor="#f2f2f2">
-                                    <table width="90%" border="0" align="center" cellpadding="0" cellspacing="0">
-                                      <tr>
-                                        <td height="5"></td>
-                                      </tr>
-                                      <tr>
-                                        <td height="30" class="footer-link" align="center">
-                                          <p class="copyright" style="color:#333"><a href="javascript:void(0)" style="color:#333">
-                                              </a> &copy; ${currentYear}. All Rights.All
-                                            Rights Reserved. Powered by<a target="_blank" href="https://onerooftech.com/"
-                                              style="color:#333"> OneRoof
-                                              Technologies LLP</a></p>
-                                        </td>
-                                      </tr>
-                                      <tr>
-                                        <td height="5"></td>
-                                      </tr>
-                                    </table>
-                                  </td>
-                                </tr>
-                              </table>
-                            </td>
-                          </tr>
-                        </table>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td height="100"></td>
-                    </tr>
-                  </table>
-                  </div>
-                </body>
-                </html>
-        `,
-  };
+    const mailconfig = {
+      from: `"KeepInBasket" <${process.env.MAIL_USERNAME}>`,
+      to: email.toLowerCase(),
+      subject: subject,
+      html: htmlContent,
+    };
 
   try {
     transport.sendMail(mailconfig, async function (err, info) {
+      console.log("err>>",err)
       if (err) {
         return { status: false, message: "Email sent Unsuccessfully" };
       } else {

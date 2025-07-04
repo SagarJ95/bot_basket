@@ -14,10 +14,8 @@ import Customer from "../../db/models/customers.js";
 import Orders from "../../db/models/orders.js";
 import customer_address from "../../db/models/customer_address.js";
 import { formatDateToISO } from "../../helpers/slug_helper.js";
-import { sendOrderConfirmation } from "../../helpers/orderconformation_mail.js";
-
 const BASE_URL = process.env.BASE_URL || "http://localhost:3848";
-
+import { sendOrderConfirmation } from "../../helpers/orderconformation_mail.js";
 //get Order list
 const getOrderlist = catchAsync(async (req, res) => {
   await Promise.all([
@@ -87,7 +85,7 @@ const getOrderlist = catchAsync(async (req, res) => {
         from orders AS o
         LEFT JOIN order_items as oi ON o.id = oi.order_id AND oi.order_item_status = $2
         where o.order_status = $1 and o.status = $3 ${dateCondition} ${searchQuery}
-        GROUP BY o.id,o.order_ref_id,o.customer_name,o.created_at, o.order_status, o.delivery_date order BY id desc`,
+        GROUP BY o.id,o.order_ref_id,o.customer_name,o.created_at, o.order_status, o.delivery_date ORDER BY o.id desc`,
       total_query_params
     );
 
@@ -111,7 +109,7 @@ const getOrderlist = catchAsync(async (req, res) => {
         from orders AS o
         LEFT JOIN order_items as oi ON o.id = oi.order_id AND oi.order_item_status = $2
         where o.order_status = $1 and o.status = $3 ${dateCondition} ${searchQuery}
-        GROUP BY o.id,o.order_ref_id,o.customer_name,o.created_at, o.order_status, o.delivery_date ORDER BY id desc
+        GROUP BY o.id,o.order_ref_id,o.customer_name,o.created_at, o.order_status, o.delivery_date  ORDER BY o.id desc
         ${pageCountQuery}`;
 
     const result = await db.query(query, query_params);
@@ -153,16 +151,26 @@ const changeStatus = catchAsync(async (req, res) => {
       date,
       order_item,
       payment_status,
+      partially_paid_amount,
       payment_mode,
       cancel_reason,
     } = req.body;
     const files = req.files || {};
     const formattedDate = await formatDateToISO(date);
 
+    // //if order_status is 2 (confirm order) then update item_delivery_status
 
-    // console.log('addressListInfo',addressListInfo.rows)
-    //if order_status is 2 (confirm order) then update item_delivery_status
     if (status == 2) {
+      if (order_item) {
+        let order_items = JSON.parse(order_item);
+        for (let item of order_items) {
+          await db.query(
+            `update order_items SET item_delivery_status = $1, reason = $4 WHERE id = $2 AND order_id = $3`,
+            [item.order_item_status, item.order_item_id, order_id, item.reason]
+          );
+        }
+      }
+
       //update Order details in order table
       const formatPath = (filePath) => {
         return filePath
@@ -173,31 +181,29 @@ const changeStatus = catchAsync(async (req, res) => {
       const invoicePath =
         files.invoice && files.invoice.length > 0
           ? formatPath(files.invoice[0].path)
-          : null;
-
-      const query = `update orders SET order_status = $1,payment_status = $2,payment_mode = $3,invoice_path = '${invoicePath}' WHERE id = $4`;
-       const result =  await db.query(query, [status, payment_status, payment_mode, order_id]);
-
+          : '';
+      const query = `update orders SET order_status = $1,payment_status = $2,payment_mode = $3,invoice_path = '${invoicePath}',partially_paid_amount = $4 WHERE id = $5`;
+      const result = await db.query(query, [
+        status,
+        payment_status ? payment_status : "",
+        payment_mode,
+        partially_paid_amount,
+        order_id,
+      ]);
+    } else if (status == 5) {
       if (order_item) {
-         let order_items = JSON.parse(order_item);
-        for (let items of order_items) {
-
+        let order_items = JSON.parse(order_item);
+        for (let item of order_items) {
           await db.query(
             `update order_items SET item_delivery_status = $1, reason = $4 WHERE id = $2 AND order_id = $3`,
-            [
-              items.order_item_status,
-              items.order_item_id,
-              order_id,
-              items.reason,
-            ]
+            [item.order_item_status, item.order_item_id, order_id, item.reason]
           );
         }
       }
-    } else if (status == 5) {
       //order cancelled
       const query = `update orders SET order_status = $1,cancel_reason = $2 WHERE id = $3`;
       await db.query(query, [status, cancel_reason, order_id]);
-    }else{
+    } else {
       const query = `update orders SET order_status = $1 WHERE id = $2`;
       await db.query(query, [status, order_id]);
     }
@@ -218,7 +224,8 @@ const changeStatus = catchAsync(async (req, res) => {
     }
 
     //get order_id ,customer info ,order_item info
-    const orderInfo = await db.query(`select customer_id,customer_name,email,whatsapp_number,address,payment_mode,
+    const orderInfo = await db.query(
+      `select customer_id,customer_name,email,whatsapp_number,address,payment_mode,delivery_option_id,shipped_date,partially_paid_amount,
       CASE WHEN payment_status = 1 THEN 'Paid'
           WHEN payment_status = 2 THEN 'Unpaid'
           WHEN payment_status = 3 THEN 'Partially Paid'
@@ -226,33 +233,53 @@ const changeStatus = catchAsync(async (req, res) => {
           CASE
           WHEN invoice_path IS NULL OR invoice_path = '' THEN ''
           ELSE CONCAT('${BASE_URL}', invoice_path)
-        END AS download_invoice from orders where id = $1`,[order_id])
+        END AS download_invoice from orders where id = $1`,
+      [order_id]
+    );
 
-        const orderItemInfo = await db.query(`select product_name,quantity,price,CASE
-                  WHEN item_delivery_status = 1 THEN 'Accept'
-                  ELSE 'Reject'
-                END AS delivery_status,reason from order_items where order_id = $1`,[order_id])
+    const orderItemInfo = await db.query(
+      `select product_name,quantity,price,CASE
+                WHEN item_delivery_status = 1 THEN 'Accepted'
+                ELSE 'Rejected'
+              END AS delivery_status,reason from order_items where order_id = $1`,
+      [order_id]
+    );
 
-        //get address list
-        const addressListInfo = await db.query(`select CONCAT(address1, ' ',address2) as address,zip_code,country,city,state from customer_addresses where id = $1 and customer_id = $2`,[orderInfo.rows[0].address,orderInfo.rows[0].customer_id])
+    //get address list
 
-        await sendOrderConfirmation(
-          req,
-          orderInfo.rows[0].email,
-          orderInfo.rows[0].customer_name,
-          orderInfo.rows[0].payment_mode,
-          orderInfo.rows[0].pay_status,
-          addressListInfo.rows,
-          orderItemInfo.rows,
-          order_id,
-          status,
-          orderInfo.rows[0].cancel_reason,
-          orderInfo.rows[0].download_invoice,
-        );
+    let addressListInfo;
+    if (orderInfo.rowCount > 0 && orderInfo.rows[0].delivery_option_id == 1) {
+      addressListInfo = await db.query(
+        `select CONCAT(address1, ' ',address2) as address,zip_code,country,city,state from customer_addresses where id = $1 and customer_id = $2`,
+        [orderInfo.rows[0].address, orderInfo.rows[0].customer_id]
+      );
+    } else {
+      addressListInfo = await db.query(
+        `select store_address as address,store_pincode as zip_code from store_self_locations where id = $1 `,
+        [orderInfo.rows[0].address]
+      );
+    }
+
+    await sendOrderConfirmation(
+      req,
+      orderInfo.rows[0].email,
+      orderInfo.rows[0].customer_name,
+      orderInfo.rows[0].payment_mode,
+      orderInfo.rows[0].pay_status,
+      orderInfo.rows[0].delivery_option_id,
+      addressListInfo.rows,
+      orderItemInfo.rows,
+      order_id,
+      status,
+      orderInfo.rows[0].cancel_reason,
+      orderInfo.rows[0].download_invoice,
+      orderInfo.rows[0].shipped_date,
+      orderInfo.rows[0].partially_paid_amount,
+    );
 
     return res.status(200).json({
       status: true,
-      message: "update Order status Successfully",
+      message: "Order status updated successfully",
     });
   } catch (error) {
     throw new AppError(error.message, 400);
@@ -289,8 +316,17 @@ const orderViewDetails = catchAsync(async (req, res) => {
                             TO_CHAR(o.created_at, 'FMDDth FMMonth YYYY') AS order_date,
                             CONCAT(ca.address1,' ',ca.address2) as address,
                             o.address as address_id,
-                            o.order_status as order_status
+                            o.order_status as order_status,
+                            o.partially_paid_amount,
+                            c.phone_no,
+                            c.phone_country_code,
+                            c.whatsapp_country_code,
+                            ca.country,
+                            ca.city,
+                            ca.state,
+                            ca.zip_code
                             FROM orders AS o
+                            LEFT JOIN customers as c ON o.customer_id = c.id
                             LEFT JOIN customer_addresses as ca ON o.address = ca.id
                             WHERE o.id = $1 `,
       [order_id]
@@ -299,30 +335,30 @@ const orderViewDetails = catchAsync(async (req, res) => {
     //fetch order_item table fetch order item list based on order_id
     const order_item = await db.query(
       `SELECT
-                    oi.id,
-                    oi.order_id,
-                    oi.product_id,
-                    oi.product_name AS product_name,
-                    p.description,
-                    oi.price AS product_price,
-                    oi.quantity AS product_quantity,
-                    SUM(CASE WHEN oi.item_delivery_status = 1 THEN oi.quantity * oi.price::numeric ELSE 0 END) AS total_price,
-                    (
-                        SELECT JSON_AGG(DISTINCT CONCAT('${BASE_URL}', pi.image_path))
-                        FROM product_images pi
-                        WHERE pi.product_id = p.id AND pi.image_path IS NOT NULL
-                    ) AS product_images,
-                        CONCAT('${BASE_URL}', p.thumbnail_product_image) as thumbnail_product_image,
-                        CONCAT('${BASE_URL}/images/img-country-flag/',cd.flag) as country_flag,
-                    c.cat_name as category_name,
-                    oi.item_delivery_status,
-                    oi.reason
-                    FROM order_items AS oi
-                    LEFT JOIN products AS p ON oi.product_id = p.id
-                    LEFT JOIN categories as c ON p.category = c.id
-                    LEFT JOIN country_data as cd ON p.country_id = cd.id
-                    WHERE oi.order_id = $1 And oi.order_item_status = $2
-                    GROUP BY oi.id,p.description,p.id,cd.flag,c.cat_name`,
+                            oi.id,
+                            oi.order_id,
+                            oi.product_id,
+                            oi.product_name AS product_name,
+                            p.description,
+                            oi.price AS product_price,
+                            oi.quantity AS product_quantity,
+                            SUM(CASE WHEN oi.item_delivery_status = 1 THEN oi.quantity * oi.price::numeric ELSE 0 END) AS total_price,
+                            (
+                                SELECT JSON_AGG(DISTINCT CONCAT('${BASE_URL}', pi.image_path))
+                                FROM product_images pi
+                                WHERE pi.product_id = p.id AND pi.image_path IS NOT NULL
+                            ) AS product_images,
+                            CONCAT('${BASE_URL}', p.thumbnail_product_image) as thumbnail_product_image,
+                             CONCAT('${BASE_URL}/images/img-country-flag/',cd.flag) as country_flag,
+                            c.cat_name as category_name,
+                            oi.item_delivery_status,
+                            oi.reason
+                            FROM order_items AS oi
+                            LEFT JOIN products AS p ON oi.product_id = p.id
+                            LEFT JOIN categories as c ON p.category = c.id
+                            LEFT JOIN country_data as cd ON p.country_id = cd.id
+                            WHERE oi.order_id = $1 And oi.order_item_status = $2
+                            GROUP BY oi.id,p.description,p.id,cd.flag,c.cat_name`,
       [order_id, 1]
     );
 
@@ -363,14 +399,14 @@ const orderViewDetails = catchAsync(async (req, res) => {
 const orderEditDetails = catchAsync(async (req, res) => {
   await Promise.all([
     body("order_id").notEmpty().withMessage("order Id is required").run(req),
-    body("payment_mode")
-      .notEmpty()
-      .withMessage("Payment mode is required")
-      .run(req),
-    body("payment_status")
-      .notEmpty()
-      .withMessage("Payment status is required")
-      .run(req),
+    // body("payment_mode")
+    //   .notEmpty()
+    //   .withMessage("Payment mode is required")
+    //   .run(req),
+    // body("payment_status")
+    //   .notEmpty()
+    //   .withMessage("Payment status is required")
+    //   .run(req),
     body("order_status")
       .notEmpty()
       .withMessage("order status is required")
@@ -422,8 +458,8 @@ const orderEditDetails = catchAsync(async (req, res) => {
     return res.status(200).json({
       status: true,
       message: updateOrderDetails
-        ? "Update Order details Successfully"
-        : "Update Order details Unsuccessfully",
+        ? "Updated Order details Successfully"
+        : "Updated Order details Unsuccessfully",
     });
   } catch (error) {
     throw new AppError(error.message, 400);

@@ -20,6 +20,9 @@ const customer_address = sequelize.define(
     mobile_number: {
       type: DataTypes.STRING,
     },
+    phone_country_code: {
+      type: DataTypes.STRING,
+    },
     address1: {
       type: DataTypes.TEXT,
     },

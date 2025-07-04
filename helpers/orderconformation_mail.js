@@ -4,7 +4,7 @@ import fs from "fs";
 import moment from "moment";
 import path from "path";
 import puppeteer from "puppeteer-core";
-
+const BASE_URL = process.env.BASE_URL
 
 
 export async function sendOrderConfirmation(
@@ -13,37 +13,50 @@ export async function sendOrderConfirmation(
   customer_name,
   payment_mode,
   payment_status,
+  delivery_option_id,
   delivery_address,
   products,
   order_id,
   status,
   cancel_reason,
-  download_invoice
+  download_invoice,
+  shippedDate,
+  partially_paid_amount
 ) {
  // const totalPrice = products.reduce((sum, p) => sum + p.price * p.quantity, 0);
   const orderId = `BOT${order_id}`;
   const orderDate = moment().format("YYYY-MM-DD HH:mm");
   const pdfPath = `./public/uploads/order_pdf/order_${Date.now()}.pdf`;
+
     const statusMessages = {
       2: {
-        title: 'Thanks for your purchase! Your order has been confirmed and is being prepared.',
-        statusText: 'Confirmed'
+        title: () => 'Thanks for your purchase! Your order has been confirmed and is being prepared.',
+        statusText: 'Confirmed',
       },
       3: {
-        title: 'Good news! Your order is on its way.',
-        statusText: 'Shipped'
+        title: (shippedDate) => `Great news! Your order was shipped on ${shippedDate.toDateString()} and is now on its way to you.`,
+        statusText: 'Shipped',
       },
       4: {
-        title: 'Your order has been delivered successfully. We hope you enjoy it!',
-        statusText: 'Delivered'
+        title: () => 'Your order has been delivered successfully. We hope you enjoy it!',
+        statusText: 'Delivered',
       },
       default: {
-        title: 'We’re sorry! Your order has been cancelled. For more info, contact support.',
-        statusText: 'Cancelled'
+        title: () => 'We’re sorry! Your order has been cancelled. For more info, contact support.',
+        statusText: 'Cancelled',
       }
     };
 
-    const { title, statusText } = statusMessages[status] || statusMessages.default;
+  // const { title, statusText } = statusMessages[status] || statusMessages.default;
+  const messageData = statusMessages[status] || statusMessages.default;
+
+  const title = typeof messageData.title === 'function'
+    ? messageData.title(shippedDate)
+    : messageData.title;
+
+  const statusText = messageData.statusText;
+
+
 
     let titleEmail = title;
     let orderStatus = statusText;
@@ -54,20 +67,24 @@ export async function sendOrderConfirmation(
       customer_name,
       payment_mode,
       payment_status,
+      delivery_option_id,
       delivery_address,
       products,
       order_id,
       status,
       titleEmail,
       cancel_reason,
-      //download_invoice
+      download_invoice,
+      logo:`${BASE_URL}/media/logos/email_logo.png`,
+      image: `${BASE_URL}/media/img/user-subscribe.png`,
+      currentYear: new Date().getFullYear(),
+      partially_paid_amount:partially_paid_amount
     };
-console.log("emailData>>",emailData)
 
   // // Render separate EJS templates for email body and PDF
   const emailBodyHtml = await new Promise((resolve, reject) => {
     req.app.render(
-      "admin/pages/email/order_summary_email",
+      "admin/pages/email/order_email",
       emailData,
       (err, html) => {
         if (err) return reject(err);
@@ -128,52 +145,52 @@ const transport = nodemailer.createTransport({
   // // Send mail using the simpler email body template
   // const mailOptions = {
   //   from: `"BotBasket" <${process.env.MAIL_USERNAME}>`,
-  //   to: 'sjagade84@gmail.com',
+  //   to: email.toLowerCase(),
   //   subject: `🛒 Your BotBasket Order ${orderStatus}`,
   //   html: emailBodyHtml,
-  //   attachments: [
-  //     {
-  //       filename: `order-${statusText}.${fileExt}`,
-  //       path: download_invoice,
-  //       contentType: content_Type,
-  //     },
-  //   ],
+  //   // attachments: [
+  //   //   {
+  //   //     filename: "order-confirmation.pdf",
+  //   //     path: pdfPath,
+  //   //     contentType: "application/pdf",
+  //   //   },
+  //   //],
   // };
 
-  const mailOptions = {
-      from: `"KeepInBasket" <${process.env.MAIL_USERNAME}>`,
-      to: email.toLowerCase(),
-      subject: `🛒 Your KeepInBasket Order ${orderStatus}`,
-      html: emailBodyHtml,
-      attachments: [],
-    };
-
-    // Check if download_invoice is provided
-    if (download_invoice && download_invoice.trim() !== "") {
-      const fileUrl = download_invoice;
-
-      const fileName = path.basename(fileUrl);
-      const fileExt = fileName.split('.').pop().toLowerCase();
-
-      // Map file extension to MIME type
-      const mimeTypes = {
-        pdf: "application/pdf",
-        css: "text/css",
-        jpg: "image/jpeg",
-        jpeg: "image/jpeg",
-        png: "image/png",
-        txt: "text/plain",
-        html: "text/html",
+   const mailOptions = {
+        from: `"KeepInBasket" <${process.env.MAIL_USERNAME}>`,
+        to: email.toLowerCase(),
+        subject: `🛒 Your KeepInBasket Order ${orderStatus}`,
+        html: emailBodyHtml,
+        attachments: [],
       };
 
-      const contentType = mimeTypes[fileExt] || "application/octet-stream";
+      // Check if download_invoice is provided
+      if (download_invoice && download_invoice.trim() !== "") {
+        const fileUrl = download_invoice;
 
-      mailOptions.attachments.push({
-        filename: `order-${statusText}.${fileExt}`,
-        path: download_invoice,
-        contentType: contentType,
-      });
-    }
+        const fileName = path.basename(fileUrl);
+        const fileExt = fileName.split('.').pop().toLowerCase();
+
+        // Map file extension to MIME type
+        const mimeTypes = {
+          pdf: "application/pdf",
+          css: "text/css",
+          jpg: "image/jpeg",
+          jpeg: "image/jpeg",
+          png: "image/png",
+          txt: "text/plain",
+          html: "text/html",
+        };
+
+        const contentType = mimeTypes[fileExt] || "application/octet-stream";
+
+        mailOptions.attachments.push({
+          filename: `order-${statusText}.${fileExt}`,
+          path: download_invoice,
+          contentType: contentType,
+        });
+      }
 
   try {
     await transport.sendMail(mailOptions);
