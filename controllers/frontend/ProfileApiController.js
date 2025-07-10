@@ -372,7 +372,6 @@ const getLocationByZip = catchAsync(async (req, res) => {
       }
 
       const postOffice = data.PostOffice[0];
-      console.log(`postOffice`, postOffice);
 
       return res.status(200).json({
         status: true,
@@ -387,7 +386,7 @@ const getLocationByZip = catchAsync(async (req, res) => {
         place: postOffice,
       });
     } else {
-      // 🌍 Use Zippopotam.us for other countries
+
       const apiUrl = `https://api.zippopotam.us/${country_code}/${zip_code}`;
       const response = await axios.get(apiUrl);
       const place = response.data;

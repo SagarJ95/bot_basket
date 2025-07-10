@@ -21,6 +21,9 @@ import multer from "multer";
 import { fileURLToPath } from "url";
 import { dirname } from "path";
 import path from "path";
+import swaggerUi from 'swagger-ui-express'
+import swaggerDocument from './swagger-output.json' assert { type: 'json' };
+
 
 app.use("/uploads/export", express.static(path.join(process.cwd(), "public/uploads/export")));
 
@@ -28,6 +31,9 @@ app.use("/uploads/export", express.static(path.join(process.cwd(), "public/uploa
 // Get the directory name
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
 
 const sessionStore = new SequelizeStore({
   db: sequelize,
@@ -43,6 +49,7 @@ import admin from "./routes/adminFront.js";
 
 // Front View Routes
 import front from "./routes/web.js";
+
 
 // Error Handlers
 import catchAsync from "./utils/catchAsync.js";

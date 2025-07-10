@@ -312,7 +312,6 @@ const resetpassword = catchAsync(async (req, res) => {
 });
 
 //delete account
-
 const deleteCustomer = catchAsync(async (req, res) => {
   try {
     const softDeleteCustomer = await db.query(
@@ -679,6 +678,7 @@ const verifyOtp = catchAsync(async (req, res) => {
     throw new AppError(err.message, 200, errors);
   }
 });
+
 /******************* End Forget password************************ */
 
 export {
