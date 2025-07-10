@@ -7,12 +7,23 @@
   },
   "host": "localhost:3848",
   "basePath": "/",
+  "tags": [
+    {
+      "name": "Web API",
+      "description": "Public-facing endpoints"
+    },
+    {
+      "name": "Admin API",
+      "description": "Admin panel endpoints"
+    }
+  ],
   "schemes": [
     "http"
   ],
   "paths": {
     "/sign_up": {
       "post": {
+        "tags": ["Web API"],
         "description": "",
         "parameters": [
               {
@@ -66,6 +77,7 @@
     },
     "/verifyOtp": {
       "post": {
+         "tags": ["Web API"],
         "description": "",
         "parameters": [
           {
@@ -93,6 +105,7 @@
     },
     "/login": {
       "post": {
+         "tags": ["Web API"],
         "description": "",
         "parameters": [
           {
@@ -120,6 +133,7 @@
     },
     "/forget_password": {
       "post": {
+         "tags": ["Web API"],
         "description": "",
         "parameters": [
           {
@@ -150,6 +164,7 @@
     },
     "/set_new_password": {
       "post": {
+         "tags": ["Web API"],
         "description": "",
         "parameters": [
           {
@@ -180,6 +195,7 @@
     },
     "/delete_account": {
       "post": {
+         "tags": ["Web API"],
         "description": "",
         "parameters": [
               {
@@ -213,6 +229,7 @@
     },
     "/resend_otp": {
       "post": {
+         "tags": ["Web API"],
         "description": "",
         "parameters": [
               {
@@ -251,6 +268,7 @@
     },
     "/fetch_customer_profile": {
       "post": {
+         "tags": ["Web API"],
         "description": "",
         "parameters": [
               {
@@ -281,6 +299,7 @@
     },
     "/getAddressList": {
       "post": {
+         "tags": ["Web API"],
         "description": "",
         "parameters": [
               {
@@ -311,6 +330,7 @@
     },
     "/addUpdateAddress": {
       "post": {
+         "tags": ["Web API"],
         "description": "",
         "parameters": [
               {
@@ -391,6 +411,7 @@
     },
     "/deleteAddress": {
       "post": {
+         "tags": ["Web API"],
         "description": "",
         "parameters": [
               {
@@ -435,6 +456,7 @@
     },
     "/getLocationByZip": {
       "post": {
+         "tags": ["Web API"],
         "description": "",
         "responses": {
           "default": {
@@ -445,6 +467,7 @@
     },
     "/category_list": {
       "get": {
+         "tags": ["Web API"],
         "description": "",
         "parameters": [
               {
@@ -476,6 +499,7 @@
     },
     "/country_list": {
       "get": {
+         "tags": ["Web API"],
         "description": "",
         "parameters": [
             {
@@ -506,6 +530,7 @@
     },
     "/price_list": {
       "get": {
+         "tags": ["Web API"],
         "description": "",
         "parameters": [
           {
@@ -536,6 +561,7 @@
     },
     "/product_list": {
       "post": {
+         "tags": ["Web API"],
         "description": "",
         "parameters": [
           {
@@ -609,6 +635,7 @@
     },
     "/add_update_cart": {
       "post": {
+         "tags": ["Web API"],
         "description": "",
         "parameters": [
           {
@@ -661,6 +688,7 @@
     },
     "/cart_list": {
       "post": {
+         "tags": ["Web API"],
         "description": "",
         "parameters": [
           {
@@ -691,6 +719,7 @@
     },
     "/delete_product_cart": {
       "post": {
+         "tags": ["Web API"],
         "description": "",
         "parameters": [
           {
@@ -735,6 +764,7 @@
     },
     "/place_order": {
       "post": {
+         "tags": ["Web API"],
         "description": "",
         "parameters": [
           {
@@ -803,6 +833,7 @@
     },
     "/order_history": {
       "post": {
+         "tags": ["Web API"],
         "description": "",
         "parameters": [
           {
@@ -863,6 +894,7 @@
     },
     "/view_order": {
       "post": {
+         "tags": ["Web API"],
         "description": "",
         "parameters": [
           {
@@ -907,6 +939,7 @@
     },
     "/repeat_order": {
       "post": {
+         "tags": ["Web API"],
         "description": "",
         "responses": {
           "default": {
@@ -917,6 +950,7 @@
     },
     "/get_categories_based_product": {
       "post": {
+         "tags": ["Web API"],
         "description": "",
         "parameters": [
           {
@@ -947,6 +981,7 @@
     },
     "/get_country_based_product": {
       "post": {
+         "tags": ["Web API"],
         "description": "",
         "parameters": [
           {
@@ -977,6 +1012,7 @@
     },
     "/search_api": {
       "post": {
+         "tags": ["Web API"],
         "description": "",
         "parameters": [
           {
@@ -1030,6 +1066,7 @@
     },
     "/country_phonecode": {
       "post": {
+         "tags": ["Web API"],
         "description": "",
         "parameters": [
           {
