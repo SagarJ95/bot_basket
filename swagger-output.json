@@ -15,19 +15,45 @@
       "post": {
         "description": "",
         "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "where": {
-                  "example": "any"
+              {
+                "in": "body",
+                "name": "body",
+                "required": true,
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "first_name": {
+                      "type": "string",
+                      "example": "265"
+                    },
+                    "last_name": {
+                      "type": "string",
+                      "example": "User"
+                    },
+                    "phone_country_code": {
+                      "type": "string",
+                      "example": "sagarjagade2023@gmail.com"
+                    },
+                    "phone_no": {
+                      "type": "string",
+                      "example": "7977739926"
+                    },
+                    "email": {
+                      "type": "string",
+                      "example": "test@gmail.com"
+                    },
+                    "password": {
+                      "type": "string",
+                      "example": "test"
+                    },
+                    "confirm_password": {
+                      "type": "string",
+                      "example": "test"
+                    }
+                  }
                 }
               }
-            }
-          }
-        ],
+            ],
         "responses": {
           "200": {
             "description": "OK"
@@ -155,6 +181,26 @@
     "/delete_account": {
       "post": {
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              }
+            ],
         "responses": {
           "200": {
             "description": "OK"
@@ -169,28 +215,33 @@
       "post": {
         "description": "",
         "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "first_name": {
-                  "example": "any"
-                },
-                "last_name": {
-                  "example": "any"
-                },
-                "email": {
-                  "example": "any"
-                },
-                "status": {
-                  "example": "any"
+              {
+                "in": "body",
+                "name": "body",
+                "required": true,
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "first_name": {
+                      "type": "string",
+                      "example": "265"
+                    },
+                    "last_name": {
+                      "type": "string",
+                      "example": "User"
+                    },
+                    "email": {
+                      "type": "string",
+                      "example": "sagarjagade2023@gmail.com"
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "1"
+                    }
+                  }
                 }
               }
-            }
-          }
-        ],
+            ],
         "responses": {
           "200": {
             "description": "OK"
@@ -201,16 +252,26 @@
     "/fetch_customer_profile": {
       "post": {
         "description": "",
-        "responses": {
-          "default": {
-            "description": ""
-          }
-        }
-      }
-    },
-    "/update_customer_info": {
-      "post": {
-        "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              }
+            ],
         "responses": {
           "default": {
             "description": ""
@@ -221,6 +282,26 @@
     "/getAddressList": {
       "post": {
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              }
+            ],
         "responses": {
           "default": {
             "description": ""
@@ -231,6 +312,76 @@
     "/addUpdateAddress": {
       "post": {
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+                "in": "body",
+                "name": "body",
+                "required": true,
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "example": "265"
+                    },
+                    "full_name": {
+                      "type": "string",
+                      "example": "User"
+                    },
+                    "mobile_number": {
+                      "type": "string",
+                      "example": "7977739926"
+                    },
+                    "address1": {
+                      "type": "string",
+                      "example": "1"
+                    },
+                    "address2": {
+                      "type": "string",
+                      "example": "1"
+                    },
+                    "zip_code": {
+                      "type": "string",
+                      "example": "400605"
+                    },
+                    "country": {
+                      "type": "string",
+                      "example": "India"
+                    },
+                    "city": {
+                      "type": "string",
+                      "example": "Mumbai"
+                    },
+                    "state": {
+                      "type": "string",
+                      "example": "Maharashtra"
+                    },
+                    "phone_country_code": {
+                      "type": "string",
+                      "example": "+95"
+                    }
+                  }
+                }
+              }
+            ],
         "responses": {
           "default": {
             "description": ""
@@ -241,6 +392,40 @@
     "/deleteAddress": {
       "post": {
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+                "in": "body",
+                "name": "body",
+                "required": true,
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "example": "1"
+                    }
+                  }
+                }
+              }
+            ],
         "responses": {
           "default": {
             "description": ""
@@ -352,16 +537,69 @@
     "/product_list": {
       "post": {
         "description": "",
-        "responses": {
-          "default": {
-            "description": ""
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Accept",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "application/json"
+            }
+          },
+          {
+            "in": "Authorization",
+            "name": "Authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "Bearer "
+            }
+          },
+          {
+            "in": "x-api-key",
+            "name": "x-api-key",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "IjMgJzUSIikuLi1yYAFiNWQfZ2s0MiQzeHl2YGAyN"
+            }
+          },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "category_id": {
+                  "type": "string",
+                  "example": "[2,3]"
+                },
+                "search": {
+                  "type": "string",
+                  "example": ""
+                },
+                 "page": {
+                  "type": "string",
+                  "example": "1"
+                },
+                "country_id":{
+                    "type": "string",
+                  "example": "[2,3]"
+                },
+                "sort_by_price":{
+                   "type": "string",
+                  "example": "high_to_low"
+                },
+                "price_ranges":{
+                   "type": "string",
+                  "example": "1"
+                }
+              }
+            }
           }
-        }
-      }
-    },
-    "/particularProductDetails": {
-      "post": {
-        "description": "",
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -372,6 +610,48 @@
     "/add_update_cart": {
       "post": {
         "description": "",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Accept",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "application/json"
+            }
+          },
+          {
+            "in": "Authorization",
+            "name": "Authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "Bearer "
+            }
+          },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "example": "1"
+                },
+                "product_id": {
+                  "type": "string",
+                  "example": "2"
+                },
+                 "qty": {
+                  "type": "string",
+                  "example": "2"
+                }
+              }
+            }
+          }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -379,25 +659,29 @@
         }
       }
     },
-    "/get_self_location": {
-      "get": {
-        "description": "",
-        "responses": {
-          "200": {
-            "description": "OK"
-          },
-          "404": {
-            "description": "Not Found"
-          },
-          "500": {
-            "description": "Internal Server Error"
-          }
-        }
-      }
-    },
     "/cart_list": {
       "post": {
         "description": "",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Accept",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "application/json"
+            }
+          },
+          {
+            "in": "Authorization",
+            "name": "Authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "Bearer "
+            }
+          }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -408,6 +692,40 @@
     "/delete_product_cart": {
       "post": {
         "description": "",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Accept",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "application/json"
+            }
+          },
+          {
+            "in": "Authorization",
+            "name": "Authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "Bearer "
+            }
+          },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "cart_id": {
+                  "type": "string",
+                  "example": "User"
+                }
+              }
+            }
+          }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -418,6 +736,64 @@
     "/place_order": {
       "post": {
         "description": "",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Accept",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "application/json"
+            }
+          },
+          {
+            "in": "Authorization",
+            "name": "Authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "Bearer "
+            }
+          },
+          {
+            "in": "body",
+            "name": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "example": "User"
+                },
+                "whatsapp_number": {
+                  "type": "string",
+                  "example": "7977739926"
+                },
+                 "whatsapp_country_code": {
+                  "type": "string",
+                  "example": "+971"
+                },
+                "email":{
+                    "type": "string",
+                  "example": "sagarjagade9@gmail.com"
+                },
+                "perferred_delivery_date":{
+                   "type": "string",
+                  "example": "1-delivery,2-self-pickup"
+                },
+                "address":{
+                   "type": "string",
+                  "example": "1"
+                },
+                "instruction":{
+                   "type": "string",
+                  "example": "1"
+                }
+              }
+            }
+          }
+        ],
         "responses": {
           "default": {
             "description": ""
