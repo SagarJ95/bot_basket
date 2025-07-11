@@ -1653,6 +1653,72 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+                "in": "body",
+                "name": "body",
+                "required": true,
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "example": "1"
+                    },
+                    "description": {
+                      "type": "string",
+                      "example": ""
+                    },
+                    "category": {
+                      "type": "string",
+                      "example": ""
+                    },
+                    "countryId": {
+                      "type": "string",
+                      "example": ""
+                    },
+                    "product_images": {
+                      "type": "file",
+                      "example": ""
+                    },
+                    "thumbnail_product_image": {
+                      "type": "file",
+                      "example": ""
+                    },
+                    "minimum_order_place": {
+                      "type": "string",
+                      "example": ""
+                    },
+                    "maximum_order_place": {
+                      "type": "string",
+                      "example": ""
+                    },
+                    "price": {
+                      "type": "string",
+                      "example": ""
+                    }
+                  }
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1664,6 +1730,72 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+                "in": "body",
+                "name": "body",
+                "required": true,
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "example": "1"
+                    },
+                    "description": {
+                      "type": "string",
+                      "example": ""
+                    },
+                    "category": {
+                      "type": "string",
+                      "example": ""
+                    },
+                    "countryId": {
+                      "type": "string",
+                      "example": ""
+                    },
+                    "product_images": {
+                      "type": "file",
+                      "example": ""
+                    },
+                    "thumbnail_product_image": {
+                      "type": "file",
+                      "example": ""
+                    },
+                    "minimum_order_place": {
+                      "type": "string",
+                      "example": ""
+                    },
+                    "maximum_order_place": {
+                      "type": "string",
+                      "example": ""
+                    },
+                    "price": {
+                      "type": "string",
+                      "example": ""
+                    }
+                  }
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -2374,6 +2506,92 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+                "in": "body",
+                "name": "body",
+                "required": true,
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "first_name": {
+                      "type": "string",
+                      "example": "1"
+                    },
+                    "last_name": {
+                      "type": "string",
+                      "example": ""
+                    },
+                    "contact_number": {
+                      "type": "string",
+                      "example": ""
+                    },
+                    "whatsapp_number": {
+                      "type": "string",
+                      "example": ""
+                    },
+                    "email": {
+                      "type": "file",
+                      "example": ""
+                    },
+                    "password": {
+                      "type": "file",
+                      "example": ""
+                    },
+                    "profile": {
+                      "type": "string",
+                      "example": ""
+                    },
+                    "zipcode": {
+                      "type": "string",
+                      "example": ""
+                    },
+                    "country": {
+                      "type": "string",
+                      "example": ""
+                    },
+                    "state": {
+                      "type": "string",
+                      "example": ""
+                    },
+                    "city": {
+                      "type": "string",
+                      "example": ""
+                    },
+                    "address": {
+                      "type": "string",
+                      "example": ""
+                    },
+                    "phone_country_code": {
+                      "type": "string",
+                      "example": ""
+                    },
+                    "whatsapp_country_code": {
+                      "type": "string",
+                      "example": ""
+                    }
+                  }
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -2688,6 +2906,64 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+                "in": "body",
+                "name": "body",
+                "required": true,
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "order_id": {
+                      "type": "string",
+                      "example": "1"
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "4"
+                    },
+                    "date": {
+                      "type": "string",
+                      "example": "10-06-2025"
+                    },
+                    "payment_status": {
+                      "type": "string",
+                      "example": "1- paid, 2- unpaid,3 - partially paid"
+                    },
+                    "payment_mode": {
+                      "type": "file",
+                      "example": "online"
+                    },
+                    "cancel_reason": {
+                      "type": "file",
+                      "example": ""
+                    },
+                    "partially_paid_amount": {
+                      "type": "string",
+                      "example": ""
+                    }
+                  }
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
