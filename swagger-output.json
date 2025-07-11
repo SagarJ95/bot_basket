@@ -270,26 +270,26 @@
       "post": {
          "tags": ["Web API"],
         "description": "",
-        "parameters": [
-              {
-                "in": "header",
-                "name": "Accept",
-                "required": true,
-                "schema": {
-                  "type": "string",
-                  "example": "application/json"
+          "parameters": [
+                {
+                  "in": "header",
+                  "name": "Accept",
+                  "required": true,
+                  "schema": {
+                    "type": "string",
+                    "example": "application/json"
+                  }
+                },
+                {
+                  "in": "header",
+                  "name": "Authorization",
+                  "required": true,
+                  "schema": {
+                    "type": "string",
+                    "example": "Bearer "
+                  }
                 }
-              },
-              {
-                "in": "header",
-                "name": "Authorization",
-                "required": true,
-                "schema": {
-                  "type": "string",
-                  "example": "Bearer "
-                }
-              }
-            ],
+              ],
         "responses": {
           "default": {
             "description": ""
@@ -1207,21 +1207,42 @@
         "tags": ["Admin API"],
         "description": "",
         "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "page": {
-                  "example": "any"
-                },
-                "search": {
-                  "example": "any"
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+                "in": "body",
+                "name": "body",
+                "required": true,
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "page": {
+                      "type": "string",
+                      "example": "1"
+                    },
+                    "search": {
+                      "type": "string",
+                      "example": ""
+                    }
+                  }
                 }
               }
-            }
-          }
         ],
         "responses": {
           "200": {
@@ -1268,6 +1289,44 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+                "in": "body",
+                "name": "body",
+                "required": true,
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "page": {
+                      "type": "string",
+                      "example": "1"
+                    },
+                    "search": {
+                      "type": "string",
+                      "example": ""
+                    }
+                  }
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1279,6 +1338,44 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+                "in": "body",
+                "name": "body",
+                "required": true,
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "category_name": {
+                      "type": "string",
+                      "example": "1"
+                    },
+                    "description": {
+                      "type": "string",
+                      "example": ""
+                    }
+                  }
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1290,6 +1387,38 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+                "in": "body",
+                "name": "body",
+                "required": true,
+                "schema": {
+                  "type": "object",
+                  "id": {
+                      "type": "string",
+                      "example": "1"
+                    }
+                  }
+                }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1301,6 +1430,46 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "category_id": {
+                    "type": "string",
+                    "example": "1"
+                  },
+                  "category_name": {
+                    "type": "string",
+                    "example": "1"
+                  },
+                  "description": {
+                    "type": "string",
+                    "example": "1"
+                  }
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1312,6 +1481,38 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "category_id": {
+                    "type": "string",
+                    "example": "1"
+                  }
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1323,6 +1524,26 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1334,6 +1555,46 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "category_id": {
+                    "type": "string",
+                    "example": "1"
+                  },
+                  "category_name": {
+                    "type": "string",
+                    "example": "1"
+                  },
+                  "description": {
+                    "type": "string",
+                    "example": "1"
+                  }
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1345,6 +1606,42 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "category_id": {
+                    "type": "string",
+                    "example": "1"
+                  },
+                  "status": {
+                    "type": "string",
+                    "example": "1"
+                  }
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1378,6 +1675,38 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "id": {
+                    "type": "string",
+                    "example": "1"
+                  }
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1389,6 +1718,38 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "id": {
+                    "type": "string",
+                    "example": "1"
+                  }
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1400,6 +1761,42 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "id": {
+                    "type": "string",
+                    "example": "1"
+                  },
+                  "status": {
+                    "type": "string",
+                    "example": "1"
+                  }
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1411,6 +1808,38 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "category_id": {
+                    "type": "string",
+                    "example": "1"
+                  }
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1422,6 +1851,42 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "product_id": {
+                    "type": "string",
+                    "example": "21,19"
+                  },
+                  "price": {
+                    "type": "string",
+                    "example": "55.22"
+                  }
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1433,6 +1898,38 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "product_id": {
+                    "type": "string",
+                    "example": "21,19"
+                  }
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1444,6 +1941,38 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "product_id": {
+                    "type": "string",
+                    "example": "21,19"
+                  }
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1462,21 +1991,54 @@
         }
       }
     },
-    "/changeProductStockStatus": {
-      "post": {
-        "tags": ["Admin API"],
-        "description": "",
-        "responses": {
-          "default": {
-            "description": ""
-          }
-        }
-      }
-    },
     "/getProductlist": {
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "category_id": {
+                    "type": "string",
+                    "example": "0"
+                  },
+                  "country_id": {
+                    "type": "string",
+                    "example": "0"
+                  },
+                  "page": {
+                    "type": "string",
+                    "example": "1"
+                  },
+                  "search": {
+                    "type": "string",
+                    "example": ""
+                  }
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1488,6 +2050,50 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "category_id": {
+                    "type": "string",
+                    "example": "0"
+                  },
+                  "country_id": {
+                    "type": "string",
+                    "example": "0"
+                  },
+                  "page": {
+                    "type": "string",
+                    "example": "1"
+                  },
+                  "search": {
+                    "type": "string",
+                    "example": ""
+                  }
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1499,6 +2105,26 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1510,6 +2136,26 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1521,6 +2167,38 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "excel": {
+                    "type": "file",
+                    "example": ""
+                  }
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1532,6 +2210,38 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "csv_file": {
+                    "type": "file",
+                    "example": ""
+                  }
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1543,6 +2253,42 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                  "page": {
+                    "type": "string",
+                    "example": "1"
+                  },
+                  "search": {
+                    "type": "string",
+                    "example": ""
+                  }
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1554,6 +2300,26 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1565,6 +2331,38 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "customer_id": {
+                    "type": "string",
+                    "example": "1"
+                  }
+              }
+            }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1587,6 +2385,42 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "customer_id": {
+                    "type": "string",
+                    "example": "1"
+                  },
+                "status": {
+                    "type": "string",
+                    "example": "1"
+                  }
+              }
+            }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1598,6 +2432,74 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "customer_id": {
+                    "type": "string",
+                    "example": "1"
+                  },
+                "address_id": {
+                    "type": "string",
+                    "example": "213"
+                  },
+                "full_name": {
+                    "type": "string",
+                    "example": "test1"
+                  },
+                "mobile_no": {
+                    "type": "string",
+                    "example": "9874634637"
+                  },
+                "address": {
+                    "type": "string",
+                    "example": "mumbai"
+                  },
+                "zipcode": {
+                    "type": "string",
+                    "example": "94833"
+                  },
+                "country": {
+                    "type": "string",
+                    "example": "India"
+                  },
+                "state": {
+                    "type": "string",
+                    "example": "Maharahsta"
+                  },
+                "city": {
+                    "type": "string",
+                    "example": "mumbai"
+                  },
+                "phone_country_code": {
+                    "type": "string",
+                    "example": "+97"
+                  }
+              }
+            }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1609,6 +2511,42 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "customer_id": {
+                    "type": "string",
+                    "example": "1"
+                  },
+                "address_id": {
+                    "type": "string",
+                    "example": "213"
+                  }
+              }
+            }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1620,46 +2558,73 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+         "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "customer_id": {
+                    "type": "string",
+                    "example": "1"
+                  },
+                "full_name": {
+                    "type": "string",
+                    "example": "test"
+                  },
+                "mobile_number": {
+                    "type": "string",
+                    "example": "7977739926"
+                  },
+                "address": {
+                    "type": "string",
+                    "example": "test"
+                  },
+                "zip_code": {
+                    "type": "string",
+                    "example": "400605"
+                  },
+                "country": {
+                    "type": "string",
+                    "example": "India"
+                  },
+                "city": {
+                    "type": "string",
+                    "example": "Mumbai"
+                  },
+                "state": {
+                    "type": "string",
+                    "example": "Maharashtra"
+                  },
+                "phone_country_code": {
+                    "type": "string",
+                    "example": "+97"
+                  }
+              }
+            }
+        ],
         "responses": {
           "default": {
             "description": ""
-          }
-        }
-      }
-    },
-    "/getRoles": {
-      "post": {
-        "tags": ["Admin API"],
-        "description": "",
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "draw": {
-                  "example": "any"
-                },
-                "start": {
-                  "example": "any"
-                },
-                "length": {
-                  "example": "any"
-                },
-                "order": {
-                  "example": "any"
-                },
-                "search": {
-                  "example": "any"
-                }
-              }
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
           }
         }
       }
@@ -1668,6 +2633,50 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+         "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "order_status": {
+                    "type": "string",
+                    "example": "1"
+                  },
+                "page": {
+                    "type": "string",
+                    "example": "1"
+                  },
+                "search": {
+                    "type": "string",
+                    "example": ""
+                  },
+                "filter_date": {
+                    "type": "string",
+                    "example": "01-06-2025 - 30-06-2025"
+                  }
+              }
+            }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1690,6 +2699,38 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+         "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "order_id": {
+                    "type": "string",
+                    "example": "1"
+                  }
+              }
+            }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1701,6 +2742,54 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "order_id": {
+                    "type": "string",
+                    "example": "1"
+                  },
+                "payment_mode": {
+                    "type": "string",
+                    "example": "online"
+                  },
+                  "payment_status": {
+                    "type": "string",
+                    "example": "1- paid, 2- unpaid,3 - partially paid"
+                  },
+                  "order_status": {
+                    "type": "string",
+                    "example": "1"
+                  },
+                  "invoice": {
+                    "type": "file",
+                    "example": ""
+                  }
+              }
+            }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1837,19 +2926,45 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
-        "parameters": [
-          {
-            "name": "body",
-            "in": "body",
-            "schema": {
-              "type": "object",
-              "properties": {
-                "delivery_option_name": {
-                  "example": "any"
+         "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
                 }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "store_name": {
+                    "type": "string",
+                    "example": "test"
+                  },
+                "store_address": {
+                    "type": "string",
+                    "example": "mulund"
+                  },
+                  "store_pincode": {
+                    "type": "string",
+                    "example": "40605"
+                  }
               }
             }
-          }
         ],
         "responses": {
           "200": {
@@ -1868,6 +2983,46 @@
       "get": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "store_name": {
+                    "type": "string",
+                    "example": "test"
+                  },
+                "store_address": {
+                    "type": "string",
+                    "example": "mulund"
+                  },
+                  "store_pincode": {
+                    "type": "string",
+                    "example": "40605"
+                  }
+              }
+            }
+        ],
         "responses": {
           "200": {
             "description": "OK"
@@ -1885,6 +3040,26 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1896,6 +3071,46 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "country_name": {
+                    "type": "string",
+                    "example": "test"
+                  },
+                "country_code": {
+                    "type": "string",
+                    "example": "mulund"
+                  },
+                  "country_flag": {
+                    "type": "file",
+                    "example": ""
+                  }
+              }
+            }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1907,6 +3122,38 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "country_id": {
+                    "type": "string",
+                    "example": "21"
+                  }
+              }
+            }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1918,6 +3165,50 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "country_id": {
+                    "type": "string",
+                    "example": "test"
+                  },
+                "country_name": {
+                    "type": "string",
+                    "example": "mulund"
+                  },
+                  "country_code":{
+                    "type": "string",
+                    "example": "mulund"
+                  },
+                  "country_flag": {
+                    "type": "file",
+                    "example": ""
+                  }
+              }
+            }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1929,6 +3220,38 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "country_id": {
+                    "type": "string",
+                    "example": "test"
+                  }
+              }
+            }
+        ],
         "responses": {
           "default": {
             "description": ""
@@ -1940,6 +3263,42 @@
       "post": {
         "tags": ["Admin API"],
         "description": "",
+        "parameters": [
+              {
+                "in": "header",
+                "name": "Accept",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "application/json"
+                }
+              },
+              {
+                "in": "header",
+                "name": "Authorization",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "example": "Bearer "
+                }
+              },
+              {
+              "in": "body",
+              "name": "body",
+              "required": true,
+              "schema": {
+                "type": "object",
+                "country_id": {
+                    "type": "string",
+                    "example": "test"
+                  },
+                  "status": {
+                    "type": "string",
+                    "example": "0"
+                  }
+              }
+            }
+        ],
         "responses": {
           "default": {
             "description": ""

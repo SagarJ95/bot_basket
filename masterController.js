@@ -191,6 +191,7 @@ const getCategoryById = catchAsync(async (req, res) => {
 
 // PATCH update category by ID
 const updateCategoryById = catchAsync(async (req, res) => {
+
   const categoryId = parseInt(req.body.category_id);
 
   // Apply validation rules
@@ -488,6 +489,7 @@ const excelExportCategory = catchAsync(async (req, res) => {
     });
   }
 });
+
 /* Category API End ------------------------------- */
 const excelImportCategory = catchAsync(async (req, res) => {
   try {
@@ -624,8 +626,6 @@ const getProductlist = catchAsync(async (req, res) => {
       }`;
       query_params.push(10, pageCount);
     }
-
-
 
     //get total number of products
     const totalCountQuery = `
